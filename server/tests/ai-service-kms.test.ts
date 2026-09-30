@@ -1,3 +1,4 @@
+import { Decipheriv } from 'node:crypto';
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { AiService } from '../src/modules/ai/services/ai-service.js';
 import { CredentialManager } from '../src/modules/auth/kms/credential-manager.js';
@@ -224,6 +225,41 @@ describe('LocalEnvKmsProvider — additional edge cases', () => {
 // ---------------------------------------------------------------------------
 
 describe('CredentialManager with a mock IKMSProvider', () => {
+  async function createCredentialWithRetainingKms(userId: string, apiKey: string) {
+    const storageProvider = new LocalEnvKmsProvider();
+    const storageManager = new CredentialManager(storageProvider);
+    const user = await seedUser({ id: userId, email: `${userId}@example.com` });
+    await storageManager.StoreCredential(user.id, 'openai', apiKey);
+
+    const [record] = await db
+      .select()
+      .from(userExternalCredentials)
+      .where(and(eq(userExternalCredentials.userId, user.id), eq(userExternalCredentials.provider, 'openai')));
+    if (!record) throw new Error('Test credential was not stored');
+
+    let retainedPlaintextDEK: Buffer | undefined;
+    const injectedKms = {
+      GenerateDataKey: vi.fn(() => {
+        throw new Error('GenerateDataKey is not used by this test');
+      }),
+      DecryptDataKey: vi.fn((encryptedDEK: Buffer) => {
+        retainedPlaintextDEK = storageProvider.DecryptDataKey(encryptedDEK);
+        return retainedPlaintextDEK;
+      }),
+    };
+
+    return {
+      manager: new CredentialManager(injectedKms),
+      record,
+      retainedDEK: () => retainedPlaintextDEK,
+    };
+  }
+
+  function expectBufferWiped(buffer: Buffer | undefined) {
+    expect(buffer).toBeDefined();
+    expect(buffer?.every((byte) => byte === 0)).toBe(true);
+  }
+
   it('delegates key generation to the injected KMS provider', async () => {
     const mockKms = {
       GenerateDataKey: vi.fn(() => {
@@ -258,5 +294,64 @@ describe('CredentialManager with a mock IKMSProvider', () => {
       expect(key).toBe('sk-real-key');
     });
     expect(decryptSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('wipes the retained DEK and unauthenticated plaintext chunk when the GCM tag is tampered with', async () => {
+    const { manager, record, retainedDEK } = await createCredentialWithRetainingKms(
+      'di-tampered-tag-user',
+      'sk-tamper-key',
+    );
+    const tamperedTag = Buffer.from(record.aesAuthTag);
+    tamperedTag[0] ^= 0x01;
+
+    await db
+      .update(userExternalCredentials)
+      .set({ aesAuthTag: tamperedTag })
+      .where(and(eq(userExternalCredentials.userId, record.userId), eq(userExternalCredentials.provider, 'openai')));
+
+    const callback = vi.fn();
+    const updateSpy = vi.spyOn(Decipheriv.prototype, 'update');
+
+    await expect(manager.ExecuteWithCredential(record.userId, 'openai', callback)).rejects.toThrow(
+      'Security Exception: Failed to decrypt credentials. Integrity check failed or data was tampered with.',
+    );
+
+    expect(callback).not.toHaveBeenCalled();
+    expectBufferWiped(retainedDEK());
+    expect(updateSpy).toHaveBeenCalledTimes(1);
+    expectBufferWiped(updateSpy.mock.results[0]?.value as Buffer | undefined);
+  });
+
+  it('wipes the retained DEK and decrypted buffers after callback success', async () => {
+    const apiKey = 'sk-callback-success-key';
+    const { manager, record, retainedDEK } = await createCredentialWithRetainingKms('di-success-user', apiKey);
+    const updateSpy = vi.spyOn(Decipheriv.prototype, 'update');
+
+    const result = await manager.ExecuteWithCredential(record.userId, 'openai', (key) => {
+      expect(key).toBe(apiKey);
+      return 'callback-result';
+    });
+
+    expect(result).toBe('callback-result');
+    expectBufferWiped(retainedDEK());
+    expectBufferWiped(updateSpy.mock.results[0]?.value as Buffer | undefined);
+  });
+
+  it('wipes the retained DEK and decrypted buffers without relabeling callback failures', async () => {
+    const { manager, record, retainedDEK } = await createCredentialWithRetainingKms(
+      'di-callback-error-user',
+      'sk-callback-error-key',
+    );
+    const updateSpy = vi.spyOn(Decipheriv.prototype, 'update');
+    const callbackError = new Error('provider callback failed');
+
+    await expect(
+      manager.ExecuteWithCredential(record.userId, 'openai', () => {
+        throw callbackError;
+      }),
+    ).rejects.toBe(callbackError);
+
+    expectBufferWiped(retainedDEK());
+    expectBufferWiped(updateSpy.mock.results[0]?.value as Buffer | undefined);
   });
 });
