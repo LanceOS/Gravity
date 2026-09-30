@@ -20,11 +20,10 @@ import type { TicketWithRelations } from '../../modules/tickets/utils/ticketRela
 import type { 
   TicketMutationContextType, 
   CreateTicketInput, 
-  TicketUpdateBatch, 
-  InFlightTicketUpdateBatch, 
   TicketUpdateOptions 
 } from './TicketMutationContext.types';
 import { TICKET_UPDATE_DEBOUNCE_MS } from './ticketMutationUtils';
+import { TicketUpdateBatchManager } from './TicketUpdateBatchManager';
 
 export const TicketMutationContext = createContext<TicketMutationContextType | undefined>(undefined);
 
@@ -51,9 +50,6 @@ export const TicketMutationProvider: React.FC<{ children: React.ReactNode }> = (
   useEffect(() => {
     activeTicketRef.current = activeTicket;
   }, [activeTicket]);
-
-  const pendingTicketUpdateBatchesRef = useRef(new Map<string, TicketUpdateBatch>());
-  const inFlightTicketUpdateBatchesRef = useRef(new Map<string, InFlightTicketUpdateBatch>());
 
   const applyConfirmedTicketUpdate = useCallback((updatedTicket: Ticket) => {
     queryClient.setQueryData<TicketWithRelations>(queryKeys.ticketDetail(updatedTicket.id), (existing) => (
@@ -82,17 +78,46 @@ export const TicketMutationProvider: React.FC<{ children: React.ReactNode }> = (
     }
   }, [queryClient, setActiveTicket]);
 
-  useEffect(() => {
-    return () => {
-      for (const batch of pendingTicketUpdateBatchesRef.current.values()) {
-        if (batch.timerId !== null) {
-          window.clearTimeout(batch.timerId);
-        }
+  const batchManagerRef = useRef<TicketUpdateBatchManager<Partial<Ticket>, Ticket | undefined, Ticket> | null>(null);
+  // A child may save from its mount effect before this provider's effect runs.
+  // Initialize lazily at the first queue operation as well as during setup.
+  const getBatchManager = useCallback(() => {
+    if (batchManagerRef.current) return batchManagerRef.current;
+    const applyPendingUpdates = (id: string, updates: Partial<Ticket>) => {
+      patchTicketInAllCaches(queryClient, id, (ticket) => ({ ...ticket, ...updates }));
+      if (activeTicketRef.current?.id === id) {
+        setActiveTicket((ticket) => ticket?.id === id ? { ...ticket, ...updates } : ticket);
       }
-      pendingTicketUpdateBatchesRef.current.clear();
-      inFlightTicketUpdateBatchesRef.current.clear();
     };
-  }, []);
+    const batchManager = new TicketUpdateBatchManager<Partial<Ticket>, Ticket | undefined, Ticket>({
+      debounceMs: TICKET_UPDATE_DEBOUNCE_MS,
+      send: ({ id, updates, projectId }) => apiClient.patch<Ticket>(`/tickets/${id}`, updates, {
+        headers: { 'X-Project-Id': projectId },
+      }),
+      getSnapshotAfterSuccess: (updatedTicket) => updatedTicket,
+      onSuccess: (updatedTicket, batch, followUp) => {
+        applyConfirmedTicketUpdate(updatedTicket);
+        if (followUp) applyPendingUpdates(batch.id, followUp.updates);
+        toast.show('Ticket saved.', 'success');
+      },
+      onError: (error, batch, followUp) => {
+        console.error('Error updating ticket on server, rolling back:', error);
+        toast.show('Unable to save ticket. Please try again.', 'error');
+        if (batch.snapshot) applyConfirmedTicketUpdate(batch.snapshot);
+        if (followUp) applyPendingUpdates(batch.id, followUp.updates);
+      },
+    });
+    batchManagerRef.current = batchManager;
+    return batchManager;
+  }, [applyConfirmedTicketUpdate, queryClient, setActiveTicket]);
+
+  useEffect(() => {
+    const batchManager = getBatchManager();
+    return () => {
+      batchManager.dispose();
+      batchManagerRef.current = null;
+    };
+  }, [getBatchManager]);
 
   const createTicketMutation = useMutation({
     mutationFn: async (ticketInput: CreateTicketInput) => apiClient.post<Ticket>('/tickets', ticketInput, {
@@ -136,70 +161,6 @@ export const TicketMutationProvider: React.FC<{ children: React.ReactNode }> = (
     }),
   });
 
-  const flushPendingTicketUpdate = useCallback(async function flushPendingTicketUpdateInner(ticketId: string) {
-    const pendingBatch = pendingTicketUpdateBatchesRef.current.get(ticketId);
-    if (!pendingBatch) return;
-
-    if (pendingBatch.timerId !== null) {
-      window.clearTimeout(pendingBatch.timerId);
-      pendingBatch.timerId = null;
-    }
-
-    if (inFlightTicketUpdateBatchesRef.current.has(ticketId)) {
-      pendingBatch.flushRequested = true;
-      return;
-    }
-
-    if (Object.keys(pendingBatch.updates).length === 0) {
-      pendingTicketUpdateBatchesRef.current.delete(ticketId);
-      return;
-    }
-
-    pendingTicketUpdateBatchesRef.current.delete(ticketId);
-    inFlightTicketUpdateBatchesRef.current.set(ticketId, pendingBatch);
-
-    try {
-      const updatedTicket = await updateTicketMutation.mutateAsync({
-        id: ticketId,
-        updates: pendingBatch.updates,
-        projectId: pendingBatch.projectId,
-      });
-      applyConfirmedTicketUpdate(updatedTicket);
-      toast.show('Ticket saved.', 'success');
-
-      inFlightTicketUpdateBatchesRef.current.delete(ticketId);
-
-      const followUpBatch = pendingTicketUpdateBatchesRef.current.get(ticketId);
-      if (followUpBatch && followUpBatch.flushRequested) {
-        followUpBatch.flushRequested = false;
-        void flushPendingTicketUpdateInner(ticketId);
-      }
-    } catch (e) {
-      console.error('Error updating ticket on server, rolling back:', e);
-      toast.show('Unable to save ticket. Please try again.', 'error');
-      inFlightTicketUpdateBatchesRef.current.delete(ticketId);
-
-      // Rollback cache
-      queryClient.setQueryData<Ticket[]>(queryKeys.tickets(pendingBatch.projectId), [...pendingBatch.originalTickets]);
-
-      const followUpBatch = pendingTicketUpdateBatchesRef.current.get(ticketId);
-      if (followUpBatch) {
-        followUpBatch.originalTickets = pendingBatch.originalTickets;
-        if (Object.keys(followUpBatch.updates).length > 0) {
-          queryClient.setQueryData<Ticket[]>(queryKeys.tickets(pendingBatch.projectId), (old) => {
-            const currentTickets = old ?? [];
-            return patchTicketInListById(currentTickets, ticketId, followUpBatch.updates) ?? currentTickets;
-          });
-        }
-
-        if (followUpBatch.flushRequested) {
-          followUpBatch.flushRequested = false;
-          void flushPendingTicketUpdateInner(ticketId);
-        }
-      }
-    }
-  }, [applyConfirmedTicketUpdate, queryClient, updateTicketMutation]);
-
   const updateTicket = useCallback(async (
     id: string,
     updates: Partial<Ticket>,
@@ -232,11 +193,7 @@ export const TicketMutationProvider: React.FC<{ children: React.ReactNode }> = (
         updatedAt: optimisticUpdatedAt,
       };
 
-      const pendingBatch = pendingTicketUpdateBatchesRef.current.get(id);
-      if (pendingBatch && pendingBatch.timerId !== null) {
-        window.clearTimeout(pendingBatch.timerId);
-      }
-      pendingTicketUpdateBatchesRef.current.delete(id);
+      batchManagerRef.current?.cancel(id);
 
       queryClient.setQueryData<Ticket[]>(ticketsQueryKey, (old) => {
         const currentTickets = old ?? [];
@@ -278,20 +235,7 @@ export const TicketMutationProvider: React.FC<{ children: React.ReactNode }> = (
       return;
     }
 
-    const pendingBatch = pendingTicketUpdateBatchesRef.current.get(id);
     const ticketsQueryKey = queryKeys.tickets(projectId);
-    const currentTickets = queryClient.getQueryData<Ticket[]>(ticketsQueryKey) || [];
-
-    if (!pendingBatch) {
-      pendingTicketUpdateBatchesRef.current.set(id, {
-        originalTickets: [...currentTickets],
-        projectId,
-        updates: {},
-        timerId: null,
-        flushRequested: false,
-      });
-    }
-
     const optimisticUpdatedAt = new Date().toISOString();
     const optimisticPatch = {
       ...updates,
@@ -316,21 +260,8 @@ export const TicketMutationProvider: React.FC<{ children: React.ReactNode }> = (
       });
     }
 
-    const nextBatch = pendingTicketUpdateBatchesRef.current.get(id);
-    if (!nextBatch) return;
-
-    nextBatch.projectId = projectId;
-    nextBatch.updates = { ...nextBatch.updates, ...updates };
-    nextBatch.flushRequested = false;
-
-    if (nextBatch.timerId !== null) {
-      window.clearTimeout(nextBatch.timerId);
-    }
-
-    nextBatch.timerId = window.setTimeout(() => {
-      void flushPendingTicketUpdate(id);
-    }, TICKET_UPDATE_DEBOUNCE_MS);
-  }, [activeProjectIdRef, applyConfirmedTicketUpdate, flushPendingTicketUpdate, queryClient, setActiveTicket, updateTicketMutation]);
+    getBatchManager().queue({ id, projectId, updates, snapshot: cachedTicket });
+  }, [activeProjectIdRef, applyConfirmedTicketUpdate, getBatchManager, queryClient, setActiveTicket, updateTicketMutation]);
 
   const deleteTicketMutation = useMutation({
     mutationFn: async (id: string) => {
