@@ -80,7 +80,7 @@ export function TicketLink({ ticketKey }: { ticketKey: string }) {
 }
 
 function escapeRegex(value: string) {
-  return value.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+  return value.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
 }
 
 function getSafeUrlAttribute<T extends string | undefined>(element: HTMLElement, attrName: string, fallback: T): string | T {
@@ -107,7 +107,7 @@ function renderTextWithTicketLinks(text: string, ticketRegex: RegExp): React.Rea
   }
 
   if (lastIndex < text.length) {
-    nodes.push(<React.Fragment key={`text-${keyIndex++}`}>{text.substring(lastIndex)}</React.Fragment>);
+    nodes.push(<React.Fragment key={`text-${keyIndex}`}>{text.substring(lastIndex)}</React.Fragment>);
   }
 
   return nodes;

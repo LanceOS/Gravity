@@ -6,6 +6,7 @@ import { ThemeProvider, useTheme } from '../ThemeContext';
 let renderCount = 0;
 
 const ThemeProbe = React.memo(function ThemeProbe() {
+  // eslint-disable-next-line react-hooks/globals -- Test probe exposes the rendered context to assertions outside React.
   renderCount += 1;
   const { theme, setTheme } = useTheme();
 

@@ -216,10 +216,10 @@ function buildUseTickets(overrides: Partial<Record<string, unknown>> = {}) {
       updatedAt: '2026-05-01T00:00:00.000Z',
     },
   ];
-  const tickets = (Array.isArray(overrides.tickets) ? overrides.tickets : defaultTickets) as any[];
-  const users = (Array.isArray(overrides.users) ? overrides.users : [currentUser].filter(Boolean)) as any[];
+  const tickets = (Array.isArray(overrides.tickets) ? overrides.tickets : defaultTickets) as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any[];
+  const users = (Array.isArray(overrides.users) ? overrides.users : [currentUser].filter(Boolean)) as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any[];
   const ticketsByProject = new Map<string, unknown[]>();
-  for (const ticket of tickets as any[]) {
+  for (const ticket of tickets as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any[]) {
     const projectTickets = ticketsByProject.get(ticket.projectId) || [];
     projectTickets.push(ticket);
     ticketsByProject.set(ticket.projectId, projectTickets);
@@ -397,7 +397,7 @@ function renderAppShell(options: { hierarchyMode?: 'flat' | 'teams'; path?: stri
     { id: 'project-2', name: 'Second project', key: 'TWO', status: 'active', workspaceId: 'workspace-1', teamId: 'team-2' },
     { id: 'project-other', name: 'Other workspace project', key: 'OTHER', status: 'active', workspaceId: 'workspace-other' },
   ] } : {});
-  const ticketState = tickets as any;
+  const ticketState = tickets as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any;
   mocks.useAuth.mockReturnValue({
     currentUser: ticketState.currentUser ?? null,
     loading: Boolean(ticketState.loading),
@@ -414,9 +414,9 @@ function renderAppShell(options: { hierarchyMode?: 'flat' | 'teams'; path?: stri
     activeProjectIdRef: { current: ticketState.activeProjectId || '' },
   });
   const projects = Array.isArray(ticketState.projects) ? ticketState.projects : [];
-  const projectById = new Map(projects.map((project: any) => [project.id, project]));
-  const projectsByWorkspaceId = new Map<string, any[]>();
-  for (const project of projects as any[]) {
+  const projectById = new Map(projects.map((project: /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any) => [project.id, project]));
+  const projectsByWorkspaceId = new Map<string, /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any[]>();
+  for (const project of projects as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any[]) {
     const workspaceProjects = projectsByWorkspaceId.get(project.workspaceId) || [];
     workspaceProjects.push(project);
     projectsByWorkspaceId.set(project.workspaceId, workspaceProjects);
@@ -505,7 +505,7 @@ describe('AppShellPage theme integration', () => {
     vi.clearAllMocks();
     mocks.renderSidebar = false;
     mocks.createLabel.mockResolvedValue({ id: 'created-label' });
-    delete (document as any).modelContext;
+    delete (document as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any).modelContext;
     window.localStorage.clear();
     window.localStorage.setItem('gravity_theme', 'dark');
     document.documentElement.className = '';

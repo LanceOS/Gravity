@@ -1,1 +1,1 @@
-export { AppShellPage } from '../../modules/appShellPage/screens/AppShellPage';
+export { AppShellPage } from '../../modules/appShellPage';

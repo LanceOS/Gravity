@@ -11,8 +11,6 @@ import { AccountPreferencesPageRoute } from '../../pages/AccountPreferencesPage/
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { queryClient as sharedQueryClient, queryKeys } from '../../utils/queryClient';
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 /** Helper: captures the current MemoryRouter URL from inside the tree. */
 function LocationDisplay() {
   const loc = useLocation();
@@ -33,7 +31,7 @@ type WorkspaceLayoutMockProps = {
       onSelectLabel?: (projectId: string, labelId: string) => void;
       onSelectWorkspaceProjects?: () => void;
       onOpenCreateTeam?: () => void;
-      counts?: any;
+      counts?: /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any;
       navigationState?: {
         activeScope?: string;
       };
@@ -51,7 +49,7 @@ type WorkspacePageMockProps = {
     projectId?: string;
   };
   onSelectNote?: (noteId: string) => void;
-  onSelectTicket?: (ticket: any) => void;
+  onSelectTicket?: (ticket: /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any) => void;
   onDeleteTicket?: (ticketId: string) => void;
   projects?: unknown[];
   tickets?: unknown[];
@@ -182,7 +180,7 @@ vi.mock('../../utils/webmcp', async importOriginal => ({
 
 vi.mock('../../modules/ai', () => ({
   AgentSimulator: () => <div>AgentSimulator</div>,
-  AgentChat: ({ seedChatSessionId, seedMessages, navigationScope, projectId }: any) => (
+  AgentChat: ({ seedChatSessionId, seedMessages, navigationScope, projectId }: /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any) => (
     <div>
       <div>AgentChat</div>
       <div data-testid="chat-navigation" data-storage-project={projectId}>{JSON.stringify(navigationScope)}</div>
@@ -201,9 +199,9 @@ vi.mock('../../modules/tickets', async (importOriginal) => {
 
   return {
     ...actual,
-  CreateTicketModal: ({ isOpen }: any) => isOpen ? <div>CreateTicketModal</div> : null,
-  LabelCreateOverlay: ({ isOpen }: any) => isOpen ? <div>LabelCreateOverlay</div> : null,
-  TicketDetailRoute: ({ onDeleteTicket, activeTicket }: any) => (
+  CreateTicketModal: ({ isOpen }: /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any) => isOpen ? <div>CreateTicketModal</div> : null,
+  LabelCreateOverlay: ({ isOpen }: /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any) => isOpen ? <div>LabelCreateOverlay</div> : null,
+  TicketDetailRoute: ({ onDeleteTicket, activeTicket }: /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any) => (
     <div>
       <div>TicketDetailRoute Mock</div>
       {onDeleteTicket && activeTicket && (
@@ -285,7 +283,7 @@ vi.mock('../../modules/loadingPage', () => ({
 }));
 
 vi.mock('../../modules/workspaceDirectoryPage', () => ({
-  WorkspaceDirectoryPage: ({ onOpenWorkspace }: any) => (
+  WorkspaceDirectoryPage: ({ onOpenWorkspace }: /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any) => (
     <div>
       <div>WorkspaceDirectoryPage</div>
       {onOpenWorkspace ? (
@@ -349,7 +347,7 @@ vi.mock('../../modules/workspaceTeamsPage', () => ({
 }));
 
 vi.mock('../../modules/workspaceTeamProjectsPage', () => ({
-  WorkspaceTeamProjectsPage: ({ team, projects, onBackToTeams }: any) => (
+  WorkspaceTeamProjectsPage: ({ team, projects, onBackToTeams }: /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any) => (
     <div>
       <div>WorkspaceTeamProjectsPage</div>
       <div data-testid="team-projects-state">{`${team?.name ?? 'none'} ${projects.length}`}</div>
@@ -365,7 +363,7 @@ vi.mock('../../pages/AccountPreferencesPage/AccountPreferencesPage', async (impo
 
   return {
     ...actual,
-  AccountPreferencesPage: ({ onResetTutorial, onBack, onOpenDirectory }: any) => (
+  AccountPreferencesPage: ({ onResetTutorial, onBack, onOpenDirectory }: /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any) => (
     <div>
       <div>AccountPreferencesPage</div>
       <button type="button" onClick={onResetTutorial}>
@@ -383,7 +381,7 @@ vi.mock('../../pages/AccountPreferencesPage/AccountPreferencesPage', async (impo
 });
 
 vi.mock('../../modules/accountPreferencesPage/screens/AccountPreferencesPage', () => ({
-  AccountPreferencesPage: ({ onResetTutorial, onBack, onOpenDirectory }: any) => (
+  AccountPreferencesPage: ({ onResetTutorial, onBack, onOpenDirectory }: /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any) => (
     <div>
       <div>AccountPreferencesPage</div>
       <button type="button" onClick={onResetTutorial}>
@@ -434,10 +432,10 @@ function buildUseTickets(overrides: Partial<Record<string, unknown>> = {}) {
       updatedAt: '2026-05-01T00:00:00.000Z',
     },
   ];
-  const tickets = (Array.isArray(overrides.tickets) ? overrides.tickets : defaultTickets) as any[];
-  const users = (Array.isArray(overrides.users) ? overrides.users : [currentUser].filter(Boolean)) as any[];
+  const tickets = (Array.isArray(overrides.tickets) ? overrides.tickets : defaultTickets) as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any[];
+  const users = (Array.isArray(overrides.users) ? overrides.users : [currentUser].filter(Boolean)) as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any[];
   const ticketsByProject = new Map<string, unknown[]>();
-  for (const ticket of tickets as any[]) {
+  for (const ticket of tickets as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any[]) {
     const projectTickets = ticketsByProject.get(ticket.projectId) || [];
     projectTickets.push(ticket);
     ticketsByProject.set(ticket.projectId, projectTickets);
@@ -615,7 +613,7 @@ function renderAppShell({
   initialEntries?: string[];
   queryClient?: QueryClient;
 } = {}) {
-  const ticketState = tickets as any;
+  const ticketState = tickets as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any;
   mocks.useAuth.mockReturnValue({
     currentUser: ticketState.currentUser ?? null,
     loading: Boolean(ticketState.loading),
@@ -632,9 +630,9 @@ function renderAppShell({
     activeProjectIdRef: { current: ticketState.activeProjectId || '' },
   });
   const projects = Array.isArray(ticketState.projects) ? ticketState.projects : [];
-  const projectById = new Map(projects.map((project: any) => [project.id, project]));
-  const projectsByWorkspaceId = new Map<string, any[]>();
-  for (const project of projects as any[]) {
+  const projectById = new Map(projects.map((project: /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any) => [project.id, project]));
+  const projectsByWorkspaceId = new Map<string, /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any[]>();
+  for (const project of projects as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any[]) {
     const workspaceProjects = projectsByWorkspaceId.get(project.workspaceId) || [];
     workspaceProjects.push(project);
     projectsByWorkspaceId.set(project.workspaceId, workspaceProjects);
@@ -892,7 +890,7 @@ function mockAggregateApiResponses() {
 describe('AppShellPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    delete (document as any).modelContext;
+    delete (document as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any).modelContext;
     window.localStorage.clear();
     sharedQueryClient.clear();
     mocks.fetch.mockImplementation((input: string | URL | Request) =>
@@ -1013,7 +1011,7 @@ describe('AppShellPage', () => {
           {
             pathname: '/workspace-access-error',
             state: { from: '/workspaces/workspace-private/projects/project-secret/tickets/SEC-401' },
-          } as any,
+          } as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any,
         ]}
       >
         <LocationDisplay />

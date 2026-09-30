@@ -2,7 +2,6 @@ import * as matchers from '@testing-library/jest-dom/matchers';
 import { afterEach, beforeEach, expect, vi } from 'vitest';
 import { act, cleanup } from '@testing-library/react';
 import { queryClient } from '../src/utils/queryClient';
-import { router } from '../src/router';
 import { transferableAbortController } from 'node:util';
 
 expect.extend(matchers);
@@ -214,7 +213,7 @@ export interface MockState {
   accountSettings: MockAccountSettings | null;
 }
 
-export let dbState: MockState = {
+export const dbState: MockState = {
   currentUser: null,
   tutorialCompleted: false,
   workspaces: [],
@@ -433,7 +432,7 @@ export function addWorkspaceMember(workspaceId: string, userId: string, role = '
   return member;
 }
 
-function resolveCurrentUserId(init: RequestInit | undefined, body: any) {
+function resolveCurrentUserId(init: RequestInit | undefined, body: /* eslint-disable-line @typescript-eslint/no-explicit-any -- The synthetic HTTP/SSE harness accepts partial transport payloads and browser doubles. */ any) {
   const headerUserId = normalizeText(getHeader(init, 'x-mock-user-id') ?? getHeader(init, 'x-user-id'));
   if (headerUserId) {
     return headerUserId;
@@ -868,7 +867,7 @@ class MockEventSource {
   }
 }
 
-globalThis.EventSource = MockEventSource as any;
+globalThis.EventSource = MockEventSource as /* eslint-disable-line @typescript-eslint/no-explicit-any -- The synthetic HTTP/SSE harness accepts partial transport payloads and browser doubles. */ any;
 if (typeof window !== 'undefined') {
   Object.defineProperty(window, 'EventSource', {
     configurable: true,
@@ -877,7 +876,7 @@ if (typeof window !== 'undefined') {
   });
 }
 
-function jsonResponse(status: number, data: any) {
+function jsonResponse(status: number, data: /* eslint-disable-line @typescript-eslint/no-explicit-any -- The synthetic HTTP/SSE harness accepts partial transport payloads and browser doubles. */ any) {
   const headers = new Headers();
   headers.set('content-type', 'application/json');
   return {
@@ -955,7 +954,7 @@ function serializeWorkspaceSidebar(workspace: MockWorkspace) {
   };
 }
 
-function buildTicketRecordFromBody(body: any, projectId: string) {
+function buildTicketRecordFromBody(body: /* eslint-disable-line @typescript-eslint/no-explicit-any -- The synthetic HTTP/SSE harness accepts partial transport payloads and browser doubles. */ any, projectId: string) {
   const project = getProjectById(projectId);
   const labelNames = resolveLabelNames(body?.labels ?? body?.labelNames);
   const labelIds = Array.isArray(body?.labelIds)
@@ -1349,7 +1348,7 @@ async function executeMockMcpTool(workspaceId: string, actorUserId: string, tool
   }
 }
 
-async function handleMockMcpTransport(url: URL, body: any, init?: RequestInit) {
+async function handleMockMcpTransport(url: URL, body: /* eslint-disable-line @typescript-eslint/no-explicit-any -- The synthetic HTTP/SSE harness accepts partial transport payloads and browser doubles. */ any, init?: RequestInit) {
   const workspaceId = normalizeText(
     getHeader(init, 'x-workspace-id') ?? body?.params?.workspaceId ?? url.searchParams.get('workspaceId') ?? '',
   );
@@ -1964,7 +1963,7 @@ globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) =>
   }
 
   return jsonResponse(404, { error: 'Mock endpoint not found' });
-}) as any;
+}) as /* eslint-disable-line @typescript-eslint/no-explicit-any -- The synthetic HTTP/SSE harness accepts partial transport payloads and browser doubles. */ any;
 
 beforeEach(() => {
   resetMockDb();

@@ -5,9 +5,9 @@ import { useActiveProject } from '../project/ActiveProjectContext';
 
 type FilterAction = 
   | { type: 'UPDATE'; payload: Partial<TicketFiltersState> }
-  | { type: 'RESET' };
+  | { type: 'RESET'; projectId: string };
 
-function filtersReducer(state: TicketFiltersState, action: FilterAction, activeProjectIdRef: React.MutableRefObject<string>): TicketFiltersState {
+function filtersReducer(state: TicketFiltersState, action: FilterAction): TicketFiltersState {
   switch (action.type) {
     case 'UPDATE': {
       let hasChanges = false;
@@ -36,7 +36,7 @@ function filtersReducer(state: TicketFiltersState, action: FilterAction, activeP
       return hasChanges ? nextState : state;
     }
     case 'RESET':
-      return { ...initialFilters, projectId: activeProjectIdRef.current };
+      return { ...initialFilters, projectId: action.projectId };
     default:
       return state;
   }
@@ -48,9 +48,9 @@ export const TicketFiltersProvider: React.FC<{ children: ReactNode }> = ({ child
   const { activeProjectId, activeProjectIdRef } = useActiveProject();
 
   const [filters, dispatch] = useReducer(
-    (state: TicketFiltersState, action: FilterAction) => filtersReducer(state, action, activeProjectIdRef), 
+    filtersReducer,
     initialFilters,
-    () => ({ ...initialFilters, projectId: activeProjectIdRef.current })
+    () => ({ ...initialFilters, projectId: activeProjectId })
   );
 
   const setFilters = useCallback((nextFilters: Partial<TicketFiltersState>) => {
@@ -58,8 +58,8 @@ export const TicketFiltersProvider: React.FC<{ children: ReactNode }> = ({ child
   }, []);
 
   const resetFilters = useCallback(() => {
-    dispatch({ type: 'RESET' });
-  }, []);
+    dispatch({ type: 'RESET', projectId: activeProjectIdRef.current });
+  }, [activeProjectIdRef]);
 
   useEffect(() => {
     if (filters.projectId !== activeProjectId) {

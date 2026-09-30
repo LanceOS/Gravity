@@ -1,8 +1,8 @@
-import { createContext, useContext, useEffect, useMemo, useRef, type FC, type ReactNode } from 'react';
+import { createContext, useContext, useMemo, useState, type FC, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '../../utils/apiClient';
 import { CACHE_CONFIGS, queryKeys } from '../../utils/queryClient';
-import type { Comment, Ticket } from '../../types/domain';
+import type { Comment } from '../../types/domain';
 import type { TicketWithRelations } from '../../modules/tickets/utils/ticketRelations';
 import { useAuth } from '../auth/AuthContext';
 import { useActiveProject } from '../project/ActiveProjectContext';
@@ -32,8 +32,8 @@ export function useTicketDetailContextValue({
 }: TicketDetailContextValueArgs): TicketDetailContextType {
   const activeTicketId = activeTicket?.id;
   const activeTicketProjectId = activeTicket?.projectId || activeProjectId;
-  const previousActiveTicketDetailRef = useRef<TicketWithRelations | null>(null);
-  const previousCommentsRef = useRef<Comment[] | undefined>(undefined);
+  const [previousDetail, setPreviousDetail] = useState<TicketWithRelations | null>(null);
+  const [previousComments, setPreviousComments] = useState<Comment[] | undefined>(undefined);
 
   const activeTicketDetailQuery = useQuery<TicketWithRelations | null>({
     queryKey: queryKeys.ticketDetail(activeTicketId || ''),
@@ -42,19 +42,6 @@ export function useTicketDetailContextValue({
     ...CACHE_CONFIGS.ticketDetail,
   });
 
-  useEffect(() => {
-    if (activeTicketDetailQuery.data) {
-      previousActiveTicketDetailRef.current = activeTicketDetailQuery.data;
-    }
-  }, [activeTicketDetailQuery.data]);
-
-  useEffect(() => {
-    if (!activeTicketId) {
-      previousActiveTicketDetailRef.current = null;
-      previousCommentsRef.current = undefined;
-    }
-  }, [activeTicketId]);
-
   const commentsQuery = useQuery<Comment[]>({
     queryKey: queryKeys.comments(activeTicketId || ''),
     queryFn: () => apiClient.get<Comment[]>(`/tickets/${activeTicketId}/comments`, { projectId: activeTicketProjectId }),
@@ -62,18 +49,24 @@ export function useTicketDetailContextValue({
     ...CACHE_CONFIGS.ticketDetail,
   });
 
-  useEffect(() => {
-    if (Array.isArray(commentsQuery.data)) {
-      previousCommentsRef.current = commentsQuery.data;
+  if (!activeTicketId) {
+    if (previousDetail !== null) setPreviousDetail(null);
+    if (previousComments !== undefined) setPreviousComments(undefined);
+  } else {
+    if (activeTicketDetailQuery.data && activeTicketDetailQuery.data !== previousDetail) {
+      setPreviousDetail(activeTicketDetailQuery.data);
     }
-  }, [commentsQuery.data]);
+    if (Array.isArray(commentsQuery.data) && commentsQuery.data !== previousComments) {
+      setPreviousComments(commentsQuery.data);
+    }
+  }
 
   const activeTicketDetail = activeTicketId
-    ? activeTicketDetailQuery.data ?? previousActiveTicketDetailRef.current ?? null
+    ? activeTicketDetailQuery.data ?? previousDetail ?? null
     : null;
-  const comments = activeTicketId
-    ? commentsQuery.data ?? previousCommentsRef.current ?? []
-    : [];
+  const comments = useMemo(() => activeTicketId
+    ? commentsQuery.data ?? previousComments ?? []
+    : [], [activeTicketId, commentsQuery.data, previousComments]);
 
   return useMemo(() => ({
     activeTicket,

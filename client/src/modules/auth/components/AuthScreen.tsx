@@ -35,8 +35,9 @@ export const AuthScreen: React.FC = () => {
           return;
         }
       }
-    } catch (err: any) {
-      setErrorMsg(err.message || 'An error occurred during authentication.');
+    } catch (err) {
+      const message = err && typeof err === 'object' && 'message' in err && typeof err.message === 'string' ? err.message : '';
+      setErrorMsg(message || 'An error occurred during authentication.');
     } finally {
       setLoading(false);
     }

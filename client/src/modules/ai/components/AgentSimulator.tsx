@@ -32,7 +32,7 @@ export const AgentSimulator: React.FC<AgentSimulatorProps> = ({ onClose }) => {
     setLogs(prev => [...prev, { type, text }]);
   };
 
-  const executeMcpCall = async (method: string, args: any) => {
+  const executeMcpCall = async (method: string, args: Record<string, unknown>) => {
     addLog('tool', `👉 Calling MCP tool: "${method}" with arguments:\n${JSON.stringify(args, null, 2)}`);
     
     // Simulate slight network delay for premium visual pacing
@@ -62,8 +62,8 @@ export const AgentSimulator: React.FC<AgentSimulatorProps> = ({ onClose }) => {
       
       // Parse result to get object if needed
       return parseToolResultText(textResult);
-    } catch (e: any) {
-      addLog('error', `❌ Tool error: ${e.message}`);
+    } catch (e) {
+      addLog('error', `❌ Tool error: ${e instanceof Error ? e.message : String(e)}`);
       throw e;
     }
   };
@@ -85,7 +85,7 @@ export const AgentSimulator: React.FC<AgentSimulatorProps> = ({ onClose }) => {
 
       // 2. Call list_tickets tool
       addLog('thought', '🤔 [Agent Thought]: Querying database to check if a ticket with this setup already exists...');
-      const listResult = await executeMcpCall('list_tickets', { projectId: 'p-gravity', status: 'todo' });
+      await executeMcpCall('list_tickets', { projectId: 'p-gravity', status: 'todo' });
 
       // 3. Call create_ticket tool
       addLog('thought', '🤔 [Agent Thought]: No duplicate ticket found. Proceeding to create the new backend ticket assigned to Bob...');
@@ -125,7 +125,7 @@ export const AgentSimulator: React.FC<AgentSimulatorProps> = ({ onClose }) => {
       setCompletedPrompt(prompt);
       toast.show('Agent simulation completed.', 'success');
       fetchInitialData();
-    } catch (error) {
+    } catch {
       toast.show('Simulation failed. Review the log and existing tickets before retrying; earlier actions may have succeeded.', 'error');
       addLog('error', '⚠️ Simulation halted due to execution failure.');
     } finally {

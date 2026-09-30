@@ -3,13 +3,11 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { WorkspaceTeamProjectsPage } from '../../pages/WorkspaceTeamProjectsPage/WorkspaceTeamProjectsPage.tsx';
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 vi.mock('@library', () => ({
-  Button: ({ children, loading, ...props }: any) => (
+  Button: ({ children, loading, ...props }: /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any) => (
     <button {...props}>{loading ? 'Loading' : children}</button>
   ),
-  Modal: ({ children, title, footer, isOpen }: any) =>
+  Modal: ({ children, title, footer, isOpen }: /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any) =>
     isOpen ? (
       <section>
         {title ? <h2>{title}</h2> : null}
@@ -17,14 +15,14 @@ vi.mock('@library', () => ({
         {footer ? <footer>{footer}</footer> : null}
       </section>
     ) : null,
-  Alert: ({ children, type }: any) => <div data-alert-type={type}>{children}</div>,
-  TextInput: ({ label, value, onChange, ...props }: any) => (
+  Alert: ({ children, type }: /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any) => <div data-alert-type={type}>{children}</div>,
+  TextInput: ({ label, value, onChange, ...props }: /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any) => (
     <label>
       <span>{label}</span>
       <input value={value} onChange={onChange} {...props} />
     </label>
   ),
-  Textarea: ({ label, value, onChange, autoGrow, inputStyle, ...props }: any) => (
+  Textarea: ({ label, value, onChange, autoGrow, inputStyle, ...props }: /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any) => (
     <label>
       <span>{label}</span>
       <textarea value={value} onChange={onChange} {...props} />
@@ -33,7 +31,7 @@ vi.mock('@library', () => ({
 }));
 
 vi.mock('../../components/WorkspaceProjectPanel', () => ({
-  ProjectCreateOverlay: ({ onClose, onSubmitProject }: any) => (
+  ProjectCreateOverlay: ({ onClose, onSubmitProject }: /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any) => (
     <div>
       <div>ProjectCreateOverlay</div>
       <button
@@ -66,7 +64,7 @@ vi.mock('../../modules/workspaces', () => ({
     active: 'Active',
     completed: 'Archived',
   },
-  ProjectCreateOverlay: ({ onClose, onSubmitProject }: any) => (
+  ProjectCreateOverlay: ({ onClose, onSubmitProject }: /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any) => (
     <div>
       <div>ProjectCreateOverlay</div>
       <button
@@ -87,10 +85,10 @@ vi.mock('../../modules/workspaces', () => ({
     </div>
   ),
   WorkspaceHeader: Object.assign(
-    ({ children }: any) => <header>{children}</header>,
+    ({ children }: /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any) => <header>{children}</header>,
     {
-      Top: ({ children }: any) => <div>{children}</div>,
-      Title: ({ children }: any) => <h1>{children}</h1>,
+      Top: ({ children }: /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any) => <div>{children}</div>,
+      Title: ({ children }: /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any) => <h1>{children}</h1>,
     },
   ),
   sanitizeProjectKey: (value: string) => value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8),

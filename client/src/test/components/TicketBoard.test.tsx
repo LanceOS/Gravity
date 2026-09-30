@@ -1,9 +1,8 @@
-import type { ButtonHTMLAttributes, ChangeEvent, CSSProperties, DragEvent, ReactNode } from 'react';
+import type { ButtonHTMLAttributes, ChangeEvent, CSSProperties, ReactNode } from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { TicketBoard } from '../../modules/tickets/components/TicketBoard';
-import type { TicketCardProps } from '../../modules/tickets/types/TicketBoard';
 
 type MockButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   children?: ReactNode;
@@ -43,11 +42,11 @@ vi.mock('@library', () => ({
       ))}
     </select>
   ),
-  Flex: ({ children, style, ...props }: any) => <div style={{ display: 'flex', ...style }} {...props}>{children}</div>,
-  KanbanBoard: ({ columns, cards, onCardMove, renderColumnHeader, style }: any) => (
+  Flex: ({ children, style, ...props }: /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any) => <div style={{ display: 'flex', ...style }} {...props}>{children}</div>,
+  KanbanBoard: ({ columns, cards, onCardMove, renderColumnHeader, style }: /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any) => (
     <div style={{ display: 'flex', ...style }}>
-      {columns.map((col: any) => {
-        const colCards = cards.filter((c: any) => c.status === col.id);
+      {columns.map((col: /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any) => {
+        const colCards = cards.filter((c: /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any) => c.status === col.id);
         return (
           <div
             key={col.id}
@@ -63,7 +62,7 @@ vi.mock('@library', () => ({
           >
             {renderColumnHeader ? renderColumnHeader(col.id, col.title, colCards.length) : <div>{col.title}</div>}
             <div>
-              {colCards.map((card: any) => (
+              {colCards.map((card: /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any) => (
                 <div key={card.id}>
                   {card.content}
                 </div>
@@ -78,9 +77,9 @@ vi.mock('@library', () => ({
 }));
 
 vi.mock('../../modules/tickets/components/TicketCard', () => ({
-  TicketCard: ({ ticket, onClick, onDragStart, assigneeAvatar }: any) => {
+  TicketCard: ({ ticket, onClick, onDragStart, assigneeAvatar }: /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any) => {
     const labelsStr = ticket.labels && ticket.labels.length > 0
-      ? ticket.labels.map((l: any) => l.name).join(', ')
+      ? ticket.labels.map((l: /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any) => l.name).join(', ')
       : 'No label';
     return (
       <button type="button" draggable onClick={onClick} onDragStart={onDragStart}>

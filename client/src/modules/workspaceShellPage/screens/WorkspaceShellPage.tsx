@@ -85,7 +85,6 @@ export function WorkspaceShellPage() {
   } = useTicketListContext();
   const { activeProjectId, setActiveProjectId } = useActiveProject();
   const {
-    projects,
     projectById,
     projectsByWorkspaceId,
     projectsLoading,
@@ -737,7 +736,6 @@ export function WorkspaceShellPage() {
     activeWorkspace?.hierarchyMode,
     activeWorkspace?.memberRole,
     projectIdParam,
-    route.projectIdParam,
     route.teamIdParam,
     sidebarActiveScope,
     sidebarTeamIdByProjectId,

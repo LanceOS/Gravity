@@ -3,7 +3,6 @@ import { useInfiniteQuery } from '@tanstack/react-query';
 import { CACHE_CONFIGS, queryKeys } from '../../../utils/queryClient';
 import type { NoteMetadata } from '../types';
 import { notesService, type NotesService } from '../services/notesService';
-import { useState } from 'react';
 
 interface UseNotesOptions {
   notesService?: NotesService;
@@ -22,7 +21,7 @@ export function useNotes(projectId: string, sortDirection: 'desc' | 'asc' = 'des
 
       return clientNotesService.listNotes(projectId, {
         limit,
-        offset: pageParam,
+        offset: typeof pageParam === 'number' ? pageParam : 0,
         sort: sortDirection,
       });
     },
@@ -39,13 +38,14 @@ export function useNotes(projectId: string, sortDirection: 'desc' | 'asc' = 'des
 
   const notes = useMemo(() => query.data?.pages.flat() ?? [], [query.data]);
 
+  const { hasNextPage, isFetchingNextPage, fetchNextPage } = query;
   const loadMore = useCallback(() => {
-    if (!query.hasNextPage || query.isFetchingNextPage) {
+    if (!hasNextPage || isFetchingNextPage) {
       return Promise.resolve();
     }
 
-    return query.fetchNextPage();
-  }, [query.fetchNextPage, query.hasNextPage, query.isFetchingNextPage]);
+    return fetchNextPage();
+  }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
 
   return {
     notes,

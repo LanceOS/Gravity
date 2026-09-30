@@ -72,7 +72,7 @@ function renderWorkspaceProjectsListPage(overrides: Partial<Record<string, unkno
     setActiveProjectId: vi.fn(),
     activeProjectIdRef: { current: 'project-1' },
     ...overrides,
-  } as any);
+  } as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any);
 
   mocks.useProjectContext.mockReturnValue({
     projects,

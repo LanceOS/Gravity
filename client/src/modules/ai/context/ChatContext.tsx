@@ -1,5 +1,6 @@
+import type { McpTool } from '../../../utils/mcp';
 import { toast } from '@library';
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useRef } from 'react';
 import type { Message, SendMessageOptions, NavigationScope } from '../types/AgentChat';
 import type { WorkspaceSettings } from '../../../utils/settings';
 import { apiClient } from '../../../utils/apiClient';
@@ -10,7 +11,7 @@ export interface ChatContextType {
   messages: Message[];
   isGenerating: boolean;
   chatSessionId: string;
-  mcpTools: any[];
+  mcpTools: McpTool[];
   error: string | null;
   model: string;
   setModel: (model: string) => void;
@@ -132,7 +133,7 @@ export const ChatContextProvider: React.FC<ChatProviderProps> = ({
   seedMessages,
   onSessionCreated,
 }) => {
-  const cloudModelsList = CLOUD_MODELS[settings.aiProvider] || ['gpt-4o-mini'];
+  const cloudModelsList = useMemo(() => CLOUD_MODELS[settings.aiProvider] || ['gpt-4o-mini'], [settings.aiProvider]);
 
   const getProviderName = (provider?: string) => {
     switch (provider) {
@@ -151,7 +152,7 @@ export const ChatContextProvider: React.FC<ChatProviderProps> = ({
   const [modelStatus, setModelStatus] = useState<'connected' | 'disconnected' | 'checking'>('connected');
 
   // MCP Tools
-  const [mcpTools, setMcpTools] = useState<any[]>([]);
+  const [mcpTools, setMcpTools] = useState<McpTool[]>([]);
 
   // Chat states
   const [messages, setMessages] = useState<Message[]>(() =>
@@ -186,6 +187,7 @@ export const ChatContextProvider: React.FC<ChatProviderProps> = ({
     const nextChatSessionId = seedChatSessionId || '';
     if (nextChatSessionId !== chatSessionIdRef.current) cancelGeneration();
     chatSessionIdRef.current = nextChatSessionId;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Changing the externally selected chat cancels generation and replaces its editable message/session state.
     setChatSessionId(nextChatSessionId);
     setMessages(seedMessages && seedMessages.length > 0 ? seedMessages : getInitialMessages());
     setErrorState(null);
@@ -208,13 +210,15 @@ export const ChatContextProvider: React.FC<ChatProviderProps> = ({
   useEffect(() => {
     const initial = getInitialModel(initialModel);
     const defaultCloudModel = cloudModelsList.includes(initial) ? initial : cloudModelsList[0];
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Changing the provider or initial model resets the user-editable model selection.
     setModel(defaultCloudModel);
     setModelStatus('connected');
-  }, [settings.aiProvider, initialModel]);
+  }, [cloudModelsList, initialModel]);
 
   // Fetch MCP tools
   useEffect(() => {
     if (!workspaceId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- A workspace change clears the previous workspace tool inventory before loading its replacement.
       setMcpTools([]);
       return;
     }
@@ -223,7 +227,7 @@ export const ChatContextProvider: React.FC<ChatProviderProps> = ({
       .fetchQuery(
         queryKeys.mcpTools(workspaceId),
         () =>
-          apiClient.post<{ result?: { tools?: any[] } }>('/mcp/sse', {
+          apiClient.post<{ result?: { tools?: McpTool[] } }>('/mcp/sse', {
             jsonrpc: '2.0',
             id: 1,
             method: 'tools/list',
@@ -330,7 +334,7 @@ export const ChatContextProvider: React.FC<ChatProviderProps> = ({
         return;
       }
 
-      const statusCode = error instanceof Error && 'status' in error ? (error as any).status : undefined;
+      const statusCode = error instanceof Error && 'status' in error ? error.status : undefined;
       let detail: string;
       if (statusCode === 401 || statusCode === 403) {
         detail = 'Your API key appears to be invalid or lacks the required permissions. Please update it in **Account Preferences**.';

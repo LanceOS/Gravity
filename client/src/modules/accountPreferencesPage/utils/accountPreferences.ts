@@ -1,7 +1,7 @@
 import { Bot, Plug, Settings2, WandSparkles } from 'lucide-react';
 
 import { API_KEY_MASK, AI_PROVIDER_OPTIONS } from '../../../utils/settings';
-import type { AccountPreferencesCategoryMeta, SettingsCategoryId } from '../types';
+import type { AccountPreferencesCategoryMeta } from '../types';
 
 export const SETTINGS_CATEGORIES: AccountPreferencesCategoryMeta[] = [
   {

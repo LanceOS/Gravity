@@ -79,7 +79,7 @@ export const TicketDetailRoute: React.FC<TicketDetailRouteProps> = ({
 
       return rawSubtasks.map((t) => ticketsByIdResolved.get(t.id) || t);
     },
-    [activeTicket, activeTicketDetail?.subtasks, ticketsByIdResolved, ticketsByParentId]
+    [activeTicket, activeTicketDetail, ticketsByIdResolved, ticketsByParentId]
   );
 
   const parentTicket = useMemo(
@@ -90,7 +90,7 @@ export const TicketDetailRoute: React.FC<TicketDetailRouteProps> = ({
 
       return ticketsByIdResolved.get(activeTicket.parentId) || null;
     },
-    [activeTicket?.parentId, ticketsByIdResolved]
+    [activeTicket, ticketsByIdResolved]
   );
 
   const completedDetailSubtasks = useMemo(

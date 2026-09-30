@@ -1,1 +1,1 @@
-export { WorkspaceShellPage } from '../../modules/workspaceShellPage/screens/WorkspaceShellPage';
+export { WorkspaceShellPage } from '../../modules/workspaceShellPage';

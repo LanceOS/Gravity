@@ -5,10 +5,6 @@ import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { WorkspacePage } from '../../pages/WorkspacePage/WorkspacePage.tsx';
 import type { Cycle, Domain, Project, Ticket } from '../../context/TicketContextContext';
-
-type TicketBoardMockProps = {
-};
-
 type TicketListMockProps = {
   filteredCount: number;
 };
@@ -451,7 +447,7 @@ describe('WorkspacePage', () => {
 
   it('allows filtering by project through context menu', async () => {
     const user = userEvent.setup();
-    const { props, container } = renderWorkspacePage({
+    const { props } = renderWorkspacePage({
       activeView: 'list',
       tickets: [ticket],
       projects: [
@@ -480,7 +476,7 @@ describe('WorkspacePage', () => {
 
   it('allows sorting notes through context menu in notes view', async () => {
     const user = userEvent.setup();
-    const { container } = renderWorkspacePage({
+    renderWorkspacePage({
       activeContext: 'notes',
       tickets: [],
       projects: [project],
@@ -515,7 +511,7 @@ describe('WorkspacePage', () => {
       json: async () => ({ id: 'note-new-123', title: 'Untitled Note' }),
     } as Response);
 
-    const { container } = renderWorkspacePage({
+    renderWorkspacePage({
       activeContext: 'notes',
       tickets: [],
       projects: [project],

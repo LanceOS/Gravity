@@ -9,6 +9,7 @@ const TestComponent = () => {
   return (
     <div>
       <div data-testid="state">{activeProjectId}</div>
+      {/* eslint-disable-next-line react-hooks/refs -- This test observes the public imperative ref alongside its state value. */}
       <div data-testid="ref">{activeProjectIdRef.current}</div>
       <button onClick={() => setActiveProjectId('proj-123')}>Set Proj 1</button>
       <button onClick={() => setActiveProjectId('proj-456')}>Set Proj 2</button>

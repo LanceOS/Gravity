@@ -366,7 +366,7 @@ export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWork
       });
 
       if (!response.ok) {
-        let data: { error?: string; message?: string } | null = null;
+        let data: { error?: string; message?: string } | null;
         try {
           data = await response.json();
         } catch {
@@ -470,7 +470,7 @@ export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWork
     queryClient.setQueryData<WorkspaceMember[]>(queryKeys.workspaceMembers(activeWorkspaceId), (old) =>
       old ? old.map((m) => (m.id === userId ? { ...m, lastActiveAt } : m)) : []
     );
-  }, [activeWorkspaceId]);
+  }, [activeWorkspaceId, queryClient]);
 
   const saveError = settingsQuery.error?.message || saveSettingsMutation.error?.message || saveErrorState || null;
 

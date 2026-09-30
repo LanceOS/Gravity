@@ -51,6 +51,8 @@ export function useWorkspaceDirectory({
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const actionPending = useRef(false);
   const refreshRequestIdRef = useRef(0);
+  const resolvedUserIdRef = useRef(resolvedUserId);
+  useEffect(() => { resolvedUserIdRef.current = resolvedUserId; }, [resolvedUserId]);
 
   const refreshWorkspaces = useCallback(async () => {
     const requestId = ++refreshRequestIdRef.current;
@@ -64,7 +66,7 @@ export function useWorkspaceDirectory({
       return [];
     }
 
-    if (resolvedUserId !== requestedUserId) {
+    if (resolvedUserIdRef.current !== requestedUserId) {
       setLoading(true);
     }
     setError(null);
@@ -100,6 +102,7 @@ export function useWorkspaceDirectory({
   }, [currentUser, workspaceDirectoryService]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Start the user-scoped HTTP refresh, including its loading state; stale responses are request-version guarded.
     void refreshWorkspaces();
   }, [refreshWorkspaces]);
 

@@ -3,21 +3,22 @@ import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { TextSelection } from 'prosemirror-state';
 import { createEmptyRichTextValue, parseRichTextValue, renderRichTextHtml, RichTextEditor, serializeRichTextJson } from '@library';
 
-let lastEditorView: any = null;
+let lastEditorView: /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any = null;
 
 vi.mock('prosemirror-view', async (importOriginal) => {
   const actual = await importOriginal<typeof import('prosemirror-view')>();
 
   class FakeEditorView {
-    state: any;
-    props: any;
+    state: /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any;
+    props: /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any;
     focused = false;
     dom: HTMLElement;
 
-    constructor(mount: HTMLElement, props: any) {
+    constructor(mount: HTMLElement, props: /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any) {
       this.state = props.state;
       this.props = props;
       this.dom = mount;
+      // eslint-disable-next-line @typescript-eslint/no-this-alias -- The test retains the constructed editor double for dispatch assertions.
       lastEditorView = this;
 
       const surface = document.createElement('div');
@@ -25,13 +26,13 @@ vi.mock('prosemirror-view', async (importOriginal) => {
       mount.appendChild(surface);
     }
 
-    dispatch = (transaction: any) => {
+    dispatch = (transaction: /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any) => {
       this.props.dispatchTransaction(transaction);
     };
 
     pasteText = vi.fn(() => true);
 
-    updateState(nextState: any) {
+    updateState(nextState: /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any) {
       this.state = nextState;
     }
 
@@ -52,7 +53,7 @@ vi.mock('prosemirror-view', async (importOriginal) => {
       };
     }
 
-    setProps(nextProps: any) {
+    setProps(nextProps: /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any) {
       this.props = { ...this.props, ...nextProps };
     }
 
@@ -77,7 +78,7 @@ describe('RichTextEditor HTML paste security', () => {
     return { view: lastEditorView, onChange };
   }
 
-  function paste(view: any, html: string, text = '') {
+  function paste(view: /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any, html: string, text = '') {
     const event = {
       clipboardData: {
         getData: (type: string) => (type === 'text/html' ? html : type === 'text/plain' ? text : ''),

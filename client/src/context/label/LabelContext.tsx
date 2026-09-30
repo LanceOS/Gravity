@@ -39,7 +39,7 @@ export const LabelProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     ...CACHE_CONFIGS.metadata,
   });
 
-  const labels = labelsQuery.data || [];
+  const labels = useMemo(() => labelsQuery.data || [], [labelsQuery.data]);
   const labelById = useMemo(() => new Map(labels.map((label) => [label.id, label] as const)), [labels]);
 
   const findLabelQueryKey = useCallback(

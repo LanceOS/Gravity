@@ -15,7 +15,8 @@ describe('TicketFiltersContext', () => {
 
   beforeEach(() => {
     activeProjectIdRef = { current: mockActiveProjectId };
-    (useActiveProject as any).mockReturnValue({
+    vi.mocked(useActiveProject).mockReturnValue({
+      setActiveProjectId: vi.fn(),
       activeProjectId: mockActiveProjectId,
       activeProjectIdRef,
     });
@@ -69,7 +70,8 @@ describe('TicketFiltersContext', () => {
     expect(result.current.filters.status).toBe('done');
 
     activeProjectIdRef.current = 'project-456';
-    (useActiveProject as any).mockReturnValue({
+    vi.mocked(useActiveProject).mockReturnValue({
+      setActiveProjectId: vi.fn(),
       activeProjectId: 'project-456',
       activeProjectIdRef,
     });
@@ -81,6 +83,20 @@ describe('TicketFiltersContext', () => {
       result.current.resetFilters();
     });
 
+    expect(result.current.filters).toEqual({ ...initialFilters, projectId: 'project-456' });
+  });
+
+  it('keeps a retained reset callback current after a project switch', () => {
+    const { result, rerender } = renderHook(() => useTicketFilters(), { wrapper });
+    const reset = result.current.resetFilters;
+    activeProjectIdRef.current = 'project-456';
+    vi.mocked(useActiveProject).mockReturnValue({
+      activeProjectId: 'project-456', activeProjectIdRef, setActiveProjectId: vi.fn(),
+    });
+    rerender();
+    expect(result.current.resetFilters).toBe(reset);
+    act(() => result.current.setFilters({ status: 'done' }));
+    act(() => reset());
     expect(result.current.filters).toEqual({ ...initialFilters, projectId: 'project-456' });
   });
 

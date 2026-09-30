@@ -1,1 +1,1 @@
-export { LoadingPage } from "../../modules/loadingPage/screens/LoadingPage";
+export { LoadingPage } from '../../modules/loadingPage';

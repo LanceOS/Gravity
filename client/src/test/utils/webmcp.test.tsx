@@ -13,8 +13,8 @@ function installModelContext() {
 }
 
 afterEach(() => {
-  delete (document as any).modelContext;
-  delete (navigator as any).modelContext;
+  delete (document as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any).modelContext;
+  delete (navigator as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any).modelContext;
   vi.restoreAllMocks();
 });
 

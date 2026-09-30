@@ -198,7 +198,7 @@ function seedRealtimeWorkspace(): SeededWorkspace {
   dbState.accountSettings = {
     userId: memberUser.id,
     theme: 'dark',
-    projectLayout: 'standard' as any,
+    projectLayout: 'standard' as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any,
     notificationsEnabled: true,
   };
   dbState.workspaces = [workspace];
@@ -376,7 +376,7 @@ describe('MCP SSE pipeline', () => {
     await user.click(mainTicketCard);
 
     dbState.currentUser = nonMemberUser;
-    const deniedSource = new EventSource(`/api/v1/events/subscribe?workspaceId=${workspace.id}`) as any;
+    const deniedSource = new EventSource(`/api/v1/events/subscribe?workspaceId=${workspace.id}`) as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any;
     const deniedMessageSpy = vi.fn();
     deniedSource.addEventListener('message', deniedMessageSpy);
 

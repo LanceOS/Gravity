@@ -82,6 +82,7 @@ function ModalDialogRoot({
 
   useEffect(() => {
     if (isOpen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Presence state intentionally outlives isOpen until the imperative exit animation completes.
       setIsRendered(true);
     } else if (isRendered) {
       const isTest = typeof process !== 'undefined' && process.env.NODE_ENV === 'test';
@@ -150,15 +151,17 @@ function ModalDialogRoot({
   }, [isOpen, isRendered]);
 
   useEffect(() => {
+    const backdrop = backdropRef.current;
+    const panel = panelRef.current;
     return () => {
-      if (backdropRef.current) {
-        anime.remove(backdropRef.current);
+      if (backdrop) {
+        anime.remove(backdrop);
       }
-      if (panelRef.current) {
-        anime.remove(panelRef.current);
+      if (panel) {
+        anime.remove(panel);
       }
     };
-  }, []);
+  }, [isRendered]);
 
   useEffect(() => {
     if (!isRendered) {

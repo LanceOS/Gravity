@@ -3,9 +3,9 @@ const RETRY_BASE_DELAY_MS = 300;
 
 export class ApiError extends Error {
   public status: number;
-  public data: any;
+  public data: Record<string, unknown> | null | undefined;
 
-  constructor(status: number, message: string, data?: any) {
+  constructor(status: number, message: string, data?: Record<string, unknown> | null) {
     super(message);
     this.status = status;
     this.data = data;
@@ -92,7 +92,7 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
   let data;
   try {
     data = await response.json();
-  } catch (err) {
+  } catch {
     data = null;
   }
 
@@ -114,9 +114,9 @@ async function requestRaw(endpoint: string, options: RequestOptions = {}): Promi
 
 export const apiClient = {
   get: <T>(endpoint: string, options?: RequestOptions) => request<T>(endpoint, { ...options, method: 'GET' }),
-  post: <T>(endpoint: string, body: any, options?: RequestOptions) => request<T>(endpoint, { ...options, method: 'POST', body: JSON.stringify(body) }),
-  patch: <T>(endpoint: string, body: any, options?: RequestOptions) => request<T>(endpoint, { ...options, method: 'PATCH', body: JSON.stringify(body) }),
-  put: <T>(endpoint: string, body: any, options?: RequestOptions) => request<T>(endpoint, { ...options, method: 'PUT', body: JSON.stringify(body) }),
+  post: <T>(endpoint: string, body: unknown, options?: RequestOptions) => request<T>(endpoint, { ...options, method: 'POST', body: JSON.stringify(body) }),
+  patch: <T>(endpoint: string, body: unknown, options?: RequestOptions) => request<T>(endpoint, { ...options, method: 'PATCH', body: JSON.stringify(body) }),
+  put: <T>(endpoint: string, body: unknown, options?: RequestOptions) => request<T>(endpoint, { ...options, method: 'PUT', body: JSON.stringify(body) }),
   delete: <T>(endpoint: string, options?: RequestOptions) => request<T>(endpoint, { ...options, method: 'DELETE' }),
   postBinary: <T>(endpoint: string, body: BodyInit | null, options?: RequestOptions) => request<T>(endpoint, {
     ...options,

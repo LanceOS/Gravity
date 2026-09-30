@@ -54,8 +54,9 @@ export function useTicketRelationActions({
   }, [activeTicket]);
 
   useEffect(() => {
+    const pendingAdds = pendingTicketRelationAddsRef.current;
     return () => {
-      pendingTicketRelationAddsRef.current.clear();
+      pendingAdds.clear();
     };
   }, []);
 

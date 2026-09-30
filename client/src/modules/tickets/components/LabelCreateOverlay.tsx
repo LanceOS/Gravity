@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Tag } from 'lucide-react';
 import { Button, CircularColorInput, Select, TextInput, Textarea } from '@library';
 import { FormSection } from '../../../components/FormSection';
@@ -35,14 +35,14 @@ export function LabelCreateOverlay({
   const [labelDescription, setLabelDescription] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
 
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     if (!loading) {
       onClose();
     }
-  };
+  }, [loading, onClose]);
 
   const submissionPending = useRef(false);
-  const handleSubmit = async (event?: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = useCallback(async (event?: React.FormEvent<HTMLFormElement>) => {
     event?.preventDefault();
     if (!isOpen || submissionPending.current || loading) return;
     setFormError(null);
@@ -73,7 +73,7 @@ export function LabelCreateOverlay({
     } finally {
       submissionPending.current = false;
     }
-  };
+  }, [isOpen, loading, labelName, scope, scopeId, onSubmitLabel, labelColor, labelDescription, handleClose]);
 
   const wasOpen = useRef(false);
   const previousScopeKind = useRef(scope?.kind);

@@ -63,7 +63,6 @@ export function SettingsScreen(props: SettingsScreenProps) {
   const {
     currentUser,
     workspace,
-    settings,
     settingsLoading,
     saveLoading,
     saveSuccess,
@@ -73,7 +72,6 @@ export function SettingsScreen(props: SettingsScreenProps) {
     onBackToWorkspace,
     onOpenDirectory,
     onSaveSettings,
-    onApproveJoinRequest,
   } = props;
   const [activeCategory, setActiveCategory] = useState<SettingsCategoryId>('overview');
   const isMobile = useIsMobile();

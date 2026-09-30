@@ -4,12 +4,12 @@ import { describe, expect, it, vi } from 'vitest';
 import { TicketCard } from '../../modules/tickets/components/TicketCard';
 
 vi.mock('@library', () => ({
-  Card: ({ children, bodyStyle: _bodyStyle, ...props }: any) => <div {...props}>{children}</div>,
-  Avatar: ({ src, name, ...props }: any) => (
+  Card: ({ children, bodyStyle: _bodyStyle, ...props }: /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any) => <div {...props}>{children}</div>,
+  Avatar: ({ src, name, ...props }: /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any) => (
     src ? <img src={src} alt={name || ''} {...props} /> : <div {...props}>avatar</div>
   ),
-  Badge: ({ children, ...props }: any) => <span {...props}>{children}</span>,
-  Flex: ({ children, ...props }: any) => <div {...props}>{children}</div>,
+  Badge: ({ children, ...props }: /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any) => <span {...props}>{children}</span>,
+  Flex: ({ children, ...props }: /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any) => <div {...props}>{children}</div>,
 }));
 
 describe('TicketCard', () => {

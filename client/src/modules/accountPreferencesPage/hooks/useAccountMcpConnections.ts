@@ -54,6 +54,7 @@ export function useAccountMcpConnections() {
 
   useEffect(() => {
     mounted.current = true;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Mount starts an abortable inventory request and publishes its loading state.
     void refresh();
     return () => {
       mounted.current = false;

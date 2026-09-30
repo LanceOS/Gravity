@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
+import { useMemo, useState, type Dispatch, type SetStateAction } from 'react';
 
 interface UseListSelectionArgs<Item extends { id: string }> {
   items: Item[];
@@ -16,42 +16,19 @@ export function useListSelection<Item extends { id: string }>({
   activeItemId,
 }: UseListSelectionArgs<Item>): UseListSelectionResult<Item> {
   const [selectedItemId, setSelectedItemId] = useState('');
-  const lastActiveItemIdRef = useRef(activeItemId);
+  const [lastActiveItemId, setLastActiveItemId] = useState(activeItemId);
+  const activeItemExists = !!activeItemId && items.some(item => item.id === activeItemId);
+  const selectedItemExists = !!selectedItemId && items.some(item => item.id === selectedItemId);
+  const nextSelectedId = !items.length ? ''
+    : activeItemExists && (!selectedItemExists || lastActiveItemId !== activeItemId) ? activeItemId
+    : selectedItemExists ? selectedItemId : items[0].id;
+  if (lastActiveItemId !== activeItemId) setLastActiveItemId(activeItemId);
+  if (nextSelectedId !== selectedItemId) setSelectedItemId(nextSelectedId);
 
   const selectedItem = useMemo(
-    () => items.find((item) => item.id === selectedItemId) ?? null,
+    () => items.find(item => item.id === selectedItemId) ?? null,
     [items, selectedItemId],
   );
-
-  useEffect(() => {
-    if (items.length === 0) {
-      setSelectedItemId('');
-      lastActiveItemIdRef.current = activeItemId;
-      return;
-    }
-
-    const activeItemExists = !!activeItemId && items.some((item) => item.id === activeItemId);
-    const selectedItemExists = !!selectedItemId && items.some((item) => item.id === selectedItemId);
-    const activeItemChanged = lastActiveItemIdRef.current !== activeItemId;
-
-    if (!selectedItemExists && activeItemExists) {
-      setSelectedItemId(activeItemId);
-      lastActiveItemIdRef.current = activeItemId;
-      return;
-    }
-
-    if (activeItemChanged && activeItemExists) {
-      setSelectedItemId(activeItemId);
-      lastActiveItemIdRef.current = activeItemId;
-      return;
-    }
-
-    if (!selectedItemExists) {
-      setSelectedItemId(items[0].id);
-    }
-
-    lastActiveItemIdRef.current = activeItemId;
-  }, [activeItemId, items, selectedItemId]);
 
   return {
     selectedItemId,

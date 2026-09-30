@@ -116,7 +116,7 @@ describe('ChatContextProvider integration', () => {
   });
 
   it('sends the current navigation scope on each turn without adding it to visible messages', async () => {
-    const bodies: any[] = [];
+    const bodies: /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any[] = [];
     mocks.fetch.mockImplementation((url: string, options: RequestInit) => {
       if (url.endsWith('/stream')) bodies.push(JSON.parse(options.body as string));
       return Promise.resolve(createSseResponse([{ type: 'done', message: 'Ready.' }]));

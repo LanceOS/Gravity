@@ -52,6 +52,7 @@ function ConsentRequest({ requestId, accountEmail }: { requestId: string; accoun
 
   useEffect(() => {
     if (!requestId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- The abortable consent request owns loading/error state, including invalid request IDs.
       setError('This page is missing a connection request. Start the connection from your AI client.');
       setUnavailable(true);
       setLoading(false);
@@ -79,6 +80,7 @@ function ConsentRequest({ requestId, accountEmail }: { requestId: string; accoun
   useEffect(() => {
     if (!request) return;
     const remaining = Date.parse(request.expiresAt) - Date.now();
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Synchronize expiration with the external clock and schedule the deadline callback.
     setExpired(remaining <= 0);
     if (remaining <= 0) return;
     const timer = window.setTimeout(() => setExpired(true), remaining);

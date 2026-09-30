@@ -98,6 +98,7 @@ export function useWorkspaceProjectPanelLabelState({
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Changing the managed project clears the previous project label editor.
     clearLabelEditor();
   }, [clearLabelEditor, managedProjectId]);
 
@@ -108,6 +109,7 @@ export function useWorkspaceProjectPanelLabelState({
 
     const nextLabel = sortedLabels.find((label) => label.id === editingLabelId);
     if (!nextLabel) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Synchronize the editable label fields with the newly selected or externally updated label.
       clearLabelEditor();
       return;
     }

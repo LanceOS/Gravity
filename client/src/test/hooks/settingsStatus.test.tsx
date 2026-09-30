@@ -23,7 +23,7 @@ beforeEach(() => vi.clearAllMocks());
 
 describe('settings persistence status', () => {
   it('keeps workspace edits on failure, permits retry, then becomes clean after confirmation', async () => {
-    vi.mocked(apiClient.get).mockImplementation(async path => path.endsWith('/settings') ? { ...workspace } : [] as any);
+    vi.mocked(apiClient.get).mockImplementation(async path => path.endsWith('/settings') ? { ...workspace } : [] as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any);
     const client = new QueryClient();
     const { result } = renderHook(() => useWorkspaceSettings({ currentUser: user, activeWorkspaceId: workspace.workspaceId }), {
       wrapper: ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>,
@@ -31,7 +31,7 @@ describe('settings persistence status', () => {
     await waitFor(() => expect(result.current.settingsLoading).toBe(false));
     expect(result.current.hasChanges).toBe(false);
     act(() => result.current.updateSettings({ hostUrl: 'https://new.example' }));
-    const request = deferred<any>();
+    const request = deferred</* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any>();
     vi.mocked(apiClient.patch).mockReturnValueOnce(request.promise);
     let running!: Promise<void>;
     act(() => { running = result.current.saveSettings(); });
@@ -59,7 +59,7 @@ describe('settings persistence status', () => {
     const { result } = renderHook(() => useAccountSettings({ currentUser: user, activeView: 'board', theme: 'dark', setTheme, setView }));
     await waitFor(() => expect(result.current.settingsHydrated).toBe(true));
     act(() => result.current.updateSettings({ defaultView: 'list' }));
-    const request = deferred<any>();
+    const request = deferred</* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any>();
     vi.mocked(apiClient.patch).mockReturnValueOnce(request.promise);
     let running!: Promise<void>;
     act(() => { running = result.current.saveSettings(); });
@@ -76,7 +76,7 @@ describe('settings persistence status', () => {
 
 
 it('refreshes workspace settings after all local edits have been reverted', async () => {
-  vi.mocked(apiClient.get).mockImplementation(async path => path.endsWith('/settings') ? { ...workspace } : [] as any);
+  vi.mocked(apiClient.get).mockImplementation(async path => path.endsWith('/settings') ? { ...workspace } : [] as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any);
   const client = new QueryClient();
   const { result } = renderHook(() => useWorkspaceSettings({ currentUser: user, activeWorkspaceId: workspace.workspaceId }), {
     wrapper: ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>,
@@ -85,21 +85,21 @@ it('refreshes workspace settings after all local edits have been reverted', asyn
   act(() => result.current.updateSettings({ hostUrl: 'https://draft.example' }));
   act(() => result.current.updateSettings({ hostUrl: '' }));
   expect(result.current.hasChanges).toBe(false);
-  vi.mocked(apiClient.get).mockImplementation(async path => path.endsWith('/settings') ? { ...workspace, hostUrl: 'https://server.example' } : [] as any);
+  vi.mocked(apiClient.get).mockImplementation(async path => path.endsWith('/settings') ? { ...workspace, hostUrl: 'https://server.example' } : [] as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any);
   await act(async () => { await result.current.refreshWorkspaceAdmin(); });
   expect(result.current.settings.hostUrl).toBe('https://server.example');
   expect(result.current.hasChanges).toBe(false);
 });
 
 it('preserves a workspace revert made while a different value is being saved', async () => {
-  vi.mocked(apiClient.get).mockImplementation(async path => path.endsWith('/settings') ? { ...workspace } : [] as any);
+  vi.mocked(apiClient.get).mockImplementation(async path => path.endsWith('/settings') ? { ...workspace } : [] as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any);
   const client = new QueryClient();
   const { result } = renderHook(() => useWorkspaceSettings({ currentUser: user, activeWorkspaceId: workspace.workspaceId }), {
     wrapper: ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>,
   });
   await waitFor(() => expect(result.current.settingsLoading).toBe(false));
   act(() => result.current.updateSettings({ hostUrl: 'https://submitted.example' }));
-  const request = deferred<any>();
+  const request = deferred</* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any>();
   vi.mocked(apiClient.patch).mockReturnValueOnce(request.promise);
   let running!: Promise<void>;
   act(() => { running = result.current.saveSettings(); });
@@ -115,7 +115,7 @@ it.each([false, true])('confirms the saved API key while preserving newer creden
   const { result } = renderHook(() => useAccountSettings({ currentUser: user, activeView: 'board', theme: 'dark', setTheme, setView }));
   await waitFor(() => expect(result.current.settingsHydrated).toBe(true));
   act(() => result.current.updateSettings({ apiKey: 'test-key' }));
-  const request = deferred<any>();
+  const request = deferred</* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any>();
   vi.mocked(apiClient.patch).mockReturnValueOnce(request.promise);
   let running!: Promise<void>;
   act(() => { running = result.current.saveSettings(); });

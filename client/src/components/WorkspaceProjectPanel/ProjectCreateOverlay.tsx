@@ -78,6 +78,7 @@ export function ProjectCreateOverlay({
 
   useEffect(() => {
     if (isOpen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Opening this retained modal starts a new editable draft; its inputs remain local state while open.
       resetForm();
     }
   }, [isOpen, resetForm]);

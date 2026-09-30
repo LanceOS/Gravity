@@ -27,7 +27,7 @@ export function useWorkspaceSelectionState({
 }: BaseWorkspaceSelectionArgs): void {
   const cachedWorkspaceIdKey = useMemo(
     () => (currentUser ? (['workspaceShell', 'activeWorkspaceId', { userId: currentUser.id }] as const) : null),
-    [currentUser?.id]
+    [currentUser]
   );
 
   const { readValue, writeValue } = useQueryCacheString({

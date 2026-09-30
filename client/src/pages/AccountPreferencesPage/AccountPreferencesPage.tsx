@@ -1,1 +1,1 @@
-export { AccountPreferencesPage, AccountPreferencesPageRoute } from '../../modules/accountPreferencesPage/screens';
+export { AccountPreferencesPage, AccountPreferencesPageRoute } from '../../modules/accountPreferencesPage';

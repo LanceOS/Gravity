@@ -52,8 +52,8 @@ vi.mock('../../context/cycle/CycleContext', () => ({
 vi.mock('@library', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@library')>();
 
-  const MockRichTextEditor = forwardRef<any, any>(function MockRichTextEditor(
-    { value, onChange, placeholder, className, minHeight, toolbarMode, surface }: any,
+  const MockRichTextEditor = forwardRef</* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any, any>(function MockRichTextEditor(
+    { value, onChange, placeholder, className, minHeight, toolbarMode, surface }: /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any,
     ref,
   ) {
     const [text, setText] = useState(() => {
@@ -157,7 +157,7 @@ vi.mock('@library', async (importOriginal) => {
         )}
       </div>
     ),
-    Popover: ({ trigger, children }: any) => (
+    Popover: ({ trigger, children }: /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any) => (
       <div>
         {trigger}
         <div>{children}</div>

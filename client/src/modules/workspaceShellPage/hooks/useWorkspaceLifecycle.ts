@@ -217,6 +217,7 @@ export function useWorkspaceProjectSelection({
       return;
     }
   }, [
+    activeWorkspaceProjects,
     activeProjectId,
     activeWorkspaceDefaultProjectId,
     activeWorkspaceId,

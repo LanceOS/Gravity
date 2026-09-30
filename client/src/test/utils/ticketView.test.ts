@@ -101,7 +101,7 @@ describe('ticketView utils', () => {
       createdAt: '2026-05-01T00:00:00.000Z',
       updatedAt: '2026-05-01T00:00:00.000Z',
       branchName: 'feature/GRA-99-new-thing',
-    } as any;
+    } as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any;
 
     const results = filterTickets([branchTicket], { ...baseFilters, search: 'GRA-99' });
     expect(results).toHaveLength(1);
@@ -127,7 +127,7 @@ describe('ticketView utils', () => {
       createdAt: '2026-05-01T00:00:00.000Z',
       updatedAt: '2026-05-01T00:00:00.000Z',
       branchName: 'feature/GRA-100-awesome',
-    } as any;
+    } as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any;
 
     expect(filterTickets([branchTicket], { ...baseFilters, search: 'GRA100' })).toHaveLength(1);
     expect(filterTickets([branchTicket], { ...baseFilters, search: 'gra-100' })).toHaveLength(1);
@@ -208,7 +208,7 @@ describe('ticketView utils', () => {
         createdAt: '2026-05-02T00:00:00.000Z',
         updatedAt: '2026-05-02T00:00:00.000Z',
       },
-    ] as any;
+    ] as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any;
 
     expect(sortTicketsForList(tickets, {}, 'newest_urgent').map((ticket) => ticket.id)).toEqual([
       'urgent',

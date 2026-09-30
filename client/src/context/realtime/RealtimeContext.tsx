@@ -4,7 +4,7 @@ import { disposeSseService, getSseService } from '../../services/sseService';
 import { SseEventCoalescer, type SseCoalescedEvent } from '../../services/SseEventCoalescer';
 import { normalizeCommentPayload, normalizeTicketPayload, invalidateAggregateTicketQueries } from '../shared';
 import { useActiveProject } from '../project/ActiveProjectContext';
-import { useProjectContext, ProjectContext } from '../project/ProjectContext';
+import { ProjectContext } from '../project/ProjectContext';
 import { resolveWorkspaceIdForSse } from '../project/projectCacheUtils';
 import { useActiveTicket } from '../ticket/ActiveTicketContext';
 import { queryKeys } from '../../utils/queryClient';
@@ -34,14 +34,12 @@ export function useRealtimeContext(): RealtimeContextType {
   return context;
 }
 
-export function useRealtimeContextValue({
-  currentUserId,
-}: RealtimeContextValueArgs): RealtimeContextType {
+export function useRealtimeContextValue(_options: RealtimeContextValueArgs): RealtimeContextType {
   const { activeProjectId } = useActiveProject();
   const { activeTicket, setActiveTicket } = useActiveTicket();
   const projectContext = React.useContext(ProjectContext);
-  const projects = projectContext?.projects || [];
-  const projectLookup = projectContext?.projectLookup || new Map();
+  const projects = useMemo(() => projectContext?.projects || [], [projectContext?.projects]);
+  const projectLookup = useMemo(() => projectContext?.projectLookup || new Map(), [projectContext?.projectLookup]);
   const queryClient = useQueryClient();
   const activeTicketRef = useRef<Ticket | null>(activeTicket);
   const sseCoalescerRef = useRef<SseEventCoalescer | null>(null);

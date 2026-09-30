@@ -81,6 +81,7 @@ export function useWorkspaceProjectPanelProjectState({
   const shouldShowLabels = true;
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Reconcile the managed selection when the externally supplied project inventory or active project changes.
     setManagedProjectId((currentId) =>
       resolveManagedProjectId({
         projects,

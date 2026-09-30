@@ -35,11 +35,9 @@ function ProgrammaticPasteFixture() {
 }
 
 function ClipboardDropFixture() {
-  const source = useRichTextEditor({ value: 'a  b', onChange: () => {} });
-  const target = useRichTextEditor({ value: 'AB', onChange: () => {} });
+  const { view: sourceView, mountRef: sourceMountRef } = useRichTextEditor({ value: 'a  b', onChange: () => {} });
+  const { view: targetView, mountRef: targetMountRef } = useRichTextEditor({ value: 'AB', onChange: () => {} });
   useEffect(() => {
-    const sourceView = source.view;
-    const targetView = target.view;
     if (!sourceView || !targetView) return;
     Object.assign(testApi, {
       copySelection: (closed: boolean) => {
@@ -92,10 +90,10 @@ function ClipboardDropFixture() {
         return { serialized, reloaded: serializeRichTextJson(targetView.state.doc) };
       },
     });
-  }, [source.view, target.view]);
+  }, [sourceView, targetView]);
   return <>
-    <section data-testid="drop-source"><div ref={source.mountRef} /></section>
-    <section data-testid="drop-target"><div ref={target.mountRef} /></section>
+    <section data-testid="drop-source"><div ref={sourceMountRef} /></section>
+    <section data-testid="drop-target"><div ref={targetMountRef} /></section>
   </>;
 }
 

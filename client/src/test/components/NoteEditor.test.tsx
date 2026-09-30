@@ -11,8 +11,8 @@ vi.mock('../../modules/notes/hooks/useNote', () => ({
 
 vi.mock('@library', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@library')>();
-  const MockRichTextEditor = forwardRef<any, any>(function MockRichTextEditor(
-    { value, onChange, placeholder, className, toolbarMode }: any,
+  const MockRichTextEditor = forwardRef</* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any, any>(function MockRichTextEditor(
+    { value, onChange, placeholder, className, toolbarMode }: /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any,
     ref,
   ) {
     const [internalValue, setInternalValue] = useState(value);
@@ -53,17 +53,26 @@ vi.mock('@library', async (importOriginal) => {
   };
 });
 
+function makeNote(overrides: Partial<NonNullable<ReturnType<typeof useNote>['note']>> = {}) {
+  return {
+    id: 'note-1', projectId: 'proj-1', userId: 'user-1',
+    title: 'Test Title', body: 'Test body', version: 1,
+    createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z',
+    ...overrides,
+  };
+}
+
 describe('NoteEditor', () => {
   const mockSaveNote = vi.fn();
   const mockUploadMedia = vi.fn().mockResolvedValue('/image.png');
 
   beforeEach(() => {
     vi.clearAllMocks();
-    writeDraft('gravity:note-draft:[null,"proj-1","note-1"]', null);
-    writeDraft('gravity:note-draft:[null,"proj-1","note-2"]', null);
+    writeDraft('gravity:note-draft:["user-1","proj-1","note-1"]', null);
+    writeDraft('gravity:note-draft:["user-1","proj-1","note-2"]', null);
     mockSaveNote.mockResolvedValue(undefined);
-    (useNote as any).mockReturnValue({
-      note: { id: 'note-1', title: 'Test Title', body: 'Test body', version: 1 },
+    vi.mocked(useNote, { partial: true, deep: true }).mockReturnValue({
+      note: makeNote({ id: 'note-1', title: 'Test Title', body: 'Test body', version: 1 }),
       loading: false,
       saving: false,
       saveError: null,
@@ -79,7 +88,7 @@ describe('NoteEditor', () => {
   });
 
   it('renders loading state initially if loading', () => {
-    (useNote as any).mockReturnValue({ loading: true, note: null });
+    vi.mocked(useNote, { partial: true, deep: true }).mockReturnValue({ loading: true, note: null });
     render(<NoteEditor projectId="proj-1" noteId="note-1" />);
     expect(screen.getByText('Loading note...')).toBeInTheDocument();
   });
@@ -94,8 +103,8 @@ describe('NoteEditor', () => {
   });
 
   it('normalizes the legacy empty heading body on load', () => {
-    (useNote as any).mockReturnValue({
-      note: { id: 'note-1', title: 'Test Title', body: '# \n\nReal body' },
+    vi.mocked(useNote, { partial: true, deep: true }).mockReturnValue({
+      note: makeNote({ id: 'note-1', title: 'Test Title', body: '# \n\nReal body', version: 1 }),
       loading: false,
       saving: false,
       saveError: null,
@@ -145,8 +154,8 @@ describe('NoteEditor', () => {
   });
 
   it('displays saving state', () => {
-    (useNote as any).mockReturnValue({
-      note: { id: 'note-1', title: 'Test Title', body: 'Test body' },
+    vi.mocked(useNote, { partial: true, deep: true }).mockReturnValue({
+      note: makeNote({ id: 'note-1', title: 'Test Title', body: 'Test body', version: 1 }),
       saving: true,
       saveError: null,
       savedAt: null,
@@ -159,8 +168,8 @@ describe('NoteEditor', () => {
   });
 
   it('displays save error state', () => {
-    (useNote as any).mockReturnValue({
-      note: { id: 'note-1', title: 'Test Title', body: 'Test body' },
+    vi.mocked(useNote, { partial: true, deep: true }).mockReturnValue({
+      note: makeNote({ id: 'note-1', title: 'Test Title', body: 'Test body', version: 1 }),
       saving: false,
       saveError: 'Network Error',
       savedAt: null,
@@ -174,8 +183,8 @@ describe('NoteEditor', () => {
 
   it('displays saved at time', () => {
     const time = new Date('2026-01-01T12:00:00Z');
-    (useNote as any).mockReturnValue({
-      note: { id: 'note-1', title: 'Test Title', body: 'Test body' },
+    vi.mocked(useNote, { partial: true, deep: true }).mockReturnValue({
+      note: makeNote({ id: 'note-1', title: 'Test Title', body: 'Test body', version: 1 }),
       saving: false,
       saveError: null,
       savedAt: time,
@@ -190,7 +199,7 @@ describe('NoteEditor', () => {
   it('handles drag and drop file uploads', async () => {
     render(<NoteEditor projectId="proj-1" noteId="note-1" />);
 
-    const dropZone = screen.getByTestId('rich-text-editor').parentElement?.parentElement!;
+    const dropZone = screen.getByTestId('rich-text-editor').parentElement!.parentElement!;
 
     fireEvent.dragOver(dropZone);
     expect(screen.getByText('Drop image to attach')).toBeInTheDocument();

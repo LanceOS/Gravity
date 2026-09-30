@@ -36,8 +36,6 @@ globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
 const RESET = '\x1b[0m';
 const GREEN = '\x1b[32m';
 const RED = '\x1b[31m';
-const YELLOW = '\x1b[33m';
-const BLUE = '\x1b[34m';
 const CYAN = '\x1b[36m';
 const BOLD = '\x1b[1m';
 
@@ -134,7 +132,7 @@ async function signUpUser(name: string, email: string, password: string) {
   });
 
   assert(res.ok, `Sign-up should succeed for ${email}`);
-  const data = await res.json() as any;
+  const data = await res.json();
   assert(typeof data.user?.id === 'string' && data.user.id.length > 0, `Sign-up should return a user id for ${email}`);
   return data.user.id as string;
 }
@@ -153,7 +151,7 @@ async function createProjectFixture(ownerId: string, name: string, key: string) 
   });
 
   assert(res.status === 201, `${name} fixture project should be created`);
-  return await res.json() as any;
+  return await res.json();
 }
 
 // Test cases
@@ -172,7 +170,7 @@ const tests = [
       });
 
       assert(res.status === 200, 'Signup status should be 200');
-      const data = await res.json() as any;
+      const data = await res.json();
       assert(data.user !== undefined, 'User object should be returned');
       assert(data.user.email === 'jane@gravity.dev', 'Returned email should match');
       assert(typeof data.user.id === 'string' && data.user.id.length > 0, 'User ID should be returned');
@@ -195,7 +193,7 @@ const tests = [
       });
 
       assert(res.status === 400, 'Should reject registration with 400 Bad Request');
-      const data = await res.json() as any;
+      const data = await res.json();
       assert(data.error.includes('required'), 'Should return required fields error description');
     }
   },
@@ -213,7 +211,7 @@ const tests = [
       });
 
       assert(res.status === 400, 'Should reject duplicate email registration with 400');
-      const data = await res.json() as any;
+      const data = await res.json();
       assert(
         /already|duplicate|exist|registered|unique constraint/i.test(String(data.error ?? '')),
         'Should report a duplicate-email registration error',
@@ -233,7 +231,7 @@ const tests = [
       });
 
       assert(res.status === 200, 'Signin status should be 200');
-      const data = await res.json() as any;
+      const data = await res.json();
       assert(data.user.id === testUserId, 'Signed in user ID should match registered ID');
       assert(data.user.name === 'Jane Tester', 'User name should match');
       assert(data.user.password === undefined, 'Password must be completely omitted in login API response for security');
@@ -252,7 +250,7 @@ const tests = [
       });
 
       assert(res.status === 401, 'Should fail with 401 Unauthorized for unknown emails');
-      const data = await res.json() as any;
+      const data = await res.json();
       assert(
         /not found|register|invalid email or password/i.test(String(data.error ?? '')),
         'Should report a safe authentication failure message for unknown emails',
@@ -272,7 +270,7 @@ const tests = [
       });
 
       assert(res.status === 401, 'Should fail with 401 Unauthorized for bad passwords');
-      const data = await res.json() as any;
+      const data = await res.json();
       assert(
         /incorrect password|invalid email or password/i.test(String(data.error ?? '')),
         'Should report a safe authentication failure message for bad passwords',
@@ -289,7 +287,7 @@ const tests = [
       });
 
       assert(res.ok, 'Tutorial update should succeed');
-      const data = await res.json() as any;
+      const data = await res.json();
       assert(data.user.tutorial_completed === 1, 'tutorial_completed should now be persisted as 1 (true) in the workspace database');
     }
   },
@@ -297,9 +295,9 @@ const tests = [
     name: "Auto-Initialized Settings (GET Jane's Initial Defaults)",
     fn: async () => {
       // Jane was created in Test 1. Her settings should have been auto-seeded during signup.
-      let res = await fetch(`${BASE_URL}/api/settings/${testUserId}`);
+      const res = await fetch(`${BASE_URL}/api/settings/${testUserId}`);
       assert(res.ok, 'GET Settings should succeed for a registered user');
-      let settings = await res.json() as any;
+      const settings = await res.json();
       assert(settings.userId === testUserId, 'Should return settings mapped to correct userId');
       assert(settings.defaultView === 'board', 'Should fallback to default view: board');
       assert(settings.theme === 'dark', 'Should fallback to default theme: dark');
@@ -321,7 +319,7 @@ const tests = [
       });
 
       assert(res.ok, 'Settings patch should be successful');
-      let settings = await res.json() as any;
+      const settings = await res.json();
       assert(settings.defaultView === 'list', 'Theme preferences should be patched');
       assert(settings.theme === 'light', 'Theme should be light');
       assert(settings.projectLayout === 'condensed', 'Project layout density should be patched');
@@ -329,7 +327,7 @@ const tests = [
       // 2. GET back Jane's settings to verify SQL database persistence
       res = await fetch(`${BASE_URL}/api/settings/${testUserId}`);
       assert(res.ok, 'GET settings should succeed');
-      const loaded = await res.json() as any;
+      const loaded = await res.json();
       assert(loaded.projectLayout === 'condensed', 'Verify layout density matches patched value');
     }
   },
@@ -365,7 +363,7 @@ const tests = [
       });
 
       assert(res.status === 201, 'Project create status should be 201');
-      const data = await res.json() as any;
+      const data = await res.json();
       assert(data.key === 'TST', 'Project key prefix should match TST');
       assert(data.inviteCode !== undefined, 'Project should automatically generate an inviteCode');
       assert(data.inviteCode.startsWith('INV-TST-'), 'Invite code should follow INV-PREFIX pattern');
@@ -386,7 +384,7 @@ const tests = [
       });
 
       assert(res.status === 400, 'Projects creation should fail on missing fields with status 400');
-      const data = await res.json() as any;
+      const data = await res.json();
       assert(data.error.includes('required'), 'Should state name and key are required');
     }
   },
@@ -406,7 +404,7 @@ const tests = [
       });
 
       assert(res.status === 409, 'Duplicate project keys should be rejected with 409');
-      const data = await res.json() as any;
+      const data = await res.json();
       assert(
         data.error === 'Project key TST is already in use. Choose a different global project key.',
         'Duplicate project keys should return a friendly conflict message',
@@ -427,11 +425,11 @@ const tests = [
       });
 
       assert(res.ok, 'Adding members should succeed');
-      const data = await res.json() as any;
+      const data = await res.json();
       assert(data.success === true, 'Success flag should be true');
       const membersRes = await fetch(`${BASE_URL}/api/users?projectId=${encodeURIComponent(gravityProjectId)}`);
       assert(membersRes.ok, 'Project members lookup should succeed');
-      const members = await membersRes.json() as any[];
+      const members = await membersRes.json() as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any[];
       assert(members.some((member) => member.id === testUserId), 'Jane should exist inside the project user list');
 
       const resDup = await fetch(`${BASE_URL}/api/projects/${gravityProjectId}/members`, {
@@ -446,7 +444,7 @@ const tests = [
 
       const dedupedMembersRes = await fetch(`${BASE_URL}/api/users?projectId=${encodeURIComponent(gravityProjectId)}`);
       assert(dedupedMembersRes.ok, 'Project members lookup after duplicate assignment should succeed');
-      const dedupedMembers = await dedupedMembersRes.json() as any[];
+      const dedupedMembers = await dedupedMembersRes.json() as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any[];
       assert(dedupedMembers.filter((member) => member.id === testUserId).length === 1, 'Duplicate assignment should not create duplicate members');
     }
   },
@@ -464,7 +462,7 @@ const tests = [
       });
 
       assert(res.ok, 'Invite acceptance should succeed');
-      const data = await res.json() as any;
+      const data = await res.json();
       assert(data.project.key === 'TST', 'Joined project key should match');
     }
   },
@@ -489,7 +487,7 @@ const tests = [
       // Retrieve projects Jane has joined
       const res = await fetch(`${BASE_URL}/api/projects?userId=${testUserId}`);
       assert(res.ok, 'Projects search with userId query should succeed');
-      const projects = await res.json() as any[];
+      const projects = await res.json() as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any[];
       assert(projects.length > 0, 'Jane should be joined to projects she owned/created');
       assert(projects.some(p => p.name === 'Sandboxed Test'), 'Jane should belong to project TST');
     }
@@ -497,7 +495,7 @@ const tests = [
   {
     name: 'Dynamic Tenant-Database Multi-Tenant Isolation API',
     fn: async () => {
-      let res1 = await fetch(`${BASE_URL}/api/tickets`, {
+      const res1 = await fetch(`${BASE_URL}/api/tickets`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -514,12 +512,12 @@ const tests = [
       });
 
       assert(res1.status === 201, 'Ticket creation should succeed in the gravity fixture project');
-      const ticket1 = await res1.json() as any;
+      const ticket1 = await res1.json();
       assert(ticket1.key.startsWith('GRA-'), 'Ticket key prefix should reflect project gravity key GRA');
       createdTicketId = ticket1.id;
       createdTicketKey = ticket1.key;
 
-      let res2 = await fetch(`${BASE_URL}/api/tickets`, {
+      const res2 = await fetch(`${BASE_URL}/api/tickets`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -536,12 +534,12 @@ const tests = [
       });
 
       assert(res2.status === 201, 'Ticket creation should succeed in the AI fixture project');
-      const ticket2 = await res2.json() as any;
+      const ticket2 = await res2.json();
       assert(ticket2.key.startsWith('AI-'), 'Ticket key prefix should reflect AI project');
 
-      let listRes = await fetch(`${BASE_URL}/api/tickets?projectId=${encodeURIComponent(gravityProjectId)}`);
+      const listRes = await fetch(`${BASE_URL}/api/tickets?projectId=${encodeURIComponent(gravityProjectId)}`);
       assert(listRes.ok, 'GET tickets from the gravity fixture project should succeed');
-      const list = await listRes.json() as any[];
+      const list = await listRes.json() as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any[];
       assert(list.some(t => t.id === createdTicketId), 'Should include gravity ticket');
       assert(!list.some(t => t.id === ticket2.id), 'Project-scoped ticket listing should not contain AI project tickets');
     }
@@ -554,7 +552,7 @@ const tests = [
       
       const res2 = await fetch(`${BASE_URL}/api/tickets/${createdTicketId}`);
       assert(res2.ok, 'Fetching a single ticket by id should succeed without explicit project context');
-      const ticket = await res2.json() as any;
+      const ticket = await res2.json();
       assert(ticket.id === createdTicketId, 'Single ticket lookup without explicit project context should resolve the requested ticket');
 
       const res3 = await fetch(`${BASE_URL}/api/tickets/t-non-existent?projectId=${encodeURIComponent(gravityProjectId)}`);
@@ -578,7 +576,7 @@ const tests = [
       });
 
       assert(res.ok, 'Ticket PATCH update should succeed');
-      const updated = await res.json() as any;
+      const updated = await res.json();
       assert(updated.status === 'in_progress', 'Status updated successfully');
       assert(updated.priority === 'urgent', 'Priority updated successfully');
       assert(updated.description === 'Updated ticket description text.', 'Description updated successfully');
@@ -602,17 +600,17 @@ const tests = [
       });
 
       assert(res.status === 201, 'Sub-ticket creation should succeed');
-      const sub = await res.json() as any;
+      const sub = await res.json();
       assert(sub.parentId === createdTicketId, 'Sub-ticket parentId should match the parent');
       subTicketId = sub.id;
 
       // GET parent ticket detailed view and verify subTickets array includes sub-ticket details
       const detailRes = await fetch(`${BASE_URL}/api/tickets/${createdTicketId}?projectId=${encodeURIComponent(gravityProjectId)}`);
       assert(detailRes.ok, 'GET parent ticket detail should succeed');
-      const detail = await detailRes.json() as any;
+      const detail = await detailRes.json();
       const subtaskList = Array.isArray(detail.subTickets) ? detail.subTickets : detail.subtasks;
       assert(Array.isArray(subtaskList), 'Subtask array should be fetched');
-      assert(subtaskList.some((t: any) => t.id === subTicketId), 'Subtask check should be included');
+      assert(subtaskList.some((t: /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any) => t.id === subTicketId), 'Subtask check should be included');
     }
   },
   {
@@ -632,7 +630,7 @@ const tests = [
       });
 
       assert(res.status === 201, 'Posting comment should succeed');
-      const comment = await res.json() as any;
+      const comment = await res.json();
       assert(comment.body === 'Jane posted a test comment here.', 'Comment body matches');
       assert(comment.userName === 'Jane Tester', 'Should perform attached database join for username from central DB');
       assert(comment.userAvatar.includes('bottts'), 'Should join avatar');
@@ -715,18 +713,18 @@ const tests = [
       });
 
       assert(res.status === 200, 'Webhook post should succeed');
-      const data = await res.json() as any;
+      const data = await res.json();
       assert(data.updatedTickets.includes(createdTicketKey), 'Webhook must parse and find our ticket key');
 
       // Verify the ticket status in the workspace database was transitioned to in_review
       const ticketRes = await fetch(`${BASE_URL}/api/tickets/${createdTicketId}?projectId=${encodeURIComponent(gravityProjectId)}`);
-      const ticket = await ticketRes.json() as any;
+      const ticket = await ticketRes.json();
       assert(ticket.status === 'in_review', 'Ticket status should transition to in_review');
       assert(ticket.prStatus === 'open', 'PR status should reflect open');
       assert(ticket.prUrl === 'https://github.com/lance/gravity/pull/101', 'PR URL should be synced');
       
       // Verify automatic PR warning comment was posted
-      assert(ticket.comments.some((c: any) => c.body.includes('GitHub PR update')), 'Webhook should post an automatic PR update comment');
+      assert(ticket.comments.some((c: /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any) => c.body.includes('GitHub PR update')), 'Webhook should post an automatic PR update comment');
     }
   },
   {
@@ -756,7 +754,7 @@ const tests = [
 
       // Verify the ticket status transitioned to done
       const ticketRes = await fetch(`${BASE_URL}/api/tickets/${createdTicketId}?projectId=${encodeURIComponent(gravityProjectId)}`);
-      const ticket = await ticketRes.json() as any;
+      const ticket = await ticketRes.json();
       assert(ticket.status === 'done', 'Ticket status should now transition to done');
       assert(ticket.prStatus === 'merged', 'PR status should reflect merged');
     }
@@ -770,7 +768,7 @@ const tests = [
       });
 
       assert(res.status === 200, 'Deleting a ticket should return 200');
-      const data = await res.json() as any;
+      const data = await res.json();
       assert(data.success === true, 'Success flag returned');
 
       // Attempt to retrieve deleted ticket inside correct context, expect 404
@@ -795,7 +793,7 @@ const tests = [
       });
 
       assert(res.status === 201, 'Domain creation should yield 201');
-      const domain = await res.json() as any;
+      const domain = await res.json();
       assert(domain.name === 'Security Ops', 'Domain name matches');
       assert(domain.color === '#ef4444', 'Color matches');
       createdDomainId = domain.id;
@@ -803,7 +801,7 @@ const tests = [
       // 2. Fetch list and verify it is included
       const listRes = await fetch(`${BASE_URL}/api/domains?projectId=${encodeURIComponent(gravityProjectId)}`);
       assert(listRes.ok, 'List domains should succeed');
-      const list = await listRes.json() as any[];
+      const list = await listRes.json() as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any[];
       assert(list.some(d => d.id === createdDomainId), 'Domain list should include newly created domain');
     }
   },
@@ -828,14 +826,14 @@ const tests = [
       });
 
       assert(res.status === 201, 'Cycle creation should yield 201');
-      const cycle = await res.json() as any;
+      const cycle = await res.json();
       assert(cycle.name === 'Sprint 3: Verification', 'Cycle name matches');
       createdCycleId = cycle.id;
 
       // 2. Fetch list and verify it contains our sprint
       const listRes = await fetch(`${BASE_URL}/api/cycles?projectId=${encodeURIComponent(gravityProjectId)}`);
       assert(listRes.ok, 'List cycles should succeed');
-      const list = await listRes.json() as any[];
+      const list = await listRes.json() as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any[];
       assert(list.some(c => c.id === createdCycleId), 'Cycle list should include newly created cycle');
     }
   },
@@ -844,13 +842,13 @@ const tests = [
     fn: async () => {
       const res = await fetch(`${BASE_URL}/api/projects?userId=${testUserId}`);
       assert(res.ok, 'Aggregated project hydration should succeed');
-      const projects = await res.json() as any[];
+      const projects = await res.json() as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any[];
       const gravityProject = projects.find((project) => project.id === gravityProjectId);
       assert(gravityProject !== undefined, 'Hydration should include the gravity fixture project');
       assert(Array.isArray(gravityProject.domains), 'Hydration should include a domains array');
       assert(Array.isArray(gravityProject.cycles), 'Hydration should include a cycles array');
-      assert(gravityProject.domains.some((domain: any) => domain.id === createdDomainId), 'Hydration should include the created domain');
-      assert(gravityProject.cycles.some((cycle: any) => cycle.id === createdCycleId), 'Hydration should include the created cycle');
+      assert(gravityProject.domains.some((domain: /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any) => domain.id === createdDomainId), 'Hydration should include the created domain');
+      assert(gravityProject.cycles.some((cycle: /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any) => cycle.id === createdCycleId), 'Hydration should include the created cycle');
     }
   },
   {
@@ -868,7 +866,7 @@ const tests = [
       });
 
       assert(res.status === 200, 'MCP initialize should return 200');
-      const data = await res.json() as any;
+      const data = await res.json();
       assert(data.jsonrpc === '2.0', 'JSON-RPC version is 2.0');
       assert(data.result.protocolVersion === '2024-11-05', 'Protocol version matches');
       assert(data.result.serverInfo.name === 'gravity-mcp-server', 'Server name matches');
@@ -889,10 +887,10 @@ const tests = [
       });
 
       assert(res.status === 200, 'Tools list should return 200');
-      const data = await res.json() as any;
+      const data = await res.json();
       assert(Array.isArray(data.result.tools), 'Result tools must be an array');
-      assert(data.result.tools.some((t: any) => t.name === 'list_tickets'), 'Exposes list_tickets');
-      assert(data.result.tools.some((t: any) => t.name === 'get_ticket_details'), 'Exposes get_ticket_details');
+      assert(data.result.tools.some((t: /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any) => t.name === 'list_tickets'), 'Exposes list_tickets');
+      assert(data.result.tools.some((t: /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any) => t.name === 'get_ticket_details'), 'Exposes get_ticket_details');
     }
   },
   {
@@ -917,10 +915,10 @@ const tests = [
       });
 
       assert(res.status === 200, 'Tools call should yield 200');
-      let data = await res.json() as any;
+      let data = await res.json();
       assert(data.result !== undefined, 'result object returned');
       const text = data.result.content[0].text;
-      const list = JSON.parse(text) as any[];
+      const list = JSON.parse(text) as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any[];
       assert(Array.isArray(list), 'Parsed text should be tickets array');
       assert(list.some(t => t.id === createdTicketId), 'Tickets list contains our created ticket');
 
@@ -940,8 +938,8 @@ const tests = [
           }
         })
       });
-      data = await res.json() as any;
-      const details = JSON.parse(data.result.content[0].text) as any;
+      data = await res.json();
+      const details = JSON.parse(data.result.content[0].text) as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any;
       assert(details.key === createdTicketKey, 'Key matches details key');
       assert(details.comments.length > 0, 'Includes posted thread comments');
 
@@ -964,8 +962,8 @@ const tests = [
           }
         })
       });
-      data = await res.json() as any;
-      const createResponse = JSON.parse(data.result.content[0].text) as any;
+      data = await res.json();
+      const createResponse = JSON.parse(data.result.content[0].text) as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any;
       assert(createResponse.ticket.title === 'MCP Formulated Ticket', 'Verify title of MCP ticket');
       const mcpTicketKey = createResponse.ticket.key;
 
@@ -987,8 +985,8 @@ const tests = [
           }
         })
       });
-      data = await res.json() as any;
-      const updateResponse = JSON.parse(data.result.content[0].text) as any;
+      data = await res.json();
+      const updateResponse = JSON.parse(data.result.content[0].text) as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any;
       assert(updateResponse.ticket.status === 'in_progress', 'Verify status patched through MCP');
       assert(updateResponse.ticket.priority === 'high', 'Verify priority patched through MCP');
 
@@ -1010,8 +1008,8 @@ const tests = [
           }
         })
       });
-      data = await res.json() as any;
-      const commentResponse = JSON.parse(data.result.content[0].text) as any;
+      data = await res.json();
+      const commentResponse = JSON.parse(data.result.content[0].text) as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any;
       assert(commentResponse.comment.body === 'Comment posted through standard MCP stdio JSON-RPC routing.', 'Verify comment body');
     }
   },
@@ -1031,7 +1029,7 @@ const tests = [
       });
 
       assert(res.status === 200, 'HTTP standard should return 200 containing error payload');
-      let data = await res.json() as any;
+      let data = await res.json();
       assert(data.error !== undefined, 'Should return error payload');
       assert(data.error.code === -32601, 'Error code should represent Method Not Found');
 
@@ -1049,7 +1047,7 @@ const tests = [
           }
         })
       });
-      data = await res.json() as any;
+      data = await res.json();
       assert(data.error !== undefined, 'Should return error payload');
       assert(data.error.code === -32603, 'Error code should represent execution failure -32603');
     }
@@ -1067,7 +1065,7 @@ const tests = [
       });
 
       assert(res.status === 400, 'Structured connection wrapper should return 400 for invalid credentials');
-      const data = await res.json() as any;
+      const data = await res.json();
       assert(data.connected === false, 'Structured connection wrapper should report connected=false');
       assert(data.latency_ms === null, 'Structured connection wrapper should report null latency on failure');
       assert(typeof data.error === 'string' && data.error.length > 0, 'Structured connection wrapper should include an error string');
@@ -1086,7 +1084,7 @@ const tests = [
       });
 
       assert(res.status === 401 || res.status === 400 || res.status === 502, 'Should reject invalid credentials gracefully');
-      const data = await res.json() as any;
+      const data = await res.json();
       assert(data.error !== undefined, 'Error message should be returned in body');
     }
   },
@@ -1095,8 +1093,6 @@ const tests = [
 // Main runner
 async function runSuite() {
   setupSandbox();
-  
-  let successCount = 0;
   let failureCount = 0;
 
   try {
@@ -1111,8 +1107,7 @@ async function runSuite() {
       try {
         await t.fn();
         process.stdout.write(`${GREEN}✔ PASS${RESET}\n`);
-        successCount++;
-      } catch (err: any) {
+      } catch (err: /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any) {
         process.stdout.write(`${RED}✘ FAIL${RESET}\n`);
         console.error(`${RED}${BOLD}Reason: ${err.message}${RESET}\n`);
         failureCount++;
@@ -1123,11 +1118,9 @@ async function runSuite() {
 
     if (failureCount > 0) {
       process.exitCode = 1;
-    } else {
-      
     }
 
-  } catch (error: any) {
+  } catch (error: /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any) {
     console.error(`\n${RED}${BOLD}Critical error running test suite: ${error.message}${RESET}\n`);
     process.exitCode = 1;
   } finally {
