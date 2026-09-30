@@ -3,7 +3,7 @@ import React from 'react';
 type RefForwardingChild = React.ReactElement<React.RefAttributes<Element>>;
 
 export interface ClickAwayListenerProps {
-  children: React.ReactElement;
+  children: RefForwardingChild;
   onClickAway: (event: MouseEvent | TouchEvent) => void;
   active?: boolean;
 }
@@ -23,9 +23,8 @@ export const ClickAwayListener = React.forwardRef<Element, ClickAwayListenerProp
   { children, onClickAway, active = true },
   forwardedRef,
 ) {
-  // Keep the established broad child contract while limiting the clone boundary
-  // to the optional ref shape it needs to compose.
-  const child = children as RefForwardingChild;
+  // The child contract exposes the ref that this listener composes with its own.
+  const child = children;
   const childRef = React.useRef<Element | null>(null);
 
   React.useEffect(() => {

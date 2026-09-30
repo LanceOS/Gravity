@@ -370,6 +370,16 @@ export interface ContextMenuItemProps {
   closeOnClick?: boolean;
 }
 
+function hasDisplayName(type: unknown, displayName: string): boolean {
+  if (typeof type !== 'function' && (typeof type !== 'object' || type === null)) return false;
+  return 'displayName' in type && type.displayName === displayName;
+}
+
+function isContextMenuSubMenu(child: React.ReactNode): child is React.ReactElement<ContextMenuSubMenuProps> {
+  return React.isValidElement<ContextMenuSubMenuProps>(child)
+    && (child.type === ContextMenuSubMenu || hasDisplayName(child.type, 'ContextMenuSubMenu'));
+}
+
 export function ContextMenuItemComponent({
   children,
   icon,
@@ -391,18 +401,8 @@ export function ContextMenuItemComponent({
   const itemId = useId();
   // Extract submenu child from children
   const childrenArray = React.Children.toArray(children);
-  const submenu = childrenArray.find(
-    (child) =>
-      React.isValidElement(child) &&
-      (child.type === ContextMenuSubMenu || (child.type as any).displayName === 'ContextMenuSubMenu')
-  );
-  const labelContent = childrenArray.filter(
-    (child) =>
-      !(
-        React.isValidElement(child) &&
-        (child.type === ContextMenuSubMenu || (child.type as any).displayName === 'ContextMenuSubMenu')
-      )
-  );
+  const submenu = childrenArray.find(isContextMenuSubMenu);
+  const labelContent = childrenArray.filter((child) => !isContextMenuSubMenu(child));
 
   const hasSubmenu = !!submenu;
   const isSubmenuOpen = activeSubmenuId === itemId;
@@ -495,7 +495,7 @@ export function ContextMenuItemComponent({
           onMouseEnter={cancelSubmenuClose}
           onMouseLeave={requestSubmenuClose}
         >
-          {React.cloneElement(submenu as React.ReactElement<any>, {
+          {React.cloneElement(submenu, {
             parentItemRef: itemRef,
             onClose: handleCloseSubmenu,
           })}
