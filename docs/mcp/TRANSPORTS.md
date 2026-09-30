@@ -101,6 +101,44 @@ The standalone server initializes the database and tool registry. Standard input
 
 Closing stdin or sending SIGINT/SIGTERM stops the standalone session and closes its Redis bridge, shared Redis cache client, and database pool. This lets MCP clients stop the subprocess cleanly when they disconnect.
 
+### Stdio resource and cancellation limits
+
+The transport accepts newline-delimited JSON and the older Content-Length framing,
+including split headers and bodies. Each message is limited to 10 MiB by default;
+framing headers are limited to 64 KiB. Raw buffered input, including a coalesced
+chunk, is limited to the message limit plus 64 KiB. Oversized messages receive a
+framing error when possible; exceeding the raw buffering limit closes the session.
+Input/output errors and premature stream closure stop the session. Output
+backpressure pauses input and request dispatch until the writable emits `drain`.
+
+`McpSessionOptions` also accepts positive integer limits: `maxPendingRequests`
+(default 128, including the active request and notifications), `maxPendingBytes`
+(default 16 MiB of admitted JSON bytes), `requestTimeoutMs` (default 30,000), and
+`drainTimeoutMs` (default 30,000). Output is separately bounded by the same byte
+and message limits. Timeout values must fit a Node timer (at most 2,147,483,647 ms).
+Only one request executes at a time, preserving handshake and authorization order.
+Each execution deadline starts when its request is dispatched. EOF allows already
+accepted requests and output to finish, subject to a single drain deadline; stalled
+output has its own drain deadline even when input remains open.
+
+Queue overflow or any deadline closes the session and discards pending requests,
+buffered input, and queued output without generating an error flood. Explicit stop
+and abnormal stream closure use the same terminal cancellation behavior. No more
+handlers start, late responses are suppressed, and late authentication results
+cannot restore a session. A stopped session cannot be restarted. Cleanup does not
+wait for a stalled handler. The transport cannot interrupt synchronous JavaScript
+or forcibly cancel/roll back an operation already running inside a database or
+tool; that operation may still complete after disconnection. Clients must check
+the outcome of a timed-out write before retrying it. Resource cleanup callbacks
+remain responsible for closing their dependencies.
+
+The standalone CLI allows up to 30 seconds for dependency cleanup after the
+transport stops, then exits with status 1 if cleanup is stuck. Successful cleanup
+exits with status 0 even if an abandoned operation retains a handle. The
+programmatic `McpStdioServer.start()` API only forces process exit when its owner
+explicitly supplies `shutdownTimeoutMs`; an embedded `McpStdioSession` never
+terminates its host process.
+
 The standalone entry point uses fixed trusted context. Its optional embedded `stdio/handshake` extension is disabled by default. When enabled by an embedding application, only reusable tokens can establish a session; every subsequent request rechecks token hash, expiry, revocation, and issuer workspace access. Token refresh invalidates existing token-authenticated stdio sessions.
 
 Embedded token handshakes require both `allowHandshake: true` and the administrator-controlled `MCP_STDIO_ALLOW_HANDSHAKE=true` environment setting. The standalone entrypoint always disables them, regardless of this setting. Only trusted local processes should have access to stdio or permission to launch the server; keep its environment and credentials under administrator control.
@@ -123,3 +161,8 @@ stdio configuration without starting application services or accessing a databas
 `server/tests/mcp-transport-lifecycle.test.ts` uses the official MCP SDK to initialize, discover tools, read, create, read back, and reject a revoked credential over HTTP. It also covers member read grants, catalog metadata, reusable defaults, optional IP binding, headers, notification responses, and API-issued HMAC rotation. `server/tests/mcp-stdio-sdk.test.ts` exercises the official SDK against a separate stdio process and verifies audit output stays off the protocol stream. Additional suites cover framing, token rotation/expiry/revocation, issuer removal, atomic single-use consumption, and scoped references.
 
 `server/tests/mcp-stdio-shutdown.test.ts` verifies EOF and both shutdown signals release process resources. Bridge tests cover duplicate suppression, offline delivery, bounded publications, and Redis database/deployment isolation. A live Redis check also verified that matching processes relay a synthetic event while other databases and deployment namespaces do not receive it.
+
+`server/tests/mcp-stdio-bounds.test.ts` covers stalled handlers, deadlines, queued
+byte/count limits, valid small-frame floods in both framing modes, EOF, stream
+failure, output backpressure, late authentication, and terminal teardown using
+synthetic streams and mocked handlers.
