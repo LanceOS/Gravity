@@ -1,3 +1,4 @@
+import type { LabelCreateScope } from '../../tickets/components/LabelCreateOverlay';
 import type { ReactNode } from 'react';
 import type { Cycle, Label, Project, Ticket, User } from '../../../types/domain';
 import { CreateTicketModal, LabelCreateOverlay } from '../../../modules/tickets';
@@ -36,11 +37,12 @@ type CreateProjectOverlayProps = {
 };
 
 type CreateLabelOverlayProps = {
+  scope: LabelCreateScope;
   isOpen: boolean;
   loading: boolean;
   errorMessage: string | null;
   onClose: () => void;
-  onSubmitLabel: (label: { name: string; color: string; description?: string; sortOrder?: number }) => Promise<void>;
+  onSubmitLabel: (label: { name: string; color: string; description?: string; sortOrder?: number; projectId?: string; teamId?: string }) => Promise<void>;
 };
 
 interface AppShellOverlaysProps {
@@ -83,6 +85,7 @@ export function AppShellOverlays({
       />
 
       <LabelCreateOverlay
+        scope={createLabel.scope}
         isOpen={createLabel.isOpen}
         loading={createLabel.loading}
         errorMessage={createLabel.errorMessage}

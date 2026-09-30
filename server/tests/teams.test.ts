@@ -384,6 +384,34 @@ describe('teams integration tests', () => {
     expect(labelsRes.body[0].name).toBe('Team Label 1');
   });
 
+  it('creates a sidebar label in the selected team even when that team has no projects', async () => {
+    const ownerApi = await createAuthenticatedApi({ name: 'Label Owner', email: 'label-scope@example.com', role: 'owner' });
+    const { workspace, project } = await seedWorkspaceFixture({ owner: {
+      id: ownerApi.user.id, name: ownerApi.user.name, email: ownerApi.user.email, role: 'owner', avatarUrl: ownerApi.user.avatar,
+    } });
+    await db.update(workspaceSettings).set({ hierarchyMode: 'teams' }).where(eq(workspaceSettings.workspaceId, workspace.id));
+    const selectedTeam = await ownerApi.post('/api/v1/teams').send({ workspaceId: workspace.id, name: 'Selected team' });
+    expect(selectedTeam.status).toBe(201);
+    const created = await ownerApi.post('/api/v1/labels').send({ teamId: selectedTeam.body.id, name: 'Sidebar label' });
+    expect(created.status).toBe(201);
+    expect(created.body.teamId).toBe(selectedTeam.body.id);
+    expect(created.body.projectId).toBeUndefined();
+    const [stored] = await db.select().from(labels).where(eq(labels.id, created.body.id));
+    expect(stored.teamId).toBe(selectedTeam.body.id);
+    expect(stored.projectId).toBeNull();
+    const activeProjectLabels = await ownerApi.get('/api/v1/labels').query({ projectId: project.id });
+    expect(activeProjectLabels.status).toBe(200);
+    expect(activeProjectLabels.body).not.toEqual(expect.arrayContaining([expect.objectContaining({ id: created.body.id })]));
+    const selectedTeamLabels = await ownerApi.get('/api/v1/labels').query({ teamId: selectedTeam.body.id });
+    expect(selectedTeamLabels.status).toBe(200);
+    expect(selectedTeamLabels.body).toEqual([expect.objectContaining({ id: created.body.id })]);
+    const outsiderApi = await createAuthenticatedApi({ name: 'Outsider', email: 'label-outsider@example.com', role: 'owner' });
+    const denied = await outsiderApi.post('/api/v1/labels').send({ teamId: selectedTeam.body.id, name: 'Unauthorized label' });
+    expect(denied.status).toBe(403);
+    const unchanged = await ownerApi.get('/api/v1/labels').query({ teamId: selectedTeam.body.id });
+    expect(unchanged.body).toEqual([expect.objectContaining({ id: created.body.id })]);
+  });
+
   it('requires workspace ownership to mutate teams', async () => {
     const ownerApi = await createAuthenticatedApi({
       name: 'Team Mutation Owner',

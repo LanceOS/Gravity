@@ -96,4 +96,42 @@ describe('useWorkspaceManagementCommands', () => {
     });
     expect(setLabelCreateError).toHaveBeenCalledWith(null, 'project-1');
   });
+  it('does not fall back to the active project when a team is selected', async () => {
+    const createLabel = vi.fn().mockResolvedValue({ id: 'label-1' });
+    const { result } = renderHook(() =>
+      useWorkspaceManagementCommands({
+        activeWorkspaceId,
+        currentUser: { id: 'user-1' },
+        activeProjectId,
+        createProject,
+        refreshWorkspaces,
+        createLabel,
+        updateLabel,
+        deleteLabel,
+        setActiveTicket,
+        setProjectCreateLoading,
+        setProjectCreateError,
+        setLabelCreateLoading,
+        setLabelCreateError,
+        navigate,
+      }),
+    );
+
+    await act(async () => {
+      await result.current.handleCreateLabel({
+        teamId: 'team-2',
+        name: 'Platform',
+        color: '#3b82f6',
+        description: 'Shared platform work',
+      });
+    });
+
+    expect(createLabel).toHaveBeenCalledWith({
+      name: 'Platform',
+      color: '#3b82f6',
+      description: 'Shared platform work',
+      teamId: 'team-2',
+    });
+    expect(setLabelCreateError).toHaveBeenCalledWith(null, undefined);
+  });
 });

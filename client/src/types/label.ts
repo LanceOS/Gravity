@@ -1,4 +1,5 @@
 export interface Label {
+  teamId?: string;
   id: string;
   name: string;
   color: string;

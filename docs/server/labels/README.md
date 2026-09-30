@@ -1,7 +1,7 @@
 # Server Labels
 
 ## 1. Purpose and Scope
-This document explains how labels work on the server side of Gravity. Labels are the canonical, project-scoped tagging model for tickets, and they are stored with a normalized many-to-many relationship so a ticket can have multiple labels at once.
+This document explains how labels work on the server side of Gravity. Labels are the canonical, workspace-hierarchy-scoped tagging model for tickets, and they are stored with a normalized many-to-many relationship so a ticket can have multiple labels at once.
 
 ## 2. Non-Goals or Boundary Limits
 - This document does not describe how labels are rendered in the client.
@@ -35,8 +35,8 @@ This document explains how labels work on the server side of Gravity. Labels are
 
 ### `labels`
 - **Purpose**: Stores label metadata.
-- **Fields**: `id`, `projectId`, `name`, `color`, `description`, `sortOrder`, `createdAt`.
-- **Behavior**: Labels are project-scoped. Renaming or deleting a label updates every ticket that references it through the join table.
+- **Fields**: `id`, `teamId`, `projectId`, `name`, `color`, `description`, `sortOrder`, `createdAt`.
+- **Behavior**: Labels are project-scoped in flat workspaces and team-scoped in team workspaces. Renaming or deleting a label updates every ticket that references it through the join table.
 - **Indexing**: `labels_project_id_idx` keeps project-scoped label reads fast.
 
 ### `ticket_labels`
@@ -51,8 +51,9 @@ This document explains how labels work on the server side of Gravity. Labels are
 - **Legacy Compatibility**: `tickets.domain_id` still exists during the migration window, but it is treated as compatibility data rather than the canonical tagging model.
 
 ## 6. Interfaces and Contracts
-- `GET /labels` returns all labels for the current project.
-- `POST /labels` creates a label for the current project.
+- `GET /labels?projectId=` returns labels available to that project according to workspace hierarchy. `GET /labels?teamId=` returns team-scoped labels.
+- `POST /labels` accepts an explicit `projectId` or `teamId`. Project scope derives the owning team; flat workspaces persist both IDs, while team workspaces persist `teamId` with a null `projectId`. Team-only creation requires a team workspace and works even if that team has no projects. A supplied project header also participates in scope resolution, so team-only clients must omit it.
+- A supplied team and project must agree. Scope access is authorized before insertion; successful creation invalidates the owning workspace sidebar cache.
 - `PUT /labels/:id` updates label metadata.
 - `DELETE /labels/:id` deletes the label and clears join-table rows.
 - `GET /tickets/:id/labels` returns the labels assigned to one ticket.
@@ -62,9 +63,9 @@ This document explains how labels work on the server side of Gravity. Labels are
 - `GET /domains` and `POST /domains` return a deprecation response with a warning header so older integrations fail clearly instead of silently diverging.
 
 ## 7. Permissions, Guards, or Tenant Boundaries
-- Label endpoints require project membership checks through the same authorization flow used by ticket routes.
-- A label must belong to the same project as the ticket it is assigned to.
-- Label assignment and filtering stay project-scoped, which prevents labels from leaking across projects in the same workspace.
+- Label endpoints authorize project or team access according to the supplied scope.
+- In flat workspaces a label must belong to the ticket project; in team workspaces it must belong to the ticket project’s team.
+- Label assignment and filtering respect workspace hierarchy, preventing labels from leaking across projects in flat workspaces or across teams in team workspaces.
 
 ## 8. Failure Modes, Observability, or Operational Notes
 - Label assignment is idempotent because the join table uses a composite primary key and the assignment path ignores duplicate inserts.
@@ -73,7 +74,7 @@ This document explains how labels work on the server side of Gravity. Labels are
 - If the label migration has not been applied yet, legacy `domains` data may still exist, but the new label routes and join table are the supported path.
 
 ## 9. Change Hazards, Invariants, or Migration Constraints
-- Keep the label/project relationship strict. A label should not be assignable to a ticket in a different project.
+- Keep label scope strict: project boundaries in flat workspaces and team boundaries in team workspaces.
 - Do not collapse labels back into a single `tickets` column. The normalized join table is required for multiple labels per ticket and efficient filtering.
 - Preserve the legacy `domain_id` field until all compatibility paths are removed intentionally.
 - When deleting a label, remove the join rows in the same transaction so ticket reads never point at a dangling label.
