@@ -1,6 +1,7 @@
 import { and, eq } from 'drizzle-orm';
 import { db } from '../../../db/index.js';
 import { projects } from '../../../db/schema.js';
+import { InvalidProjectKeyError } from './project-key.js';
 
 type DbErrorCandidate = {
   message?: unknown;
@@ -44,6 +45,9 @@ function unwrapDbErrors(error: unknown) {
 }
 
 export function mapProjectCreationError(error: unknown, projectKey: string) {
+  if (error instanceof InvalidProjectKeyError) {
+    return { status: 400, message: error.message };
+  }
   for (const candidate of unwrapDbErrors(error)) {
     const code = typeof candidate.code === 'string' ? candidate.code : '';
     const constraint = typeof candidate.constraint === 'string' ? candidate.constraint : '';
