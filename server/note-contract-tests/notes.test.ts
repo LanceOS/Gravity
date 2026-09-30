@@ -8,7 +8,13 @@ vi.mock('../src/lib/platform.js', () => ({ getProjectIdFromRequest: (req: any) =
 vi.mock('../src/modules/workspaces/services/membership.js', () => ({ authorizeProjectAccess: vi.fn(async () => ({ allowed: true, userId: 'test-user' })) }));
 vi.mock('../src/modules/auth/utils/request-auth.js', () => ({ resolveRequestActorUserId: vi.fn(async () => 'test-user') }));
 vi.mock('../src/modules/notes/services/notes.js', () => ({ createNote: vi.fn(), updateNote: vi.fn(), getNote: vi.fn(), listNotes: vi.fn(), searchNotes: vi.fn(), deleteNote: vi.fn(), cleanupNoteMedia: vi.fn() }));
-vi.mock('../src/modules/notes/repositories.js', () => ({ MetadataRepository: { getNoteMetadata: vi.fn() }, NotesRepository: { getAttachmentStream: vi.fn(), saveAttachmentStream: vi.fn() } }));
+vi.mock('../src/modules/notes/repositories.js', () => ({ isNoteBodyFile: (name: string) => name === 'body.md' || name.startsWith('.revisions/'), MetadataRepository: { getNoteMetadata: vi.fn() }, NotesRepository: { getAttachmentStream: vi.fn(), saveAttachmentStream: vi.fn() } }));
+vi.mock('../src/modules/notes/services/media-deletion.js', () => ({
+  deleteNoteMedia: vi.fn(),
+  MediaReferenceUnavailableError: class extends Error { constructor() { super('Note media references are unavailable; refresh the note and try again.'); } },
+  NoteMediaInUseError: class extends Error { constructor() { super('Note attachments are still referenced by other notes.'); } },
+}));
+import { deleteNoteMedia, MediaReferenceUnavailableError, NoteMediaInUseError } from '../src/modules/notes/services/media-deletion.js';
 import * as notes from '../src/modules/notes/services/notes.js';
 import { MetadataRepository, NotesRepository } from '../src/modules/notes/repositories.js';
 import { authorizeProjectAccess } from '../src/modules/workspaces/services/membership.js';
@@ -201,4 +207,35 @@ describe('note runtime contracts (isolated, no database or storage)', () => {
     assertError(await api().get('/notes/note-test/media/a.png').set('x-project-id', 'project-test'), 500);
     log.mockRestore();
   });
+  it('wraps reference conflicts in the correlated GRAV-230 error envelope', async () => {
+    vi.mocked(notes.createNote).mockRejectedValueOnce(new MediaReferenceUnavailableError());
+    vi.mocked(notes.updateNote).mockRejectedValueOnce(new MediaReferenceUnavailableError());
+    vi.mocked(notes.deleteNote).mockRejectedValueOnce(new NoteMediaInUseError());
+    const responses = [
+      await api().post('/notes').set('x-project-id', 'project-test').send({ title: 'Title', body: 'body' }),
+      await api().patch('/notes/note-test').set('x-project-id', 'project-test').send({ version: 1, body: 'body' }),
+      await api().delete('/notes/note-test').set('x-project-id', 'project-test'),
+    ];
+    for (const response of responses) {
+      expect(response.status).toBe(409);
+      expect(response.body).toEqual({ error: expect.any(String), code: 'CONFLICT', requestId: response.headers['x-request-id'] });
+      expect(response.body.requestId).toMatch(/^[a-f0-9-]{36}$/);
+    }
+  });
+
+  it('redacts deletion inventory failures while preserving correlation diagnostics', async () => {
+    const secret = 'synthetic-hidden-note-storage-path';
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.mocked(deleteNoteMedia).mockRejectedValueOnce(new Error(secret));
+    vi.mocked(notes.deleteNote).mockRejectedValueOnce(new Error(secret));
+    for (const path of ['/notes/note-test/media/a.png', '/notes/note-test']) {
+      const response = await api().delete(path).set('x-project-id', 'project-test');
+      assertError(response, 500);
+      expect(log).toHaveBeenLastCalledWith('Note API failure', expect.objectContaining({ requestId: response.body.requestId }));
+      expect(JSON.stringify(response.body)).not.toContain(secret);
+    }
+    expect(JSON.stringify(log.mock.calls)).not.toContain(secret);
+    log.mockRestore();
+  });
+
 });
