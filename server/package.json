@@ -7,7 +7,7 @@
     "check-env": "tsx src/check-env.ts",
     "dev": "tsx watch src/index.ts",
     "build": "tsc -p tsconfig.json",
-    "test": "vitest run && npm run test:health && npm run test:config && npm run test:notes-contracts",
+    "test": "vitest run && npm run test:health && npm run test:config && npm run test:notes-contracts && npm run test:storage-streams",
     "test:notes-contracts": "vitest run --config vitest.notes-contracts.config.ts",
     "test:config": "vitest run --config config-tests/vitest.config.mjs --configLoader native",
     "test:watch": "vitest",
@@ -19,7 +19,8 @@
     "db:seed": "tsx src/db/seed/seed.ts",
     "cleanup:orphaned-assets": "tsx src/jobs/cleanupOrphanedAssets.ts",
     "mcp": "tsx src/modules/mcp/stdio.ts",
-    "test:health": "vitest run --config health-tests/vitest.config.mjs --configLoader native"
+    "test:health": "vitest run --config health-tests/vitest.config.mjs --configLoader native",
+    "test:storage-streams": "vitest run --config vitest.storage-streams.config.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1064.0",
