@@ -73,6 +73,7 @@ export class AiService {
     provider: string,
     executionCallback: (apiKey: string) => Promise<T>,
   ): Promise<T> {
+    this.credentialManager.assertAvailable();
     const environmentApiKey = this.getEnvironmentApiKey(provider);
     if (environmentApiKey) {
       return executionCallback(environmentApiKey);
@@ -109,6 +110,7 @@ export class AiService {
     provider: string,
     options?: { apiKey?: string },
   ): Promise<number> {
+    this.credentialManager.assertAvailable();
     const startedAt = Date.now();
 
     const providerInst = this.getProvider(provider);
@@ -128,6 +130,7 @@ export class AiService {
   }
 
   async fetchAndChooseBestModel(provider: string, apiKey: string): Promise<string> {
+    this.credentialManager.assertAvailable();
     const lower = provider.toLowerCase();
     // Avoid making external network calls during test runs — return the provider's
     // default preferred model (so tests remain deterministic) instead of fetching.

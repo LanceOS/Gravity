@@ -93,3 +93,39 @@ Credential and settings updates utilize `db.transaction()` to prevent race condi
 
 ### Strict Session Gating
 All administrative and execution routes require an authenticated actor. In development/test, `x-user-id` can be used as a shortcut; in production the server resolves the user from the Better Auth session.
+
+
+## Production availability and recovery (GRAV-247)
+
+This release does not support a production KMS provider. Production runs with
+`ENCRYPTED_CREDENTIALS_MODE=disabled` (the default). Set `required` when your
+service contract requires encrypted credential features: preflight and startup
+then fail rather than serving an apparently ready deployment without KMS.
+Never select development mode or reuse `LOCAL_TESTING_KEK` to bypass this gate.
+The account preferences page shows the unavailable state and disables key entry,
+save and connection testing. API clients receive HTTP 503 for credential writes
+and AI operations. Project chat reports `credentials_disabled` with an explanation.
+Existing encrypted records remain intact; metadata and deletion still work.
+Environment AI key shortcuts remain development/test-only and cannot bypass disabled mode.
+
+For local provisioning only, generate an independent 32-byte KEK using
+`openssl rand -hex 32`, put it in `LOCAL_TESTING_KEK` through your secret store,
+and select `required` in development/test. Keep the original key securely backed
+up separately from the database, restrict access, and test recovery against a
+synthetic or isolated restored database. Disabled mode needs no KEK provisioning.
+
+There is no automatic migration from local encryption to a production KMS and
+no supported production credential provisioning procedure in this release.
+A future provider must authenticate using restricted workload credentials,
+validate its key identity/permissions, probe availability, and preserve the
+ability to unwrap old DEKs by their recorded `kms_kek_id`. Provisioning and a
+verified read/write round trip must precede enabling required features.
+Migration must rewrap DEKs using the original key, or re-enroll user credentials;
+never overwrite key identifiers without rewrapping their ciphertext. Retain old
+keys until every record and retained backup has been migrated or expired.
+
+Database backups alone cannot recover encrypted credentials. Preserve the
+original KEK (or future KMS key versions, policies and access) for each retained
+backup. Losing/deleting the key makes those credentials irrecoverable: users must
+re-enter keys after a supported provider is available. Disabling features does
+not rotate, delete or recover keys, and restoring a database does not enable KMS.

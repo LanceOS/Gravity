@@ -65,6 +65,7 @@ export const env = {
   mcpStdioActorUserId: parsed.MCP_STDIO_ACTOR_USER_ID?.trim() || undefined,
   mcpEventNamespace: parsed.MCP_EVENT_NAMESPACE || undefined,
   nodeEnv: parsed.NODE_ENV,
+  encryptedCredentialsMode: parsed.ENCRYPTED_CREDENTIALS_MODE!,
   allowEnvAiKeys: parsed.ALLOW_ENV_AI_KEYS,
   redisRequired: parsed.REDIS_REQUIRED === 'true',
   objectStorageRequired: parsed.OBJECT_STORAGE_REQUIRED === 'true',

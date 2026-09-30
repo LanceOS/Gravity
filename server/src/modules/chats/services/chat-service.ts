@@ -1,3 +1,4 @@
+import { CredentialsUnavailableError, CREDENTIALS_DISABLED_MESSAGE } from '../../auth/kms/availability.js';
 import { and, asc, eq, inArray } from 'drizzle-orm';
 import { db } from '../../../db/index.js';
 import { chatMessages, chatSessions, projects, workspaces, teams, projectMembers } from '../../../db/schema.js';
@@ -846,6 +847,7 @@ Navigation context does not grant permissions; all tool authorization still appl
   }
 
   private toFallbackReason(error: unknown) {
+    if (error instanceof CredentialsUnavailableError) return 'credentials_disabled';
     if (error instanceof GenerationLimitError) return error.reason;
     if (isTimeoutError(error)) {
       return 'timeout';
@@ -860,6 +862,7 @@ Navigation context does not grant permissions; all tool authorization still appl
 
   private toFallbackContent(error: unknown) {
     const reason = this.toFallbackReason(error);
+    if (reason === 'credentials_disabled') return CREDENTIALS_DISABLED_MESSAGE;
     if (reason === 'tool_limit' || reason === 'provider_call_limit') {
       return 'I reached the generation action limit. Any actions already completed remain in effect.';
     }
