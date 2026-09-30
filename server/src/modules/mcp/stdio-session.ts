@@ -26,6 +26,12 @@ export type McpSessionOptions = {
   framedOutput?: boolean;
   /** @deprecated Standard MCP output is already newline-delimited. */
   legacyOutput?: boolean;
+  // Includes the active request. Limits also apply to notifications.
+  maxPendingRequests?: number;
+  maxPendingBytes?: number;
+  requestTimeoutMs?: number;
+  // Bounds EOF completion and stalled output, independently of request execution.
+  drainTimeoutMs?: number;
   onStop?: () => void | Promise<void>;
 };
 
@@ -45,85 +51,127 @@ export class McpStdioSession {
   // The serialized request queue makes this transport-local counter race-free.
   private handshakeFailures = 0;
   private handshakeWindowStart = 0;
-  // Queue for outgoing messages when the writable signals backpressure.
+  private readonly limits;
+  private pending: { request: unknown; bytes: number }[] = [];
+  private pendingBytes = 0;
+  private active = false;
+  private ended = false;
+  private stopped = false;
+  private stopPromise?: Promise<void>;
+  private requestTimer?: ReturnType<typeof setTimeout>;
+  private drainTimer?: ReturnType<typeof setTimeout>;
+  private eofTimer?: ReturnType<typeof setTimeout>;
   private sendQueue: string[] = [];
+  private sendQueueBytes = 0;
+  private writesInFlight = 0;
+  private writeBytesInFlight = 0;
   private backpressureActive = false;
-  // Bound drain handler so we can add/remove the listener reliably.
-  private onDrain = () => {
-    this.backpressureActive = false;
-    // Flush queued messages in FIFO order.
-    while (this.sendQueue.length > 0) {
-      const next = this.sendQueue.shift()!;
-      const ok = this.output.write(next);
-      if (!ok) {
-        // Still backpressured; wait for the next drain.
-        this.backpressureActive = true;
-        this.output.once('drain', this.onDrain);
-        return;
-      }
-    }
 
-    // Queue drained — resume input if it was paused.
-    try {
-      // resume is idempotent if not paused
-      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-      // @ts-ignore - `resume` exists on Readable
-      this.input.resume();
-    } catch (e) {
-      // best-effort
+  // Node emits drain before the final write callback updates our accounting.
+  private onDrain = () => queueMicrotask(() => {
+    if (!this.running) return;
+    this.backpressureActive = false;
+    while (this.running && this.sendQueue.length > 0) {
+      const next = this.sendQueue.shift()!;
+      this.sendQueueBytes -= Buffer.byteLength(next);
+      if (!this.write(next)) return;
     }
-  };
-  private onOutputError = () => {
-    void this.stop();
-  };
+    this.pump();
+    if (this.running && !this.ended && !this.backpressureActive) this.input.resume();
+    this.finishIfIdle();
+  });
+  private onStreamError = () => { void this.stop(); };
   private onOutputClose = () => {
     void this.stop();
+    this.output.removeListener('error', this.onStreamError);
+    this.output.removeListener('close', this.onOutputClose);
   };
   private onInputClose = () => {
-    void this.processingPromise.finally(() => this.stop());
+    // A normal EOF may be followed by close while accepted work is draining.
+    if (!this.ended) void this.stop();
+    this.input.removeListener('error', this.onStreamError);
+    this.input.removeListener('close', this.onInputClose);
   };
-  // Serializes request handling to avoid races (handshake mutates session state).
-  private processingPromise: Promise<void> = Promise.resolve();
+  private onInputEnd = () => {
+    if (!this.running || this.ended) return;
+    this.ended = true;
+    this.clearChunks();
+    this.eofTimer = setTimeout(() => { void this.stop(); }, this.limits.drainTimeoutMs);
+    this.finishIfIdle();
+  };
+  private onData = (chunk: Buffer | string) => {
+    if (!this.running || this.ended) return;
+    const buf = typeof chunk === 'string' ? Buffer.from(chunk, 'utf8') : chunk;
+    // Bound raw buffering as well as decoded requests, including coalesced frames.
+    if (this.totalLength + buf.length > this.maxMessageSize + 64 * 1024) {
+      void this.stop();
+      return;
+    }
+    this.appendChunk(buf);
+    try {
+      this.processBuffer();
+    } catch {
+      void this.stop();
+    }
+  };
 
   constructor(private input: Readable, private output: Writable, private options: McpSessionOptions = {}) {
     this.maxMessageSize = options.maxMessageSize ?? DEFAULT_MAX_MESSAGE_SIZE;
+    this.limits = {
+      maxPendingRequests: options.maxPendingRequests ?? 128,
+      maxPendingBytes: options.maxPendingBytes ?? 16 * 1024 * 1024,
+      requestTimeoutMs: options.requestTimeoutMs ?? 30_000,
+      drainTimeoutMs: options.drainTimeoutMs ?? 30_000,
+    };
+    for (const [name, value] of Object.entries({ maxMessageSize: this.maxMessageSize, ...this.limits })) {
+      if (!Number.isSafeInteger(value) || value <= 0 ||
+          (name.endsWith('TimeoutMs') && value > 2_147_483_647)) {
+        throw new Error(`${name} must be a positive safe integer within the supported range`);
+      }
+    }
     this.handshakeConfig = getMcpStdioHandshakeConfig();
   }
 
   start() {
-    if (this.running) return;
+    if (this.running || this.stopped) return;
     this.running = true;
-
-    this.input.on('data', (chunk: Buffer | string) => {
-      const buf = typeof chunk === 'string' ? Buffer.from(chunk, 'utf8') : chunk;
-      this.appendChunk(buf);
-      try {
-        this.processBuffer();
-      } catch (err) {
-        // Defensive: avoid crashing the process on malformed input.
-        try {
-          this.send(createMcpErrorResponse(null, -32603, 'Internal parser error'));
-        } catch (_e) {
-          // best-effort
-        }
-        this.clearChunks();
-      }
-    });
-
-    this.input.on('end', () => {
-      // Finish already-read messages before shutting down the output.
-      void this.processingPromise.finally(() => this.stop());
-    });
-    this.input.on('error', () => {
-      void this.stop();
-    });
+    this.input.on('data', this.onData);
+    this.input.on('end', this.onInputEnd);
+    this.input.on('error', this.onStreamError);
     this.input.on('close', this.onInputClose);
-    this.output.on('error', this.onOutputError);
+    this.output.on('error', this.onStreamError);
     this.output.on('close', this.onOutputClose);
+    this.output.on('finish', this.onStreamError);
+    if (this.output.destroyed || this.output.writableEnded || (this.input.destroyed && !this.input.readableEnded)) {
+      void this.stop();
+    } else if (this.input.readableEnded) {
+      this.onInputEnd();
+    }
+  }
+
+  private finishIfIdle() {
+    if (this.ended && !this.active && !this.pending.length && !this.backpressureActive && !this.writesInFlight) void this.stop();
+  }
+
+  private pump() {
+    if (!this.running || this.active || this.backpressureActive) return;
+    const next = this.pending.shift();
+    if (!next) { this.finishIfIdle(); return; }
+    this.active = true;
+    // A deadline retires the entire session. Never start another handler beside
+    // a timed-out operation that may still be running in a dependency.
+    this.requestTimer = setTimeout(() => { void this.stop(); }, this.limits.requestTimeoutMs);
+    void this.delegateRequest(next.request).catch(() => {}).finally(() => {
+      if (!this.running) return;
+      clearTimeout(this.requestTimer);
+      this.active = false;
+      this.pendingBytes -= next.bytes;
+      this.pump();
+    });
   }
 
   private processBuffer() {
-    while (this.totalLength > 0) {
+    while (this.running && this.totalLength > 0) {
       const prefix = this.peekUpTo(Math.min(this.totalLength, 64 * 1024)).toString('utf8');
       const headerName = 'content-length:';
       const isFramed = prefix.toLowerCase().startsWith(headerName)
@@ -261,11 +309,20 @@ export class McpStdioSession {
       return;
     }
 
-    // Serialize request handling to avoid races (handshake mutates session state).
-    this.processingPromise = this.processingPromise.then(() => this.delegateRequest(request)).catch(() => {});
+    const bytes = Buffer.byteLength(raw);
+    if (this.pending.length + Number(this.active) >= this.limits.maxPendingRequests ||
+        this.pendingBytes + bytes > this.limits.maxPendingBytes) {
+      // Do not generate one error per frame: a flood must not become an output flood.
+      void this.stop();
+      return;
+    }
+    this.pending.push({ request, bytes });
+    this.pendingBytes += bytes;
+    this.pump();
   }
 
   private async delegateRequest(request: unknown) {
+    if (!this.running) return;
     const payload = request as any;
 
     // Optional handshake flow for dynamic token-based auth.
@@ -308,7 +365,9 @@ export class McpStdioSession {
       if (token && workspaceId) {
         try {
           const { verifyAndConsumeToken } = await import('./connection.js');
+          if (!this.running) return;
           const tokenRow = await verifyAndConsumeToken(token, workspaceId, {});
+          if (!this.running) return;
           if (!tokenRow || tokenRow.singleUse) {
             this.recordHandshakeFailure();
             this.send(createMcpErrorResponse(payload.id ?? null, -32001, 'Invalid or expired token.'));
@@ -320,9 +379,11 @@ export class McpStdioSession {
           // establish a session with accessChecked short-circuiting later
           // request handling.
           const { isMcpWorkspaceMember } = await import('./access.js');
+          if (!this.running) return;
           const issuerIsMember = tokenRow.generatedBy
             ? await isMcpWorkspaceMember(workspaceId, tokenRow.generatedBy)
             : false;
+          if (!this.running) return;
           if (!issuerIsMember) {
             this.recordHandshakeFailure();
             this.send(createMcpErrorResponse(payload.id ?? null, -32001, 'Unauthorized workspace access.'));
@@ -337,6 +398,7 @@ export class McpStdioSession {
           this.send({ jsonrpc: '2.0', id: payload.id ?? null, result: { ok: true } });
           return;
         } catch (err) {
+          if (!this.running) return;
           this.recordHandshakeFailure();
           this.send(createMcpErrorResponse(payload.id ?? null, -32603, 'Handshake failed.'));
           return;
@@ -364,7 +426,9 @@ export class McpStdioSession {
     try {
       if (this.connectionTokenId) {
         const { verifyConnectionTokenSession } = await import('./connection.js');
+        if (!this.running) return;
         const token = await verifyConnectionTokenSession(this.connectionTokenId, workspaceId, actorUserId, this.connectionTokenHash);
+        if (!this.running) return;
         if (!token) {
           this.send(createMcpErrorResponse(payload?.id ?? null, -32001, 'Invalid or expired token.'));
           return;
@@ -387,76 +451,93 @@ export class McpStdioSession {
     this.handshakeFailures += 1;
   }
 
-  send(msg: unknown) {
-    if (!this.running) {
-      return;
-    }
-
+  private write(payload: string): boolean {
     try {
-      if ((this.output as any).destroyed) {
-        return;
+      if (this.output.destroyed || this.output.writableEnded) {
+        void this.stop();
+        return false;
       }
-
-      const s = JSON.stringify(msg);
-      // Prepare payload
-      const payload = this.options.framedOutput ? `Content-Length: ${Buffer.byteLength(s, 'utf8')}\r\n\r\n` + s : s + '\n';
-
-      // If we're currently under backpressure or already have queued messages,
-      // enqueue the payload and return. It will be flushed on 'drain'.
-      if (this.backpressureActive || this.sendQueue.length > 0) {
-        this.sendQueue.push(payload);
-        return;
+      if (this.writesInFlight++ === 0) {
+        this.drainTimer = setTimeout(() => { void this.stop(); }, this.limits.drainTimeoutMs);
       }
-
-      const ok = this.output.write(payload);
-      if (!ok) {
-        // Writable signaled it's full — pause input and wait for drain.
+      const bytes = Buffer.byteLength(payload);
+      this.writeBytesInFlight += bytes;
+      const accepted = this.output.write(payload, error => {
+        this.writesInFlight--;
+        this.writeBytesInFlight -= bytes;
+        if (!this.running) return;
+        if (error) { void this.stop(); return; }
+        if (!this.writesInFlight) clearTimeout(this.drainTimer);
+        this.finishIfIdle();
+      });
+      if (!accepted && this.running) {
         this.backpressureActive = true;
-        try {
-          // pause is idempotent
-          // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-          // @ts-ignore
-          this.input.pause();
-        } catch (e) {
-          // best-effort
-        }
+        this.input.pause();
         this.output.once('drain', this.onDrain);
+        return false;
       }
-    } catch (e) {
-      // best-effort
+      return true;
+    } catch {
+      void this.stop();
+      return false;
     }
   }
 
-  async stop() {
+  send(msg: unknown) {
     if (!this.running) return;
-    this.running = false;
     try {
-      this.input.removeAllListeners('data');
-      this.input.removeAllListeners('end');
-      this.input.removeAllListeners('error');
-      this.input.removeListener('close', this.onInputClose);
-      // Clean up any pending drain listener and queued messages.
-      try {
-      this.output.removeListener('drain', this.onDrain);
-        this.output.removeListener('error', this.onOutputError);
-        this.output.removeListener('close', this.onOutputClose);
-      } catch (e) {
-        // ignore
+      const s = JSON.stringify(msg);
+      const payload = this.options.framedOutput ? `Content-Length: ${Buffer.byteLength(s, 'utf8')}\r\n\r\n` + s : s + '\n';
+      const bytes = Buffer.byteLength(payload);
+      // Covers parser errors and callers of send(), not only request responses.
+      if (bytes + this.sendQueueBytes + this.writeBytesInFlight > this.limits.maxPendingBytes ||
+          this.sendQueue.length + this.writesInFlight >= this.limits.maxPendingRequests) {
+        void this.stop();
+        return;
       }
-      this.sendQueue.length = 0;
-      try {
-        // resume input if paused
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-        // @ts-ignore
-        this.input.resume();
-      } catch (e) {
-        // ignore
+      if (this.backpressureActive) {
+        this.sendQueue.push(payload);
+        this.sendQueueBytes += bytes;
+        return;
       }
-      await this.processingPromise.catch(() => {});
-      await this.options.onStop?.();
-      this.sendQueue.length = 0;
-    } catch (e) {
-      // ignore
+      this.write(payload);
+    } catch {
+      void this.stop();
     }
+  }
+
+  stop(): Promise<void> {
+    if (this.stopPromise) return this.stopPromise;
+    if (!this.running) return Promise.resolve();
+    this.running = false;
+    this.stopped = true;
+    clearTimeout(this.requestTimer);
+    clearTimeout(this.drainTimer);
+    clearTimeout(this.eofTimer);
+    this.input.removeListener('data', this.onData);
+    this.input.removeListener('end', this.onInputEnd);
+    this.output.removeListener('drain', this.onDrain);
+    this.output.removeListener('finish', this.onStreamError);
+    // An outstanding write can emit an asynchronous error after cancellation.
+    // Keep error guards until each stream closes; close removes those guards.
+    if (this.input.closed) {
+      this.input.removeListener('error', this.onStreamError);
+      this.input.removeListener('close', this.onInputClose);
+    }
+    if (this.output.closed) {
+      this.output.removeListener('error', this.onStreamError);
+      this.output.removeListener('close', this.onOutputClose);
+    }
+    this.input.pause();
+    this.clearChunks();
+    this.pending.length = 0;
+    this.pendingBytes = 0;
+    this.sendQueue.length = 0;
+    this.sendQueueBytes = 0;
+    this.backpressureActive = false;
+    // Cancellation is terminal and does not await an uncooperative handler.
+    // A handler already inside a tool may still finish; send() suppresses its result.
+    this.stopPromise = Promise.resolve().then(() => this.options.onStop?.()).catch(() => {});
+    return this.stopPromise;
   }
 }
