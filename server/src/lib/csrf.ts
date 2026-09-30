@@ -1,4 +1,5 @@
 import type { Request, Response, NextFunction } from 'express';
+import { createTrustedProxyMatcher } from './trusted-proxies.js';
 import { env } from '../env.js';
 import { getTrustedServiceTokens } from './serviceTokens.js';
 
@@ -18,6 +19,16 @@ export function csrfProtect(
   const allowHostFallback = typeof options?.allowHostFallback === 'boolean' ? options.allowHostFallback : env.csrfAllowHostFallback;
   const trustedProxiesList = Array.isArray(options?.trustedProxies) ? options.trustedProxies : env.trustedProxies;
 
+  const isTrustedProxy = createTrustedProxyMatcher(trustedProxiesList);
+  const allowedHosts = new Set(allowed.flatMap((origin) => {
+    try {
+      const url = new URL(origin);
+      return ['http:', 'https:'].includes(url.protocol) ? [url.host.toLowerCase()] : [];
+    } catch {
+      return [];
+    }
+  }));
+
   return (req: Request, res: Response, next: NextFunction) => {
     try {
       // Only protect unsafe methods
@@ -36,9 +47,10 @@ export function csrfProtect(
       if (serviceToken && allowedServiceTokens.length > 0 && allowedServiceTokens.includes(String(serviceToken))) return next();
 
       // Prefer Origin header; fall back to Referer
-      let origin = req.get('origin') as string | undefined;
-      const referer = (req.get('referer') || req.get('referrer')) as string | undefined;
-      if (!origin && referer) {
+      const originHeader = req.get('origin');
+      let origin = originHeader;
+      const referer = req.get('referer') ?? req.get('referrer');
+      if (originHeader === undefined && referer) {
         try {
           origin = new URL(referer).origin;
         } catch (e) {
@@ -46,40 +58,14 @@ export function csrfProtect(
         }
       }
 
-      // Helper: normalize immediate remote address for trusted-proxy checks
-      const normalizeIp = (ip?: string | null) => {
-        if (!ip) return null;
-        const s = String(ip).trim();
-        if (s.startsWith('::ffff:')) return s.split(':').pop() || s;
-        return s;
-      };
-
-      // Build allowed host list from allowed origins
-      const allowedHosts = allowed
-        .map((o) => {
-          try {
-            return new URL(o).host.toLowerCase();
-          } catch (e) {
-            return null;
-          }
-        })
-        .filter(Boolean) as string[];
-
-      // If Origin/Referer missing: allow fallback only when explicitly enabled and coming from a trusted proxy with a verified X-Forwarded-Host header
+      // Only absent headers qualify: an invalid Referer must not become a
+      // missing-origin request eligible for fallback.
       if (!origin) {
-        if (allowHostFallback) {
-          const immediateRemote = normalizeIp((req as any).socket?.remoteAddress ?? (req as any).connection?.remoteAddress ?? null);
-          const trusted = Array.isArray(trustedProxiesList) && trustedProxiesList.length > 0
-            ? trustedProxiesList.map(normalizeIp).filter(Boolean).includes(immediateRemote || '')
-            : false;
-
-          if (trusted) {
-            const xfh = req.get('x-forwarded-host') as string | undefined;
-            if (xfh) {
-              const fh = xfh.split(',')[0].trim().toLowerCase();
-              if (allowedHosts.includes(fh)) return next();
-            }
-          }
+        if (originHeader === undefined && referer === undefined && allowHostFallback && isTrustedProxy(req.socket?.remoteAddress)) {
+          // The trusted ingress must overwrite this with one validated host.
+          // Reject lists rather than selecting an attacker-controlled entry.
+          const forwardedHost = req.get('x-forwarded-host')?.trim().toLowerCase();
+          if (forwardedHost && allowedHosts.has(forwardedHost)) return next();
         }
 
         res.status(403).json({ error: 'Missing Origin or Referer header.' });
@@ -89,30 +75,9 @@ export function csrfProtect(
       const originNormalized = normalizeOrigin(origin);
       if (allowed.includes(originNormalized)) return next();
 
-      // Origin present but not allowed. Permit a fallback only when configured and proxied via a trusted proxy that provides a verified X-Forwarded-Host (or as a last resort Host when the proxy is trusted).
-      if (allowHostFallback) {
-        const immediateRemote = normalizeIp((req as any).socket?.remoteAddress ?? (req as any).connection?.remoteAddress ?? null);
-        const trusted = Array.isArray(trustedProxiesList) && trustedProxiesList.length > 0
-          ? trustedProxiesList.map(normalizeIp).filter(Boolean).includes(immediateRemote || '')
-          : false;
-
-        if (trusted) {
-          try {
-            const originHost = new URL(originNormalized).host.toLowerCase();
-            const xfh = req.get('x-forwarded-host') as string | undefined;
-            if (xfh) {
-              const fh = xfh.split(',')[0].trim().toLowerCase();
-              if (fh === originHost) return next();
-            }
-
-            const hostHeader = req.get('host');
-            if (hostHeader && hostHeader.toLowerCase() === originHost) return next();
-          } catch (e) {
-            // ignore parse errors
-          }
-        }
-      }
-
+      // An explicit Origin/Referer is authoritative. Forwarded or client Host
+      // data must never override the configured origin policy (including scheme
+      // and port), even when the socket peer is trusted.
       res.status(403).json({ error: 'Invalid Origin or Referer header.' });
     } catch (err) {
       res.status(500).json({ error: 'CSRF check failed.' });
