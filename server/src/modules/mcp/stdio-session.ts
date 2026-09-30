@@ -1,4 +1,5 @@
 import type { Readable, Writable } from 'node:stream';
+import { getMcpStdioHandshakeConfig } from './stdio-config.js';
 import { handleMcpRequest } from './request-handler.js';
 import { createMcpErrorResponse } from './responses.js';
 import {
@@ -17,6 +18,7 @@ export type McpSessionOptions = {
   actorUserId?: string | null;
   sanitize?: boolean;
   tokenScopes?: string[] | undefined;
+  // Also requires administrator opt-in via MCP_STDIO_ALLOW_HANDSHAKE=true.
   allowHandshake?: boolean;
   // Maximum allowed message size in bytes. Defaults to 10 MiB.
   maxMessageSize?: number;
@@ -39,6 +41,10 @@ export class McpStdioSession {
   private connectionTokenId: string | null = null;
   private connectionTokenHash: string | null = null;
   private maxMessageSize: number;
+  private readonly handshakeConfig;
+  // The serialized request queue makes this transport-local counter race-free.
+  private handshakeFailures = 0;
+  private handshakeWindowStart = 0;
   // Queue for outgoing messages when the writable signals backpressure.
   private sendQueue: string[] = [];
   private backpressureActive = false;
@@ -81,6 +87,7 @@ export class McpStdioSession {
 
   constructor(private input: Readable, private output: Writable, private options: McpSessionOptions = {}) {
     this.maxMessageSize = options.maxMessageSize ?? DEFAULT_MAX_MESSAGE_SIZE;
+    this.handshakeConfig = getMcpStdioHandshakeConfig();
   }
 
   start() {
@@ -262,15 +269,38 @@ export class McpStdioSession {
     const payload = request as any;
 
     // Optional handshake flow for dynamic token-based auth.
-    if (this.options.allowHandshake && payload?.method === 'stdio/handshake') {
-      const params = payload.params ?? {};
+    if (payload?.method === 'stdio/handshake') {
+      if (!this.options.allowHandshake || !this.handshakeConfig.enabled) {
+        this.send(createMcpErrorResponse(payload.id ?? null, -32601, 'Stdio handshake is disabled.'));
+        return;
+      }
+      const validId = typeof payload.id === 'string'
+        || (typeof payload.id === 'number' && Number.isFinite(payload.id));
+      const id = validId ? payload.id : null;
+      const validParams = payload.params === undefined
+        || (payload.params !== null && typeof payload.params === 'object' && !Array.isArray(payload.params));
+      const validRequest = payload.jsonrpc === '2.0' && validId && validParams;
+      const params = validParams ? payload.params ?? {} : {};
       // Reauthentication must never retain a previous authenticated identity.
-      if (params.token || params.workspaceId) {
+      if (!validRequest || 'token' in params || 'workspaceId' in params) {
         this.connectionTokenId = null;
         this.connectionTokenHash = null;
         this.options.workspaceId = undefined;
         this.options.actorUserId = undefined;
         this.options.tokenScopes = undefined;
+      }
+
+      if (Date.now() - this.handshakeWindowStart >= this.handshakeConfig.windowMs) {
+        this.handshakeFailures = 0;
+      }
+      if (this.handshakeFailures >= this.handshakeConfig.maxAttempts) {
+        this.send(createMcpErrorResponse(id, -32029, 'Too many failed handshake attempts. Try again later.'));
+        return;
+      }
+      if (!validRequest) {
+        this.recordHandshakeFailure();
+        this.send(createMcpErrorResponse(id, -32600, 'Handshake requires a valid JSON-RPC request with an id and object params.'));
+        return;
       }
       const token = typeof params.token === 'string' ? params.token.trim() : '';
       const workspaceId = typeof params.workspaceId === 'string' ? params.workspaceId.trim() : '';
@@ -280,6 +310,7 @@ export class McpStdioSession {
           const { verifyAndConsumeToken } = await import('./connection.js');
           const tokenRow = await verifyAndConsumeToken(token, workspaceId, {});
           if (!tokenRow || tokenRow.singleUse) {
+            this.recordHandshakeFailure();
             this.send(createMcpErrorResponse(payload.id ?? null, -32001, 'Invalid or expired token.'));
             return;
           }
@@ -293,9 +324,11 @@ export class McpStdioSession {
             ? await isMcpWorkspaceMember(workspaceId, tokenRow.generatedBy)
             : false;
           if (!issuerIsMember) {
+            this.recordHandshakeFailure();
             this.send(createMcpErrorResponse(payload.id ?? null, -32001, 'Unauthorized workspace access.'));
             return;
           }
+          this.handshakeFailures = 0;
           this.connectionTokenId = tokenRow.id;
           this.connectionTokenHash = tokenRow.tokenHash;
           this.options.workspaceId = workspaceId;
@@ -304,12 +337,14 @@ export class McpStdioSession {
           this.send({ jsonrpc: '2.0', id: payload.id ?? null, result: { ok: true } });
           return;
         } catch (err) {
+          this.recordHandshakeFailure();
           this.send(createMcpErrorResponse(payload.id ?? null, -32603, 'Handshake failed.'));
           return;
         }
       }
 
       if (!this.options.workspaceId || !this.options.actorUserId) {
+        this.recordHandshakeFailure();
         this.send(createMcpErrorResponse(payload.id ?? null, -32602, 'Handshake requires workspaceId and token or pre-configured context.'));
         return;
       }
@@ -345,6 +380,11 @@ export class McpStdioSession {
     } catch (err) {
       this.send(createMcpErrorResponse(payload?.id ?? null, -32603, err instanceof Error ? err.message : String(err)));
     }
+  }
+
+  private recordHandshakeFailure() {
+    if (this.handshakeFailures === 0) this.handshakeWindowStart = Date.now();
+    this.handshakeFailures += 1;
   }
 
   send(msg: unknown) {
