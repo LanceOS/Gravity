@@ -12,6 +12,10 @@ class GetterRow {
     this.value = value;
   }
 
+  get id() {
+    return this.value;
+  }
+
   get label() {
     return this.value;
   }
@@ -28,8 +32,8 @@ describe('DataGrid and Table cell rendering', () => {
 
     render(
       <>
-        <Table columns={columns} data={rows} />
-        <DataGrid columns={columns} data={rows} height={60} rowHeight={30} />
+        <Table getRowKey={row => row.id} columns={columns} data={rows} />
+        <DataGrid getRowKey={row => row.id} columns={columns} data={rows} height={60} rowHeight={30} />
       </>,
     );
 
@@ -103,6 +107,7 @@ describe('DataGrid and Table cell rendering', () => {
 
   it('renders iterable ReactNode cell values', () => {
     const rows = [{
+      id: 'iterable',
       value: new Set([
         <span key="iterable-value">Iterable cell</span>,
       ]),
@@ -111,8 +116,8 @@ describe('DataGrid and Table cell rendering', () => {
 
     render(
       <>
-        <Table columns={columns} data={rows} />
-        <DataGrid columns={columns} data={rows} height={60} rowHeight={30} />
+        <Table getRowKey={row => row.id} columns={columns} data={rows} />
+        <DataGrid getRowKey={row => row.id} columns={columns} data={rows} height={60} rowHeight={30} />
       </>,
     );
 
@@ -129,8 +134,8 @@ describe('DataGrid and Table cell rendering', () => {
     const columns = [{ key: 'value', title: 'Value' }];
     const view = render(
       <>
-        <Table columns={columns} data={[{ value: tablePortal }]} />
-        <DataGrid columns={columns} data={[{ value: dataGridPortal }]} height={60} rowHeight={30} />
+        <Table getRowKey={row => row.id} columns={columns} data={[{ id: 'portal', value: tablePortal }]} />
+        <DataGrid getRowKey={row => row.id} columns={columns} data={[{ id: 'portal', value: dataGridPortal }]} height={60} rowHeight={30} />
       </>,
     );
 
@@ -154,12 +159,12 @@ describe.each([['DataGrid', DataGrid], ['Table', Table]] as const)('%s cell inte
       key: 'label', title: 'Action',
       render: (row: typeof rows[number]) => <button onClick={() => onOpen(row)}>Open {row.label}</button>,
     }];
-    const { rerender } = render(<Component columns={columns} data={rows} />);
+    const { rerender } = render(<Component getRowKey={row => row.id} columns={columns} data={rows} />);
 
     await user.click(screen.getByRole('button', { name: 'Open First' }));
     expect(onOpen).toHaveBeenLastCalledWith(rows[0]);
     const replacement = { id: 2, label: 'Updated second' };
-    rerender(<Component columns={columns} data={[replacement, rows[0]]} />);
+    rerender(<Component getRowKey={row => row.id} columns={columns} data={[replacement, rows[0]]} />);
     expect(screen.queryByRole('button', { name: 'Open Second' })).not.toBeInTheDocument();
     screen.getByRole('button', { name: 'Open Updated second' }).focus();
     await user.keyboard('{Enter}');
@@ -177,7 +182,7 @@ describe('DataGrid windowing', () => {
   const renderedRows = () => screen.queryAllByText(/^Row \d+$/);
 
   it('bounds mounted rows while scrolling to the middle, end, and back to the start', () => {
-    const { container } = render(<DataGrid columns={columns} data={rows} height={90} rowHeight={30} />);
+    const { container } = render(<DataGrid getRowKey={row => row.id} columns={columns} data={rows} height={90} rowHeight={30} />);
     // DataGrid exposes a scroll container, not an ARIA grid or row-selection API.
     const viewport = container.firstElementChild!;
     expect(screen.getByText('Row 0')).toBeInTheDocument();
@@ -203,15 +208,15 @@ describe('DataGrid windowing', () => {
   });
 
   it('recalculates the visible window when viewport and row heights change without another scroll', () => {
-    const { container, rerender } = render(<DataGrid columns={columns} data={rows} height={90} rowHeight={30} />);
+    const { container, rerender } = render(<DataGrid getRowKey={row => row.id} columns={columns} data={rows} height={90} rowHeight={30} />);
     fireEvent.scroll(container.firstElementChild!, { target: { scrollTop: 600 } });
     expect(screen.queryByText('Row 30')).not.toBeInTheDocument();
 
-    rerender(<DataGrid columns={columns} data={rows} height={300} rowHeight={30} />);
+    rerender(<DataGrid getRowKey={row => row.id} columns={columns} data={rows} height={300} rowHeight={30} />);
     expect(container.firstElementChild).toHaveStyle({ height: '300px' });
     expect(screen.getByText('Row 30')).toBeInTheDocument();
 
-    rerender(<DataGrid columns={columns} data={rows} height={300} rowHeight={60} />);
+    rerender(<DataGrid getRowKey={row => row.id} columns={columns} data={rows} height={300} rowHeight={60} />);
     expect(screen.getByText('Row 10')).toBeInTheDocument();
     expect(screen.getByText('Row 14')).toBeInTheDocument();
     expect(screen.queryByText('Row 30')).not.toBeInTheDocument();
@@ -219,24 +224,24 @@ describe('DataGrid windowing', () => {
   });
 
   it('updates the window as data grows, shrinks, empties, and returns', () => {
-    const { rerender } = render(<DataGrid columns={columns} data={[]} height={90} rowHeight={30} />);
+    const { rerender } = render(<DataGrid getRowKey={(row: typeof rows[number]) => row.id} columns={columns} data={[]} height={90} rowHeight={30} />);
     expect(renderedRows()).toHaveLength(0);
     expect(screen.getByText('Label')).toBeInTheDocument();
-    rerender(<DataGrid columns={columns} data={rows} height={90} rowHeight={30} />);
+    rerender(<DataGrid getRowKey={row => row.id} columns={columns} data={rows} height={90} rowHeight={30} />);
     expect(screen.getByText('Row 2')).toBeInTheDocument();
     expect(renderedRows().length).toBeLessThan(20);
-    rerender(<DataGrid columns={columns} data={rows.slice(0, 2)} height={90} rowHeight={30} />);
+    rerender(<DataGrid getRowKey={row => row.id} columns={columns} data={rows.slice(0, 2)} height={90} rowHeight={30} />);
     expect(renderedRows().map(row => row.textContent)).toEqual(['Row 0', 'Row 1']);
-    rerender(<DataGrid columns={columns} data={[]} height={90} rowHeight={30} />);
+    rerender(<DataGrid getRowKey={(row: typeof rows[number]) => row.id} columns={columns} data={[]} height={90} rowHeight={30} />);
     expect(renderedRows()).toHaveLength(0);
-    rerender(<DataGrid columns={columns} data={rows.slice(0, 1)} height={90} rowHeight={30} />);
+    rerender(<DataGrid getRowKey={row => row.id} columns={columns} data={rows.slice(0, 1)} height={90} rowHeight={30} />);
     expect(renderedRows()).toHaveLength(1);
   });
 
   it('activates a newly mounted custom cell after scrolling', async () => {
     const user = userEvent.setup();
     const onOpen = vi.fn();
-    const { container } = render(<DataGrid data={rows} height={90} rowHeight={30} columns={[{
+    const { container } = render(<DataGrid getRowKey={row => row.id} data={rows} height={90} rowHeight={30} columns={[{
       key: 'label', render: row => <button onClick={() => onOpen(row)}>Open {row.label}</button>,
     }]} />);
     expect(screen.queryByRole('button', { name: 'Open Row 50' })).not.toBeInTheDocument();

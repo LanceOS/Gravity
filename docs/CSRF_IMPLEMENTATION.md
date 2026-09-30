@@ -20,7 +20,7 @@
 The core CSRF enforcement is implemented as an Express middleware exposed from `server/src/lib/csrf.ts` with the function signature:
 
 ```
-csrfProtect(allowedOrigins?: string[], options?: { enforceInTest?: boolean; allowedServiceTokens?: string[] })
+csrfProtect(allowedOrigins?: string[], options?: { enforceInTest?: boolean; allowedServiceTokens?: string[]; allowHostFallback?: boolean; trustedProxies?: string[] })
 ```
 
 Runtime flow when a request hits the middleware:
@@ -36,7 +36,7 @@ Runtime flow when a request hits the middleware:
    * Normalize the origin by trimming trailing slashes and lower‑casing for comparison.
    * Compare the normalized origin against the configured `TRUSTED_ORIGINS` list.
    * If `Origin` matches any trusted origin, the request is allowed.
-6. If the origin does not match and the `Host` header matches the origin host component, allow the request (fallback for certain proxy setups).
+6. Only when both Origin and Referer are absent, optional host fallback may allow the request: `allowHostFallback` must be enabled, the immediate socket peer must match `TRUSTED_PROXIES`, and a single `X-Forwarded-Host` must match a host derived from the allowed HTTP(S) origins. An explicit disallowed origin can never use this fallback. See the [proxy deployment requirements](#proxy-deployment-note).
 7. If none of the checks succeed, the middleware returns `403` with a JSON error body such as `{ error: 'Missing Origin or Referer header.' }` or `{ error: 'Invalid Origin or Referer header.' }`.
 
 ## Implementation details and invariants
@@ -44,8 +44,8 @@ Runtime flow when a request hits the middleware:
 * File: [server/src/lib/csrf.ts](server/src/lib/csrf.ts#L1)
   * Normalizes origins with a simple `origin.replace(/\/$/, '').toLowerCase()` normalization.
   * Uses `env.trustedOrigins` (parsed from environment `TRUSTED_ORIGINS` or defaulted to `http://localhost:${PORT}`) when no explicit `allowedOrigins` param is passed.
-  * Accepts a second `options` parameter for test enforcement and runtime service token allowlist.
-  * Bypass rules in order: safe methods → test env (unless enforced) → `Authorization` header → `x-service-token`/`x-api-key` → `Origin`/`Referer` → `Host` fallback → deny.
+  * Accepts a second `options` parameter for test enforcement, runtime service token allowlist, optional host fallback, and trusted proxy IPs/CIDRs.
+  * Bypass rules in order: safe methods → test env (unless enforced) → `Authorization` header → `x-service-token`/`x-api-key` → `Origin`/`Referer` → optional missing-header `X-Forwarded-Host` fallback → deny.
 
 ## Data Stores and Resources
 
@@ -53,19 +53,21 @@ Runtime flow when a request hits the middleware:
 * Environment variables of interest (parsed in [server/src/env.ts](server/src/env.ts#L1)):
   * `TRUSTED_ORIGINS` — comma separated list of trusted origins (used to populate `env.trustedOrigins`). If not provided, the server defaults to `http://localhost:<PORT>`.
   * `TRUSTED_SERVICE_TOKENS` — comma separated list of service tokens that may bypass CSRF via `x-service-token` or `x-api-key` headers.
+  * `CSRF_ALLOW_HOST_FALLBACK` — disabled by default; enables the restricted missing-header exception described below.
+  * `TRUSTED_PROXIES` — exact ingress IPs or IPv4/IPv6 CIDRs; empty trusts no proxies and invalid entries fail startup.
   * `NODE_ENV` — `test` disables checks by default to keep unit tests deterministic unless `enforceInTest` is used.
 
 ## Interfaces and Contracts
 
-* Middleware signature: `csrfProtect(allowedOrigins?: string[], options?: { enforceInTest?: boolean; allowedServiceTokens?: string[] })` (see [server/src/lib/csrf.ts](server/src/lib/csrf.ts#L1)).
+* Middleware signature: `csrfProtect(allowedOrigins?: string[], options?: { enforceInTest?: boolean; allowedServiceTokens?: string[]; allowHostFallback?: boolean; trustedProxies?: string[] })` (see [server/src/lib/csrf.ts](server/src/lib/csrf.ts#L1)).
 * Request headers used by the middleware:
   * `Origin` — preferred source for the caller origin.
   * `Referer` / `Referrer` — fallback when `Origin` is missing; the middleware derives `new URL(referer).origin`.
   * `Authorization` — presence bypasses CSRF checks (intended for bearer tokens used by non‑browser clients).
   * `X-Service-Token` / `X-API-Key` — used for trusted service token bypass when tokens are configured.
-  * `Host` — used as a fallback to allow requests from same host (when proxies or networks strip `Origin`).
+  * `X-Forwarded-Host` — used only for the explicitly enabled missing-header fallback from a trusted socket peer. The client `Host` header is never an origin-policy substitute.
 * Failure responses:
-  * 403 `{ error: 'Missing Origin or Referer header.' }` — when an unsafe request lacks both `Origin` and `Referer`.
+  * 403 `{ error: 'Missing Origin or Referer header.' }` — when no usable origin can be derived and the restricted fallback does not apply (including missing or empty headers and malformed Referers).
   * 403 `{ error: 'Invalid Origin or Referer header.' }` — origin present but not allowed.
   * 500 `{ error: 'CSRF check failed.' }` — middleware internal error.
 
@@ -86,7 +88,7 @@ Runtime flow when a request hits the middleware:
 ## Failure Modes, Observability, and Operational Notes
 
 * Common failure modes:
-  * **Legitimate requests blocked**: often due to missing `Origin`/`Referer` because a proxy or client strips the header. The middleware tries a `Host` fallback but this is not always sufficient.
+  * **Legitimate requests blocked**: often due to missing `Origin`/`Referer` because a proxy or client strips the header. Preserve these headers; optional forwarded-host fallback requires the trusted-ingress controls below.
   * **Tests bypassing CSRF**: unit tests run with `NODE_ENV === 'test'` and middleware is no‑op by default; use `options.enforceInTest` in tests when asserting middleware behavior.
   * **Service token misuse**: service tokens in `TRUSTED_SERVICE_TOKENS` are bearer‑style secrets. If leaked, an attacker could bypass CSRF protections; store and rotate them securely.
 * Observability recommendations:
@@ -125,7 +127,7 @@ TRUSTED_SERVICE_TOKENS=svc-token-abc123,svc-token-xyz456
 
 
 3. Ensure session cookies include `SameSite=Lax|Strict`, `HttpOnly`, and `Secure` when applicable.
-4. If using proxies or CDNs that modify headers, ensure `Origin`/`Referer` are preserved, or configure the service to populate `Forwarded`/`X-Forwarded-*` headers in a way your deployment supports and update middleware if necessary.
+4. Ensure proxies and CDNs preserve `Origin`/`Referer`. If the missing-header exception is unavoidable, follow the [proxy deployment requirements](#proxy-deployment-note); forwarding headers alone do not validate a browser source origin.
 
 ## Evidence used while writing this document
 
@@ -159,24 +161,36 @@ TRUSTED_SERVICE_TOKENS=svc-token-abc123,svc-token-xyz456
 - If you encounter 403s for issuance from automation, check proxies/CDNs for header stripping and
   prefer service tokens in those environments.
 
-## Proxy deployment note (important)
+## Proxy deployment note
 
-- The CSRF middleware now avoids trusting the client-provided `Host` header by default. Relying on
-  `Host` weakens CSRF protections when requests transit through proxies or when headers can be
-  manipulated by clients. If your deployment requires a Host-based fallback (for example, because a
-  legacy proxy strips `Origin`/`Referer`) you MUST opt-in explicitly:
+Host fallback is disabled by default. For requests subject to origin checks (after
+the safe-method, test, and credential bypasses above), an explicit Origin (or Referer when Origin
+is absent) must match `TRUSTED_ORIGINS` / the middleware's `allowedOrigins`,
+including scheme and port. Matching `Host` or `X-Forwarded-Host` never overrides
+a disallowed origin. Malformed Referers do not qualify for missing-header fallback.
 
-  1. Set `CSRF_ALLOW_HOST_FALLBACK=true` in your process environment.
-  2. Configure `TRUSTED_PROXIES` to a comma-separated list of immediate proxy IP addresses that are
-     authorized to inject forwarding headers (for example `127.0.0.1,10.0.0.1`).
-  3. Ensure your proxy sets `X-Forwarded-Host` to the original host header; the middleware will only
-     trust `X-Forwarded-Host` when the immediate remote IP matches one of `TRUSTED_PROXIES`.
+For a legacy ingress that strips both Origin and Referer, explicitly opt in:
 
-  Notes:
-  - When `CSRF_ALLOW_HOST_FALLBACK` is disabled (the default), requests lacking `Origin` or `Referer`
-    will be rejected with `403` to avoid a potential CSRF bypass.
-  - Only enable the fallback when you control the proxy chain and can guarantee the immediate proxy
-    IPs listed in `TRUSTED_PROXIES` are not user-controllable. Misconfiguration may allow attackers to
-    bypass CSRF protections.
+1. Set `CSRF_ALLOW_HOST_FALLBACK=true` in the backend process environment.
+2. Configure `TRUSTED_PROXIES` with only the immediate ingress IPs or dedicated
+   proxy-only IPv4/IPv6 CIDRs. This uses the same validated matcher as client-IP
+   resolution, including IPv4-mapped IPv6 normalization; invalid entries fail
+   middleware construction/startup. An empty list trusts no peers.
+3. Configure permitted public origins in `TRUSTED_ORIGINS`. The forwarded host
+   must exactly match a host (including a non-default port) derived from one of
+   these HTTP(S) origins. No client `Host` fallback is accepted.
+4. Have the trusted ingress overwrite incoming `X-Forwarded-Host` with one
+   validated public host, rejecting unexpected host routing. Comma-separated
+   forwarded-host lists are rejected. Preserve a required non-default port.
 
+Only requests missing both Origin and Referer can use this exception. Trust is
+based exclusively on the immediate TCP socket peer, never Express `req.ip`,
+`X-Forwarded-For`, or another client-supplied address. Restrict backend access and
+control every forwarding hop; do not trust broad networks containing clients.
 
+**This exception weakens CSRF protection:** the destination host alone does not
+prove the browser's source origin. Prefer preserving Origin/Referer and leaving
+the fallback disabled. Ingress that strips those headers must provide equivalent
+source-origin/CSRF validation before forwarding. The supplied nginx overwrite of
+`X-Forwarded-Host` alone does not provide that validation. See
+[trusted proxy deployment requirements](trusted-proxies.md).

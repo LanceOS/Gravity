@@ -74,6 +74,27 @@ HMAC key rotation accepts API-issued credentials while the previous secret is re
 
 ## Local stdio clients
 
+### Retired embedded agent command
+
+`MCP_AGENT_COMMAND` is unsupported. The HTTP server does not launch agents or
+interpret command strings. A non-empty value now fails environment validation
+before either HTTP or standalone stdio startup, including values loaded from
+`.env`; unset, empty, and whitespace-only values are accepted. Remove the key from environment files,
+service definitions, and deployment configuration when upgrading. The validation
+error does not echo the supplied command or any credentials it might contain.
+
+Launch the standalone stdio entrypoint below through your MCP client or process
+supervisor instead. Configure a trusted executable and a separate argument array
+(for example, command `/usr/bin/node` and args
+`["/opt/gravity/server/dist/modules/mcp/stdio.js"]`, adjusted to your installation).
+Do not pass client-controlled values through a shell. Keep executable paths and
+application files writable only by trusted administrators. Run the process as a
+dedicated unprivileged OS user with only the credentials and filesystem access it
+needs; process separation alone does not restrict privileges. The HTTP server
+does not create this account or drop privileges for an external process.
+
+### Standalone entrypoint
+
 From the repository root, run `npm run --silent -w server mcp`. In a packaged deployment use `node dist/modules/mcp/stdio.js` from the server directory. Configure `DATABASE_URL`, `BETTER_AUTH_SECRET`, `NODE_IDENTITY_MASTER_KEY`, `MCP_STDIO_WORKSPACE_ID`, and `MCP_STDIO_ACTOR_USER_ID` in the process environment. The actor must have current access to that workspace. Do not accept these identity settings from untrusted client request arguments.
 
 The standalone server initializes the database and tool registry. Standard input and output use one JSON-RPC message per line; logs and audit events go to stderr. Messages are limited to 10 MiB. The session class still accepts older Content-Length framed input; framed output requires explicit `framedOutput: true` and is not used by the standalone MCP server.
@@ -91,6 +112,9 @@ With Redis enabled, the MCP event bridge relays mutations between HTTP and stdio
 The bridge channel includes the logical database selected by `REDIS_URL` (default `0`) and `MCP_EVENT_NAMESPACE` (default `default`). HTTP replicas and their stdio clients must use matching values. Set a separate `MCP_EVENT_NAMESPACE`, such as `staging` or `production`, for deployments sharing a Redis database. Compose passes this setting through from the environment. Channel names contain no Redis credentials. Explicit scoping is needed because [Redis Pub/Sub ignores logical database boundaries](https://redis.io/docs/latest/develop/pubsub/#database--scoping).
 
 ## Regression coverage
+
+`npm run -w server test:config` checks legacy command rejection and standalone
+stdio configuration without starting application services or accessing a database.
 
 `server/tests/mcp-transport-lifecycle.test.ts` uses the official MCP SDK to initialize, discover tools, read, create, read back, and reject a revoked credential over HTTP. It also covers member read grants, catalog metadata, reusable defaults, optional IP binding, headers, notification responses, and API-issued HMAC rotation. `server/tests/mcp-stdio-sdk.test.ts` exercises the official SDK against a separate stdio process and verifies audit output stays off the protocol stream. Additional suites cover framing, token rotation/expiry/revocation, issuer removal, atomic single-use consumption, and scoped references.
 

@@ -66,6 +66,20 @@ try {
       check(await overlay.evaluate((element) => Number(getComputedStyle(element).opacity)) === 1, `${name}: entrance settles fully visible`);
       const box = await overlay.boundingBox();
       check(box.x >= 0 && box.y >= 0 && box.x + box.width <= viewportWidth + 1 && box.y + box.height <= 601, `${name}: settled overlay fits viewport`);
+      if (scenario === 'tooltip') {
+        const trigger = await page.getByRole('button', { name: 'Tooltip trigger' }).locator('..').boundingBox();
+        const expectedLeft = Math.max(8, Math.min(viewportWidth - box.width - 8, trigger.x + trigger.width / 2 - box.width / 2));
+        check(Math.abs(box.x - expectedLeft) < 2, `${name}: tooltip centers on its trigger`);
+        check(Math.abs(box.y - trigger.y - trigger.height - 6) < 2, `${name}: tooltip sits below its trigger`);
+        check(Math.abs(frames[0].x - expectedLeft) < 2, `${name}: first tooltip frame is positioned`);
+        await page.setViewportSize({ width: 720, height: 440 });
+        await page.waitForTimeout(100);
+        const resized = await overlay.boundingBox();
+        check(resized.x + resized.width <= 713, `${name}: tooltip clamps after viewport resize`);
+        check(Math.abs(resized.y + resized.height + 6 - trigger.y) < 2, `${name}: tooltip flips above near viewport bottom`);
+        await page.setViewportSize({ width: viewportWidth, height: 600 });
+        await page.waitForTimeout(100);
+      }
       if (scenario === 'popover') {
         const trigger = await page.getByRole('button', { name: 'Popover trigger' }).boundingBox();
         if (align === 'custom') check(box.width === 320, `${name}: consumer CSS width is preserved`);

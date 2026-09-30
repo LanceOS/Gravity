@@ -4,6 +4,6 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   test: {
     environment: 'node',
-    include: ['tests/unit/request-ip.test.ts', 'tests/unit/rate-limit.test.ts', 'tests/unit/rate-limit-outage.test.ts'],
+    include: ['tests/csrf.proxy.test.ts', 'tests/unit/request-ip.test.ts', 'tests/unit/rate-limit.test.ts', 'tests/unit/rate-limit-outage.test.ts'],
   },
 });
