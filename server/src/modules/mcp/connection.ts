@@ -1,4 +1,4 @@
-import { createHmac, randomBytes } from 'node:crypto';
+import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { and, eq, gt, isNull, or, sql } from 'drizzle-orm';
 import { db } from '../../db/index.js';
 import { mcpConnectionTokens } from '../../db/schema.js';
@@ -9,6 +9,22 @@ import { isMcpWorkspaceMember } from './access.js';
 
 const DEFAULT_MCP_SCOPES = ['tools/list'];
 const DEFAULT_TOKEN_TTL_SECONDS = 24 * 60 * 60;
+const SHA256_DIGEST_BYTES = 32;
+const SHA256_HEX_PATTERN = /^[0-9a-f]{64}$/;
+
+function readSha256Hex(value: unknown): { bytes: Buffer; valid: boolean } {
+  const bytes = Buffer.alloc(SHA256_DIGEST_BYTES);
+  if (typeof value !== 'string' || !SHA256_HEX_PATTERN.test(value)) return { bytes, valid: false };
+  Buffer.from(value, 'hex').copy(bytes);
+  return { bytes, valid: true };
+}
+
+function timingSafeSha256HexEqual(left: unknown, right: unknown): boolean {
+  const leftDigest = readSha256Hex(left);
+  const rightDigest = readSha256Hex(right);
+  const equal = timingSafeEqual(leftDigest.bytes, rightDigest.bytes);
+  return leftDigest.valid && rightDigest.valid && equal;
+}
 
 function configuredSecrets() {
   const current = process.env.BETTER_AUTH_SECRET ?? env.betterAuthSecret;
@@ -224,22 +240,34 @@ export async function refreshConnectionToken(
 export async function verifyAndConsumeToken(rawToken: string, workspaceId: string, opts?: { sourceIp?: string | null; allowSingleUse?: boolean }) {
   const secrets = configuredSecrets();
   const knownSecrets = [...new Set([secrets.current, ...Object.values(secrets.keyed), ...secrets.legacy])];
+  const expectedHashes = knownSecrets.map((secret) => ({
+    secret,
+    digest: createHmac('sha256', secret).update(rawToken).digest(),
+  }));
 
   const rowOrUpdated = await db.transaction(async (tx) => {
     let matchedRow: typeof mcpConnectionTokens.$inferSelect | null = null;
-    for (const secret of knownSecrets) {
-      const tokenHash = createHmac('sha256', secret).update(rawToken).digest('hex');
-      const [candidate] = await tx.select().from(mcpConnectionTokens)
-        .where(and(eq(mcpConnectionTokens.tokenHash, tokenHash), eq(mcpConnectionTokens.workspaceId, workspaceId)))
-        .limit(1);
-      if (!candidate) continue;
+    const candidates = await tx.select().from(mcpConnectionTokens)
+      .where(and(eq(mcpConnectionTokens.workspaceId, workspaceId), eq(mcpConnectionTokens.status, 'active')));
+
+    // Scan every active token in the workspace so token hashes are compared in
+    // process with fixed-size buffers instead of a database text equality.
+    // Continue through all candidates and configured secrets to avoid making
+    // the matching row's position affect comparison work.
+    for (const candidate of candidates) {
+      const storedHash = readSha256Hex(candidate.tokenHash);
       const keyId = candidate.hmacKeyId ?? 'env';
-      // Historically API-issued tokens record "env", not a stable key id.
-      // Retained keyed values must therefore also verify those older tokens.
-      // Explicit key ids still require their original mapping to be retained.
-      if (keyId !== 'env' && secrets.keyed[keyId] !== secret) continue;
-      matchedRow = candidate;
-      break;
+      let candidateMatched = false;
+      for (const expectedHash of expectedHashes) {
+        const hashMatches = timingSafeEqual(expectedHash.digest, storedHash.bytes);
+        // Historically API-issued tokens record "env", not a stable key id.
+        // Retained keyed values must therefore also verify those older tokens.
+        // Explicit key ids still require their original mapping to be retained.
+        const keyMatches = keyId === 'env' || secrets.keyed[keyId] === expectedHash.secret;
+        const accepted = Number(hashMatches) & Number(storedHash.valid) & Number(keyMatches);
+        candidateMatched = Boolean(Number(candidateMatched) | accepted);
+      }
+      if (candidateMatched) matchedRow = candidate;
     }
 
     if (!matchedRow) return null;
@@ -316,7 +344,9 @@ export async function verifyConnectionTokenSession(tokenId: string, workspaceId:
   const [row] = await db.select().from(mcpConnectionTokens)
     .where(and(eq(mcpConnectionTokens.id, tokenId), eq(mcpConnectionTokens.workspaceId, workspaceId), eq(mcpConnectionTokens.generatedBy, generatedBy)))
     .limit(1);
-  if (!row || row.status !== 'active' || (row.expiresAt && row.expiresAt <= new Date()) || row.tokenHash !== expectedTokenHash) return null;
+  if (!row) return null;
+  const tokenHashMatches = timingSafeSha256HexEqual(row.tokenHash, expectedTokenHash);
+  if (row.status !== 'active' || (row.expiresAt && row.expiresAt <= new Date()) || !tokenHashMatches) return null;
   if (!await isMcpWorkspaceMember(workspaceId, generatedBy)) return null;
   return row;
 }

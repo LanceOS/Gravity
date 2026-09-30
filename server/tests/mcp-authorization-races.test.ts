@@ -12,6 +12,19 @@ import { createConnectionToken, refreshConnectionToken, verifyAndConsumeToken, v
 import { api, seedUser, seedWorkspaceFixture, seedTicket } from './helpers/test-helpers.js';
 
 describe('MCP authorization races', () => {
+  it('compares stdio session token hashes safely for valid and malformed values', async () => {
+    const { owner, workspace } = await seedWorkspaceFixture();
+    const token = await createConnectionToken({ workspaceId: workspace.id, generatedBy: owner.id });
+    const [row] = await db.select().from(mcpConnectionTokens).where(eq(mcpConnectionTokens.id, token.id));
+
+    expect(await verifyConnectionTokenSession(token.id, workspace.id, owner.id, row.tokenHash)).toBeTruthy();
+    expect(await verifyConnectionTokenSession(token.id, workspace.id, owner.id, row.tokenHash.slice(1))).toBeNull();
+    expect(await verifyConnectionTokenSession(token.id, workspace.id, owner.id, 'malformed')).toBeNull();
+
+    await db.update(mcpConnectionTokens).set({ tokenHash: 'malformed' }).where(eq(mcpConnectionTokens.id, token.id));
+    await expect(verifyAndConsumeToken(token.rawToken, workspace.id)).resolves.toBeNull();
+  });
+
   it('denies removed issuers even while Redis returns a stale membership grant', async () => {
     const { workspace } = await seedWorkspaceFixture();
     const member = await seedUser({ id: 'removed-mcp-member', email: 'removed-mcp-member@example.com' });
@@ -93,7 +106,7 @@ describe('MCP authorization races', () => {
     const transaction = vi.spyOn(db, 'transaction').mockImplementationOnce(async (callback: any) => {
       replacement = await refreshConnectionToken(token.id, owner.id);
       return callback({
-        select: () => ({ from: () => ({ where: () => ({ limit: async () => [snapshot] }) }) }),
+        select: () => ({ from: () => ({ where: async () => [snapshot] }) }),
         update: db.update.bind(db),
       });
     });
