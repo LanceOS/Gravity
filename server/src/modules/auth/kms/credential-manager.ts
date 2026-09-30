@@ -12,7 +12,8 @@ type DbClient = NodePgDatabase<typeof schema> | Parameters<Parameters<typeof db.
 /**
  * @description Manages the secure storage and retrieval of external credentials (e.g., API keys).
  * Uses envelope encryption to protect credentials at rest. Relies on an injected KMS provider
- * to handle Data Encryption Keys (DEKs). Enforces zeroization of sensitive memory.
+ * to handle Data Encryption Keys (DEKs). Wipes mutable secret buffers; immutable JavaScript
+ * strings cannot be reliably zeroized.
  */
 export class CredentialManager {
   constructor(private readonly kmsProvider: IKMSProvider, readonly available = true) {}
@@ -125,7 +126,8 @@ export class CredentialManager {
 
   /**
    * @description Flow B: Retrieves and decrypts the user's API key, executes the provided callback with it,
-   * and guarantees complete memory zeroization of the secrets when done.
+   * and wipes the mutable secret buffers when done. The immutable JavaScript string passed to the callback
+   * cannot be reliably zeroized.
    * @param {string} userId - The unique identifier of the user.
    * @param {(decryptedAPIKey: string) => Promise<T> | T} executionCallback - The function to execute with the decrypted key.
    * @return {Promise<T>} The result of the execution callback.
@@ -158,42 +160,49 @@ export class CredentialManager {
     }
 
     let plaintextDEK: Buffer | null = null;
+    let decryptedKeyUpdateBuffer: Buffer | null = null;
+    let decryptedKeyFinalBuffer: Buffer | null = null;
     let decryptedKeyBuffer: Buffer | null = null;
 
-    // Decrypt the key material in an isolated try/catch.
-    // Any error here is a cryptographic failure and is rethrown as a Security Exception.
-    let decryptedAPIKeyString: string;
     try {
-      // 2. Call DecryptDataKey to unwrap the DEK
-      plaintextDEK = this.kmsProvider.DecryptDataKey(record.encryptedDek);
+      let decryptedAPIKeyString: string;
 
-      // 3. Decrypt the API key using AES-256-GCM and verify integrity
-      const decipher = createDecipheriv('aes-256-gcm', plaintextDEK, record.aesIv);
-      decipher.setAuthTag(record.aesAuthTag);
+      // Keep the crypto catch separate from the callback so callback failures retain their
+      // original classification. The update chunk may contain unauthenticated plaintext until
+      // final() verifies the GCM tag, so every chunk must remain reachable by the outer cleanup.
+      try {
+        // 2. Call DecryptDataKey to unwrap the DEK
+        plaintextDEK = this.kmsProvider.DecryptDataKey(record.encryptedDek);
 
-      decryptedKeyBuffer = Buffer.concat([decipher.update(record.encryptedApiKey), decipher.final()]);
-      decryptedAPIKeyString = decryptedKeyBuffer.toString('utf8');
-    } catch (error) {
-      throw new Error(
-        `Security Exception: Failed to decrypt credentials. Integrity check failed or data was tampered with: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-      );
-    }
+        // 3. Decrypt the API key using AES-256-GCM and verify integrity
+        const decipher = createDecipheriv('aes-256-gcm', plaintextDEK, record.aesIv);
+        decipher.setAuthTag(record.aesAuthTag);
 
-    // 4. Run the callback in a separate try/finally so that:
-    //    a) Non-crypto callback errors are never mislabeled as Security Exceptions.
-    //    b) Plaintext secrets are always zeroized regardless of callback success or failure.
-    try {
+        decryptedKeyUpdateBuffer = decipher.update(record.encryptedApiKey);
+        decryptedKeyFinalBuffer = decipher.final();
+        decryptedKeyBuffer = Buffer.concat([decryptedKeyUpdateBuffer, decryptedKeyFinalBuffer]);
+
+        // The concatenated buffer is needed to decode the key, but the source chunks are not.
+        this.secureWipeBuffer(decryptedKeyUpdateBuffer);
+        decryptedKeyUpdateBuffer = null;
+        this.secureWipeBuffer(decryptedKeyFinalBuffer);
+        decryptedKeyFinalBuffer = null;
+
+        decryptedAPIKeyString = decryptedKeyBuffer.toString('utf8');
+      } catch {
+        throw new Error(
+          'Security Exception: Failed to decrypt credentials. Integrity check failed or data was tampered with.',
+        );
+      }
+
+      // JavaScript strings are immutable and cannot be reliably zeroized. The byte buffers
+      // holding the DEK and decrypted key are wiped in the finally block below.
       return await executionCallback(decryptedAPIKeyString);
     } finally {
-      // 5. Ensure plaintext secrets are securely wiped from memory
-      if (plaintextDEK) {
-        this.secureWipeBuffer(plaintextDEK);
-      }
-      if (decryptedKeyBuffer) {
-        this.secureWipeBuffer(decryptedKeyBuffer);
-      }
+      this.secureWipeBuffer(plaintextDEK);
+      this.secureWipeBuffer(decryptedKeyUpdateBuffer);
+      this.secureWipeBuffer(decryptedKeyFinalBuffer);
+      this.secureWipeBuffer(decryptedKeyBuffer);
     }
   }
 
