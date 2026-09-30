@@ -37,10 +37,6 @@ export function csrfProtect(
       // In tests, skip CSRF checks by default to keep unit tests deterministic
       if (env.nodeEnv === 'test' && !enforceInTest) return next();
 
-      // If client provided an Authorization header (bearer token), assume non-browser client
-      const authHeader = req.get('authorization');
-      if (authHeader && String(authHeader).trim().length > 0) return next();
-
       // Allow service-to-service tokens provided via `x-service-token` or `x-api-key`
       const serviceToken = req.get('x-service-token') || req.get('x-api-key');
       const allowedServiceTokens = allowedServiceTokensOption ?? getTrustedServiceTokens();

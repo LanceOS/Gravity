@@ -35,7 +35,7 @@ describe('CSRF proxy fallback policy', () => {
     expect(check({ ...forwarded, 'x-forwarded-for': '10.0.0.2' }, '192.0.2.1')).toBe(403);
   });
 
-  it('preserves safe methods, test opt-out and existing credential bypasses', () => {
+  it('preserves safe methods, test opt-out and trusted service-token bypasses', () => {
     for (const method of ['GET', 'HEAD', 'OPTIONS']) {
       expect(check({}, null, {}, undefined, method)).toBe(200);
     }
@@ -43,8 +43,8 @@ describe('CSRF proxy fallback policy', () => {
       expect(check({}, null, {}, undefined, method)).toBe(403);
     }
     expect(check({}, null, { enforceInTest: false })).toBe(200);
-    // Authorization-header bypass is a separate policy tracked in GRAV-92.
-    expect(check({ authorization: 'Bearer token' }, null)).toBe(200);
+    expect(check({ authorization: 'Bearer token' }, null)).toBe(403);
+    expect(check({ authorization: 'Bearer token', origin: 'https://evil.example' })).toBe(403);
     for (const header of ['x-service-token', 'x-api-key']) {
       expect(check({ [header]: 'valid' }, null, { allowedServiceTokens: ['valid'] })).toBe(200);
       expect(check({ [header]: 'invalid' }, null, { allowedServiceTokens: ['valid'] })).toBe(403);

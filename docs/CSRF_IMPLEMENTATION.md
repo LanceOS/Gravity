@@ -13,7 +13,7 @@
 ## Entry Points
 
 * Global API router: the CSRF middleware is mounted at the top of the API router factory in [server/src/routes/index.ts](server/src/routes/index.ts#L1). See the invocation of `csrfProtect()` in `createApiRouter`.
-* Workspace router: the workspace router also mounts CSRF (defensive double‑apply) in [server/src/modules/workspaces/routes.ts](server/src/modules/workspaces/routes.ts#L214). This router contains the MCP endpoints used to issue, refresh, and revoke one‑time tokens.
+* Workspace router: the workspace router also mounts CSRF (defensive double‑apply) in [server/src/modules/workspaces/routes.ts](server/src/modules/workspaces/routes.ts#L753). This router contains MCP connection endpoints used to issue, refresh, and revoke credentials. The raw token is returned on issue or refresh and is not retrievable afterward.
 
 ## Flow Steps (detailed)
 
@@ -28,16 +28,17 @@ Runtime flow when a request hits the middleware:
 
 1. If the HTTP method is safe (`GET`, `HEAD`, `OPTIONS`) the middleware allows the request through.
 2. If running under `NODE_ENV === 'test'` the middleware is NO‑OP unless `options.enforceInTest === true` (this is used by unit tests to assert behavior).
-3. If an `Authorization` header is present (Bearer token), the middleware allows the request through — this is an explicit decision that requests authenticated via explicit bearer credentials are considered non‑browser API calls.
-4. The middleware checks for service‑level headers: `x-service-token` or `x-api-key`. If one is present and matches a configured allowlist (`TRUSTED_SERVICE_TOKENS`), the request is allowed.
-5. Otherwise, the middleware validates the request origin:
+3. The middleware checks for service‑level headers: `x-service-token` or `x-api-key`. If one is present and matches a configured allowlist (`TRUSTED_SERVICE_TOKENS`), the request is allowed.
+4. Otherwise, the middleware validates the request origin:
    * Prefer the `Origin` header.
    * If `Origin` is not present, attempt to derive the origin from the `Referer` header.
    * Normalize the origin by trimming trailing slashes and lower‑casing for comparison.
    * Compare the normalized origin against the configured `TRUSTED_ORIGINS` list.
    * If `Origin` matches any trusted origin, the request is allowed.
-6. Only when both Origin and Referer are absent, optional host fallback may allow the request: `allowHostFallback` must be enabled, the immediate socket peer must match `TRUSTED_PROXIES`, and a single `X-Forwarded-Host` must match a host derived from the allowed HTTP(S) origins. An explicit disallowed origin can never use this fallback. See the [proxy deployment requirements](#proxy-deployment-note).
-7. If none of the checks succeed, the middleware returns `403` with a JSON error body such as `{ error: 'Missing Origin or Referer header.' }` or `{ error: 'Invalid Origin or Referer header.' }`.
+5. Only when both Origin and Referer are absent, optional host fallback may allow the request: `allowHostFallback` must be enabled, the immediate socket peer must match `TRUSTED_PROXIES`, and a single `X-Forwarded-Host` must match a host derived from the allowed HTTP(S) origins. An explicit disallowed origin can never use this fallback. See the [proxy deployment requirements](#proxy-deployment-note).
+6. If none of the checks succeed, the middleware returns `403` with a JSON error body such as `{ error: 'Missing Origin or Referer header.' }` or `{ error: 'Invalid Origin or Referer header.' }`.
+
+`Authorization` is not a generic middleware bypass. The API router exempts only the bearer-authenticated MCP transports described below; each transport then validates its credential. A random or malformed `Authorization` value on an ordinary cookie-authenticated API route does not replace its Origin/Referer check.
 
 ## Implementation details and invariants
 
@@ -45,7 +46,8 @@ Runtime flow when a request hits the middleware:
   * Normalizes origins with a simple `origin.replace(/\/$/, '').toLowerCase()` normalization.
   * Uses `env.trustedOrigins` (parsed from environment `TRUSTED_ORIGINS` or defaulted to `http://localhost:${PORT}`) when no explicit `allowedOrigins` param is passed.
   * Accepts a second `options` parameter for test enforcement, runtime service token allowlist, optional host fallback, and trusted proxy IPs/CIDRs.
-  * Bypass rules in order: safe methods → test env (unless enforced) → `Authorization` header → `x-service-token`/`x-api-key` → `Origin`/`Referer` → optional missing-header `X-Forwarded-Host` fallback → deny.
+  * Bypass rules in order: safe methods → test env (unless enforced) → allowlisted `x-service-token`/`x-api-key` → `Origin`/`Referer` → optional missing-header `X-Forwarded-Host` fallback → deny.
+  * Bearer exemptions are scoped in [server/src/routes/index.ts](server/src/routes/index.ts#L1): POST `/mcp` and `/mcp/sse` skip generic CSRF only when a complete Bearer credential selects the token-authenticated path; POST `/workspaces/:workspaceId/mcp` is OAuth bearer-only and must be reachable for its initial challenge.
 
 ## Data Stores and Resources
 
@@ -63,7 +65,7 @@ Runtime flow when a request hits the middleware:
 * Request headers used by the middleware:
   * `Origin` — preferred source for the caller origin.
   * `Referer` / `Referrer` — fallback when `Origin` is missing; the middleware derives `new URL(referer).origin`.
-  * `Authorization` — presence bypasses CSRF checks (intended for bearer tokens used by non‑browser clients).
+  * `Authorization` — does not bypass generic CSRF checks. The API router recognizes a complete Bearer credential only on MCP transport paths whose handlers validate bearer authentication.
   * `X-Service-Token` / `X-API-Key` — used for trusted service token bypass when tokens are configured.
   * `X-Forwarded-Host` — used only for the explicitly enabled missing-header fallback from a trusted socket peer. The client `Host` header is never an origin-policy substitute.
 * Failure responses:
@@ -83,7 +85,7 @@ Runtime flow when a request hits the middleware:
 ## Permissions, Guards, and Tenant Boundaries
 
 * CSRF is a transport‑level/HTTP boundary control and does not replace application authorization checks. All sensitive endpoints should continue to perform explicit authorization checks (e.g., membership, workspace ownership) in route handlers — see membership checks in [server/src/modules/workspaces/routes.ts](server/src/modules/workspaces/routes.ts#L1).
-* CSRF is applied globally for all API routers; service tokens and bearer tokens are **explicitly** allowed to bypass CSRF because they represent non‑browser clients or trusted automation. Keep service tokens tightly scoped and rotate them regularly.
+* CSRF is applied globally for API routes. An arbitrary `Authorization` header cannot bypass checks on session-authenticated routes. The MCP bearer transports have route-specific exemptions because their handlers authenticate the bearer credential; configured service tokens remain an explicit generic exemption and must be tightly scoped and rotated regularly.
 
 ## Failure Modes, Observability, and Operational Notes
 
@@ -93,7 +95,7 @@ Runtime flow when a request hits the middleware:
   * **Service token misuse**: service tokens in `TRUSTED_SERVICE_TOKENS` are bearer‑style secrets. If leaked, an attacker could bypass CSRF protections; store and rotate them securely.
 * Observability recommendations:
   * Log blocked origins and deny responses with a structured log message including `req.path`, `req.method`, and the normalized origin/referer when a 403 is returned.
-  * Log bypass events (Authorization header present or `x-service-token` used) at `info` level so audits can correlate bypasses to automation runs.
+  * Log bypass events for the route-specific MCP bearer transports and configured service-token use at `info` level so audits can correlate bypasses to automation runs.
 
 ## Change Hazards, Invariants, and Migration Constraints
 
@@ -150,21 +152,40 @@ TRUSTED_SERVICE_TOKENS=svc-token-abc123,svc-token-xyz456
 ## MCP compatibility note (short)
 
 - MCP HTTP transport (`/api/v1/mcp/sse`) uses bearer tokens. External connectors should call the
-  transport with `Authorization: Bearer <one-time-token>` and include `X-Workspace-Id: <workspace-id>`.
+  transport with `Authorization: Bearer <connection-token>` and include `X-Workspace-Id: <workspace-id>`.
 
-- The CSRF middleware explicitly bypasses requests with an `Authorization` header, so MCP JSON-RPC
-  calls authenticated this way will not be blocked by CSRF. Token issuance/refresh/revoke endpoints
-  remain protected by CSRF because they are intended to be invoked from browser UI flows (session cookies
-  and `Origin` checks). For automation that needs to call issuance endpoints, prefer service tokens
-  (`X-Service-Token`/`X-API-KEY` from `TRUSTED_SERVICE_TOKENS`) or an authenticated API client.
+- The API router skips generic CSRF for POST `/api/v1/mcp` and `/api/v1/mcp/sse` only when a complete
+  `Authorization: Bearer ...` credential selects the MCP token path. That handler validates the token,
+  uses it in preference to any session cookie, and rejects a supplied untrusted Origin. Cookie-only
+  requests to those paths still require the normal CSRF checks. The workspace OAuth endpoint
+  `/api/v1/workspaces/:workspaceId/mcp` is also exempt so unauthenticated clients can receive its
+  OAuth challenge; authenticated requests require an OAuth bearer token and never use a browser cookie.
+- In production, manual connection creation, refresh, and revoke endpoints resolve the actor from a
+  Better Auth session and apply workspace permission checks. Development can opt into the separate
+  `ALLOW_DEV_AUTH_BYPASS` shortcut; production requests still require Origin/Referer even
+  if an unrelated `Authorization` header is present. Generated credentials are returned only on
+  creation or refresh, the server stores an HMAC verification hash, and those responses set
+  `Cache-Control: no-store` and `Referrer-Policy: no-referrer`.
+- Browser sign-in uses Better Auth HttpOnly, SameSite=Lax cookies; session credentials are not kept in
+  localStorage. A manually generated MCP credential is different: the dialog intentionally holds and
+  displays it in page memory until the dialog closes so the user can copy or download it. An XSS flaw
+  could read a credential while it is displayed, so store it in the external client's secure credential
+  store and revoke or rotate it if exposed. See [auth architecture](auth/architecture.md) and
+  [MCP credential lifecycle](mcp/TRANSPORTS.md#issue-and-manage-credentials).
+
+- Automated credential management must establish a valid Better Auth session and workspace
+  permissions. A configured service token satisfies only the generic CSRF middleware exception; it
+  supplies no user identity or workspace permission. Do not rely on an arbitrary Authorization header
+  to exempt unrelated API routes from CSRF checks.
 
 - If you encounter 403s for issuance from automation, check proxies/CDNs for header stripping and
-  prefer service tokens in those environments.
+  confirm the client has a valid session and sends a trusted Origin or Referer. Use a configured service
+  token only when the deployment intentionally needs that additional CSRF exception.
 
 ## Proxy deployment note
 
 Host fallback is disabled by default. For requests subject to origin checks (after
-the safe-method, test, and credential bypasses above), an explicit Origin (or Referer when Origin
+the safe-method, test, and allowlisted service-token bypasses above), an explicit Origin (or Referer when Origin
 is absent) must match `TRUSTED_ORIGINS` / the middleware's `allowedOrigins`,
 including scheme and port. Matching `Host` or `X-Forwarded-Host` never overrides
 a disallowed origin. Malformed Referers do not qualify for missing-header fallback.

@@ -291,7 +291,8 @@ export function createOAuthConsentRouter() {
   });
   router.post('/mcp/oauth/requests/:requestId', async (req, res) => {
     res.set('Cache-Control', 'no-store');
-    // Do not accept the generic API middleware's Authorization-header bypass.
+    // Consent is an authenticated browser action; check the public Origin here
+    // as well as at the API-wide CSRF boundary.
     if (req.get('origin') !== publicBase()) { res.status(403).json({ error: 'A matching Origin header is required.' }); return; }
     const session = await consentSession(req);
     if (!session) { res.status(401).json({ error: 'Sign in to review this connection.' }); return; }

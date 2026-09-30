@@ -749,7 +749,8 @@ export function createWorkspacesRouter() {
   const revocationUserLimiter = createLimiter({ namespace: 'mcp.connection.revoke.user', failurePolicy: 'local', windowMs: 60_000, max: 10, keyFn: connectionUserKey });
   const revocationIpLimiter = createLimiter({ namespace: 'mcp.connection.revoke.ip', failurePolicy: 'local', windowMs: 60_000, max: 60, keyFn: connectionIpKey });
   // Enforce CSRF Origin/Referer checks for state-changing requests by default.
-  // `csrfProtect` allows Authorization header or service tokens to bypass when appropriate.
+  // Bearer-only MCP transport exceptions are scoped in the API router; this
+  // management router must not skip origin checks just because Authorization is present.
   router.use(csrfProtect());
 
   router.get('/workspaces', async (req, res) => {

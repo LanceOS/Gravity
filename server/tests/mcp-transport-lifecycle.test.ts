@@ -6,6 +6,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { createApp } from '../src/app.js';
 import { db } from '../src/db/index.js';
+import { env } from '../src/env.js';
 import { mcpConnectionTokens, workspaceMembers } from '../src/db/schema.js';
 import { api, createAuthenticatedApi, seedWorkspaceFixture, setSecretsForTest } from './helpers/test-helpers.js';
 
@@ -88,14 +89,24 @@ describe('MCP transport and credentials', () => {
     const { ownerApi, workspace } = await fixture();
     const issued = await ownerApi.post(`/api/v1/workspaces/${workspace.id}/mcp/connection`).send({});
     const send = () => api().post('/api/v1/mcp').set('Authorization', `Bearer ${issued.body.auth.token}`).set('X-Workspace-Id', workspace.id);
-    const notification = await send().send({ jsonrpc: '2.0', method: 'notifications/initialized' });
-    expect(notification.status).toBe(202);
-    expect(notification.text).toBe('');
-    expect((await api().get('/api/v1/mcp')).status).toBe(405);
-    expect((await send().set('Origin', 'https://untrusted.example').send({ jsonrpc: '2.0', id: 1, method: 'ping' })).status).toBe(403);
-    expect((await send().set('MCP-Protocol-Version', '1900-01-01').send({ jsonrpc: '2.0', id: 1, method: 'ping' })).status).toBe(400);
-    const ping = await send().set('MCP-Protocol-Version', '2025-11-25').send({ jsonrpc: '2.0', id: 2, method: 'ping' });
-    expect(ping.body).toEqual({ jsonrpc: '2.0', id: 2, result: {} });
+    const oldNodeEnv = env.nodeEnv;
+    env.nodeEnv = 'production';
+    try {
+      const notification = await send().send({ jsonrpc: '2.0', method: 'notifications/initialized' });
+      expect(notification.status).toBe(202);
+      expect(notification.text).toBe('');
+      expect((await api().get('/api/v1/mcp')).status).toBe(405);
+      expect((await send().set('Origin', 'https://untrusted.example').send({ jsonrpc: '2.0', id: 1, method: 'ping' })).status).toBe(403);
+      expect((await send().set('MCP-Protocol-Version', '1900-01-01').send({ jsonrpc: '2.0', id: 1, method: 'ping' })).status).toBe(400);
+      const ping = await send().set('MCP-Protocol-Version', '2025-11-25').send({ jsonrpc: '2.0', id: 2, method: 'ping' });
+      expect(ping.body).toEqual({ jsonrpc: '2.0', id: 2, result: {} });
+
+      const cookieOnly = await ownerApi.post('/api/v1/mcp').set('X-Workspace-Id', workspace.id)
+        .send({ jsonrpc: '2.0', id: 3, method: 'ping' });
+      expect(cookieOnly.status).toBe(403);
+    } finally {
+      env.nodeEnv = oldNodeEnv;
+    }
   });
 
   it('allows member read credentials and own inventory while rejecting write grants', async () => {
