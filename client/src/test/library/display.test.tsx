@@ -89,8 +89,8 @@ function DisplayHarness() {
 
       <DescriptionList items={[{ key: 'Owner', value: 'Jane Doe' }, { key: 'Status', value: 'Active' }]} />
       <Statistic title="Velocity" value={42} suffix="pts" />
-      <Table columns={columns} data={rows} />
-      <DataGrid columns={columns} data={rows} height={120} rowHeight={30} />
+      <Table getRowKey={row => row.id} columns={columns} data={rows} />
+      <DataGrid getRowKey={row => row.id} columns={columns} data={rows} height={120} rowHeight={30} />
 
       <KanbanBoard
         columns={[
