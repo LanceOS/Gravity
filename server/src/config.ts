@@ -39,6 +39,7 @@ const envSchema = z.object({
   MCP_AGENT_COMMAND: z.string().trim().max(0, { message: retiredCommandMessage }).optional(),
   MCP_EVENT_NAMESPACE: z.string().trim().max(128).optional(),
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+  ENCRYPTED_CREDENTIALS_MODE: z.enum(['disabled', 'required']).optional(),
   ALLOW_ENV_AI_KEYS: z.preprocess((v) => {
     if (typeof v !== 'string') return v;
     const s = v.trim().toLowerCase();
@@ -101,9 +102,13 @@ export function parseDeploymentConfig(input: Record<string, unknown>) {
       fail(key, 'use an independent random secret of at least 32 bytes; generate with openssl rand -hex 32.');
     }
   }
-  // Production intentionally uses UnconfiguredKmsProvider, not the local test key.
+  config.ENCRYPTED_CREDENTIALS_MODE ??= production ? 'disabled' : 'required';
+  if (production && config.ENCRYPTED_CREDENTIALS_MODE === 'required') {
+    fail('ENCRYPTED_CREDENTIALS_MODE', 'required encrypted credentials are unavailable: no production KMS provider is supported. Use disabled to run without cloud AI credentials.');
+  }
+  // Production never uses the local test key.
   const kek = config.LOCAL_TESTING_KEK ?? '';
-  if (!production && !(/^[a-f\d]{64}$/i.test(kek) || Buffer.byteLength(kek) === 32)) {
+  if (!production && config.ENCRYPTED_CREDENTIALS_MODE === 'required' && !(/^[a-f\d]{64}$/i.test(kek) || Buffer.byteLength(kek) === 32)) {
     fail('LOCAL_TESTING_KEK', 'use a random 32-byte key encoded as 64 hex characters (or exactly 32 UTF-8 bytes).');
   }
   if (production || config.BETTER_AUTH_BASE_URL) {

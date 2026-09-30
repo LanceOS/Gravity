@@ -9,6 +9,7 @@ import { closeHttpServer } from './lib/http-shutdown.js';
 
 async function main() {
   let stopMcpEventBridge: () => Promise<void> = async () => {};
+  if (env.encryptedCredentialsMode === 'disabled') console.warn('Encrypted credentials and cloud AI are disabled (ENCRYPTED_CREDENTIALS_MODE=disabled).');
   const app = createApp();
   const server = createServer(app);
 

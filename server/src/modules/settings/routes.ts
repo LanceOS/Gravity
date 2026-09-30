@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { eq } from 'drizzle-orm';
 import { db } from '../../db/index.js';
 import { userSettings } from '../../db/schema.js';
+import { CredentialsUnavailableError } from '../auth/kms/availability.js';
 import { credentialManager } from '../auth/kms/index.js';
 import { getUserSettingsRecord } from '../../lib/platform.js';
 import { resolveRequestActorUserId } from '../auth/utils/request-auth.js';
@@ -52,6 +53,7 @@ function toSettingsResponse(
     aiProvider: settings.aiProvider,
     projectLayout: settings.projectLayout,
     savedCredentials,
+    encryptedCredentialsAvailable: credentialManager.available,
   };
 }
 
@@ -221,6 +223,7 @@ export function createSettingsRouter() {
       const keyAction = explicitKeyAction as 'update' | 'clear' | 'keep';
 
       if (keyAction === 'update') {
+        credentialManager.assertAvailable();
         const rawKey = incomingApiKey ?? '';
         if (!rawKey || rawKey === API_KEY_MASK) {
           res.status(400).json({ error: 'apiKey is required when keyAction is "update".' });
@@ -284,6 +287,10 @@ export function createSettingsRouter() {
       const savedCredentials = await credentialManager.ListCredentials(userId);
       res.json(toSettingsResponse(merged, apiKeyPlaceholder, getCredentialListSummary(savedCredentials, merged.aiProvider)));
     } catch (error) {
+      if (error instanceof CredentialsUnavailableError) {
+        res.status(503).json({ error: error.message, code: 'ENCRYPTED_CREDENTIALS_DISABLED' });
+        return;
+      }
       console.error(`Failed to update account settings for user ${userId}:`, error);
       res.status(500).json({ error: SETTINGS_UPDATE_ERROR });
     }

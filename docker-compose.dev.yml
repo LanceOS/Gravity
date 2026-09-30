@@ -2,6 +2,8 @@ version: '3.8'
 
 services:
   backend:
+    environment:
+      ENCRYPTED_CREDENTIALS_MODE: ${ENCRYPTED_CREDENTIALS_MODE:-required}
     build:
       target: development
     volumes:

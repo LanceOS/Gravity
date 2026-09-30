@@ -14,6 +14,17 @@ const valid = {
 };
 
 describe('deployment configuration boundary', () => {
+  it('defaults production credentials to disabled and fails startup when required', () => {
+    expect(parseDeploymentConfig(valid).ENCRYPTED_CREDENTIALS_MODE).toBe('disabled');
+    expect(() => parseDeploymentConfig({ ...valid, ENCRYPTED_CREDENTIALS_MODE: 'required' })).toThrow(/no production KMS provider/);
+    expect(() => parseDeploymentConfig({ ...valid, ENCRYPTED_CREDENTIALS_MODE: 'local' })).toThrow(/ENCRYPTED_CREDENTIALS_MODE/);
+  });
+  it.each(['development', 'test'])('preserves the required default in %s', nodeEnv => {
+    expect(parseDeploymentConfig({ ...valid, NODE_ENV: nodeEnv }).ENCRYPTED_CREDENTIALS_MODE).toBe('required');
+  });
+  it('allows explicitly disabled local credentials without provisioning a test key', () => {
+    expect(parseDeploymentConfig({ ...valid, NODE_ENV: 'test', ENCRYPTED_CREDENTIALS_MODE: 'disabled', LOCAL_TESTING_KEK: undefined }).ENCRYPTED_CREDENTIALS_MODE).toBe('disabled');
+  });
   it('accepts a complete production deployment without network access', () => {
     expect(parseDeploymentConfig(valid).ALLOW_UNSIGNED_LOCAL_WEBHOOKS).toBe(false);
   });

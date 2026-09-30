@@ -4,6 +4,7 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { db } from '../../../db/index.js';
 import * as schema from '../../../db/schema.js';
 import { userExternalCredentials } from '../../../db/schema.js';
+import { CredentialsUnavailableError } from './availability.js';
 import type { IKMSProvider } from './types.js';
 
 type DbClient = NodePgDatabase<typeof schema> | Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -14,7 +15,11 @@ type DbClient = NodePgDatabase<typeof schema> | Parameters<Parameters<typeof db.
  * to handle Data Encryption Keys (DEKs). Enforces zeroization of sensitive memory.
  */
 export class CredentialManager {
-  constructor(private readonly kmsProvider: IKMSProvider) {}
+  constructor(private readonly kmsProvider: IKMSProvider, readonly available = true) {}
+
+  assertAvailable(): void {
+    if (!this.available) throw new CredentialsUnavailableError();
+  }
 
   /**
    * @description Helper to safely fill/zero out Buffers to avoid retaining secrets in memory.
@@ -52,6 +57,7 @@ export class CredentialManager {
       throw new Error('API Key cannot be empty.');
     }
 
+    this.assertAvailable();
     const normalizedProvider = provider.toLowerCase();
 
     // 1. Generate DEK from KMS provider
@@ -137,6 +143,7 @@ export class CredentialManager {
       throw new Error('Provider is required to execute with credentials.');
     }
 
+    this.assertAvailable();
     const normalizedProvider = provider.toLowerCase();
 
     // 1. Fetch user's record from database

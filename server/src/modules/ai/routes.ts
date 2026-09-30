@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { CredentialsUnavailableError } from '../auth/kms/availability.js';
 import { aiService } from './index.js';
 import { resolveRequestActorUserId } from '../auth/utils/request-auth.js';
 import { systemPrompt } from './config/sysPrompt.js';
@@ -61,6 +62,7 @@ function sanitizeAiError(
   provider: string,
   operation: 'models' | 'test' | 'chat',
 ): { status: number; message: string } {
+  if (error instanceof CredentialsUnavailableError) return { status: 503, message: error.message };
   if (error instanceof GenerationConcurrencyError) return { status: 429, message: error.message };
   const message = error instanceof Error ? error.message : 'Unexpected error.';
 
