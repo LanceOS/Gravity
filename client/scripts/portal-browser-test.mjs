@@ -42,6 +42,9 @@ try {
       const name = `${scenario}${scenario === 'popover' ? `-${align}` : ''}-${initial ? 'initial' : 'interaction'}-${motion}`;
       const viewportWidth = align === 'mobile' ? 390 : 800;
       const page = await browser.newPage({ viewport: { width: viewportWidth, height: 600 }, reducedMotion: motion });
+      // Install before the fixture schedules any animation frames. Time runs
+      // normally until the tooltip lifecycle checks explicitly pause it.
+      if (scenario === 'tooltip') await page.clock.install({ time: new Date('2025-01-01T00:00:00Z') });
       const errors = [];
       page.on('pageerror', (error) => errors.push(error.message));
       await page.route('https://fonts.googleapis.com/**', (route) => route.abort());
@@ -123,15 +126,49 @@ try {
         check(await overlay.evaluate((element) => Number(getComputedStyle(element).opacity)) === 1, `${name}: interrupted exit settles visible`);
         check(await page.evaluate(() => document.body.style.overflow) === 'hidden', `${name}: reopened dialog retains scroll lock`);
       }
-      if (motion === 'no-preference' && scenario === 'tooltip') {
+      if (scenario === 'tooltip') {
+        // Use a fixed future test time rather than a short wall-clock deadline
+        // that a delayed driver round trip could overrun under CPU load.
+        await page.clock.pauseAt(new Date('2025-01-02T00:00:00Z'));
+        const trigger = page.getByRole('button', { name: 'Tooltip trigger' }).locator('..');
         const original = await overlay.elementHandle();
-        await page.mouse.move(10, 150);
-        await page.waitForTimeout(50);
-        await page.getByRole('button', { name: 'Tooltip trigger' }).hover();
-        await page.waitForTimeout(300);
-        check(await original.evaluate((element) => element.isConnected), `${name}: reentering during exit preserves the mounted tooltip`);
-        check(await overlay.count() === 1, `${name}: reentering during exit keeps the tooltip mounted`);
-        if (await overlay.count()) check(await overlay.evaluate((element) => Number(getComputedStyle(element).opacity)) === 1, `${name}: reentered tooltip settles visible`);
+        if (motion === 'no-preference') {
+          // Driver round trips and hover actionability waits must not consume
+          // the 130ms exit window. Advance browser time only by the intended
+          // delay, then measure and reenter in the same browser task.
+          const leftAt = await trigger.evaluate((element) => {
+            element.dispatchEvent(new MouseEvent('mouseout', { bubbles: true, relatedTarget: document.body }));
+            return performance.now();
+          });
+          await page.clock.runFor(50);
+          const reentry = await trigger.evaluate((element, { original, leftAt }) => {
+            const timing = { elapsedMs: performance.now() - leftAt,
+              connected: original.isConnected, opacity: Number(getComputedStyle(original).opacity) };
+            element.dispatchEvent(new MouseEvent('mouseover', { bubbles: true, relatedTarget: document.body }));
+            return timing;
+          }, { original, leftAt });
+          results.at(-1).reentry = reentry;
+          console.info(`TIMING ${name}: ${JSON.stringify(reentry)}`);
+          check(reentry.elapsedMs === 50, `${name}: reentry occurs after exactly 50ms of browser time`);
+          check(reentry.connected && reentry.opacity > 0 && reentry.opacity < 1,
+            `${name}: reentry interrupts an active exit before completion`);
+          await page.clock.runFor(300);
+          check(await original.evaluate((element) => element.isConnected), `${name}: reentering during exit preserves the mounted tooltip`);
+          check(await overlay.count() === 1, `${name}: reentering during exit keeps the tooltip mounted`);
+          if (await overlay.count()) check(await overlay.evaluate((element) => Number(getComputedStyle(element).opacity)) === 1, `${name}: reentered tooltip settles visible`);
+        }
+        // A completed exit has a different contract: both normal and reduced
+        // motion must detach the old node and mount a fresh one on reentry.
+        await trigger.dispatchEvent('mouseout', { relatedTarget: await page.locator('body').elementHandle() });
+        await page.clock.runFor(300);
+        await overlay.waitFor({ state: 'detached' });
+        check(await original.evaluate((element) => !element.isConnected), `${name}: completed exit detaches the original tooltip`);
+        await trigger.dispatchEvent('mouseover', { relatedTarget: await page.locator('body').elementHandle() });
+        await page.clock.runFor(300);
+        await overlay.waitFor();
+        check(await overlay.evaluate((element, previous) => element !== previous, original), `${name}: reentry after completed exit mounts a new tooltip`);
+        check(await overlay.count() === 1, `${name}: reentry after completed exit mounts exactly one tooltip`);
+        check(await overlay.evaluate((element) => Number(getComputedStyle(element).opacity)) === 1, `${name}: tooltip after completed exit settles visible`);
       }
       check(errors.length === 0, `${name}: browser errors ${errors.join(', ')}`);
       console.info(`CHECKED ${name}`);

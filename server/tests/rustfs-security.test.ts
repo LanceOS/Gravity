@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { createAuthenticatedApi, seedWorkspaceFixture } from './helpers/test-helpers.js';
-import { Readable } from 'node:stream';
 
 describe('RustFS Security & Performance Endpoints', () => {
   it('enforces secure uploads, downloads, and deletions', async () => {
@@ -54,7 +53,7 @@ describe('RustFS Security & Performance Endpoints', () => {
       .send(content);
 
     expect(traversalUploadRes.status).toBe(400);
-    expect(traversalUploadRes.body.error).toBe('Invalid filename format.');
+    expect(traversalUploadRes.body).toMatchObject({ error: 'Invalid note request.', code: 'INVALID_INPUT' });
 
     // 3. Reject Forbidden Extension
     const forbiddenUploadRes = await ownerApi
@@ -75,7 +74,8 @@ describe('RustFS Security & Performance Endpoints', () => {
       .set('Content-Length', String(11 * 1024 * 1024))
       .send('a');
 
-    expect(largeContentRes.status).toBe(413);
+    expect(largeContentRes.status).toBe(400);
+    expect(largeContentRes.body.code).toBe('INVALID_INPUT');
 
     // 5. Download verification (headers)
     const downloadRes = await ownerApi

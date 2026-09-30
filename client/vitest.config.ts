@@ -2,6 +2,9 @@ import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import { resolve } from 'path';
 import { existsSync } from 'fs';
+import { assertSupportedTestRuntime } from './scripts/test-runtime';
+
+assertSupportedTestRuntime();
 
 const resolvePkgDir = (name: string) => {
   const localPath = resolve(__dirname, './node_modules', name)

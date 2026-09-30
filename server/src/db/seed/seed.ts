@@ -21,6 +21,7 @@ import {
   chatMessages,
 } from '../schema.js';
 import { eq, inArray, like } from 'drizzle-orm';
+import { normalizeProjectKey } from '../../modules/workspaces/utils/project-key.js';
 
 function randomInt(min: number, max: number) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
@@ -402,7 +403,7 @@ async function main() {
       const projectsThisTeam = Math.ceil(config.numProjects / numTeams);
       for (let p = 1; p <= projectsThisTeam; p++) {
         const projectId = `${teamId}-proj-${p}`;
-        const projKey = `${config.key}${t}${p}`;
+        const projKey = normalizeProjectKey(`${config.key}${t}${p}`);
         await db.insert(projects).values({
           id: projectId,
           workspaceId: config.id,

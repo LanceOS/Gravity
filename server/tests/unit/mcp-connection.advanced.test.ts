@@ -1,22 +1,22 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 
-import { db } from '../../src/db/index.js';
-import { mcpConnectionTokens } from '../../src/db/schema.js';
 import { eq } from 'drizzle-orm';
 
 // Helpers are in tests/helpers
-import { api as publicApi, createAuthenticatedApi, seedWorkspaceFixture, resetTestApp } from '../helpers/test-helpers.js';
+import { resetTestApp } from '../helpers/test-helpers.js';
 
 describe('MCP connection advanced flows', () => {
   afterEach(async () => {
-    // Keep env clean between tests that mutate it and ensure DB schema
-    delete process.env.BETTER_AUTH_SECRET;
-    delete process.env.BETTER_AUTH_OLD_SECRETS;
+    // Restore the setup values before reloading env.ts and the DB schema.
+    vi.unstubAllEnvs();
     vi.restoreAllMocks();
     await resetTestApp();
   });
 
   it('increments usageCount for multi-use tokens and keeps status active', async () => {
+    const { api: publicApi, createAuthenticatedApi, seedWorkspaceFixture } = await import('../helpers/test-helpers.js');
+    const { db } = await import('../../src/db/index.js');
+    const { mcpConnectionTokens } = await import('../../src/db/schema.js');
     const ownerApi = await createAuthenticatedApi({
       name: 'Multi Use Owner',
       email: `multi-owner+${Date.now()}@example.com`,
@@ -59,7 +59,8 @@ describe('MCP connection advanced flows', () => {
     const newSecret = `new-secret-${Date.now()}`;
 
     // Create token while BETTER_AUTH_SECRET == oldSecret
-    process.env.BETTER_AUTH_SECRET = oldSecret;
+    vi.stubEnv('BETTER_AUTH_SECRET', oldSecret);
+    vi.stubEnv('BETTER_AUTH_OLD_SECRETS', '');
     vi.resetModules();
     // After resetting modules, ensure the in-memory DB schema exists again
     const { initializeDatabase } = await import('../../src/db/bootstrap.js');
@@ -82,16 +83,15 @@ describe('MCP connection advanced flows', () => {
     const rawToken = tokenPayload.rawToken;
 
     // Rotate secrets: new secret is current, old secret must be listed in BETTER_AUTH_OLD_SECRETS
-    process.env.BETTER_AUTH_SECRET = newSecret;
-    process.env.BETTER_AUTH_OLD_SECRETS = oldSecret;
-    // Mutate runtime env so existing modules pick up rotated keys without resetting DB
-    helpers.setSecretsForTest({ betterAuthSecret: newSecret, betterAuthOldSecrets: [oldSecret] });
+    vi.stubEnv('BETTER_AUTH_SECRET', newSecret);
+    vi.stubEnv('BETTER_AUTH_OLD_SECRETS', oldSecret);
 
     const verified = await connModule.verifyAndConsumeToken(rawToken, workspace.id);
     expect(verified).toBeTruthy();
   });
 
   it('enforces sourceIp binding when token has a sourceIp', async () => {
+    const { createAuthenticatedApi, seedWorkspaceFixture } = await import('../helpers/test-helpers.js');
     const ownerApi = await createAuthenticatedApi({
       name: 'Source IP Owner',
       email: `source-owner+${Date.now()}@example.com`,
@@ -117,6 +117,7 @@ describe('MCP connection advanced flows', () => {
   });
 
   it('emits a security alert when a connection-token audit write fails', async () => {
+    const { createAuthenticatedApi, seedWorkspaceFixture } = await import('../helpers/test-helpers.js');
     const ownerApi = await createAuthenticatedApi({
       name: 'Audit Failure Owner',
       email: `audit-failure-owner+${Date.now()}@example.com`,
@@ -150,6 +151,7 @@ describe('MCP connection advanced flows', () => {
   });
 
   it('does not fail token creation when all audit alert sinks fail', async () => {
+    const { createAuthenticatedApi, seedWorkspaceFixture } = await import('../helpers/test-helpers.js');
     const ownerApi = await createAuthenticatedApi({
       name: 'Audit Outage Owner',
       email: `audit-outage-owner+${Date.now()}@example.com`,

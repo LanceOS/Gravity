@@ -33,7 +33,7 @@ export function OverviewSection(): React.ReactNode {
           <Select
             label="Join Policy"
             value={settings.joinMode}
-            onChange={(event) => onChangeSettings({ joinMode: event.target.value as WorkspaceAdminSettings['joinMode'] })}
+            onValueChange={(value) => onChangeSettings({ joinMode: value as WorkspaceAdminSettings['joinMode'] })}
             options={[
               { value: 'approval_required', label: 'Owner Approval Required' },
               { value: 'auto_join', label: 'Auto Join' }

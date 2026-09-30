@@ -225,7 +225,7 @@ async function discardRevision(bodyKey: string): Promise<void> {
     const revision = await NoteRevisionRepository.abandon(bodyKey);
     if (revision) await NotesRepository.deleteFile(revision.bucketPath, revision.bodyKey);
   } catch (error) {
-    console.error('Note revision cleanup deferred to recovery:', error);
+    console.error('Note revision cleanup deferred to recovery.');
   }
 }
 

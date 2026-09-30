@@ -74,7 +74,7 @@ export function CloudProviderSection({
           <Select
             label="Provider"
             value={resolvedSettings.aiProvider}
-            onChange={(event) => resolvedOnChangeSettings({ aiProvider: event.target.value as AIProvider })}
+            onValueChange={(value) => resolvedOnChangeSettings({ aiProvider: value as AIProvider })}
             options={CLOUD_PROVIDER_OPTIONS}
           />
 

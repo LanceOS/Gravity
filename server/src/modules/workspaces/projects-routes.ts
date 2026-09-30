@@ -3,8 +3,6 @@ import { Router } from 'express';
 import { db } from '../../db/index.js';
 import { cycles, projects, workspaces, workspaceSettings } from '../../db/schema.js';
 import {
-  createId,
-  normalizeEntityKey,
   normalizeIsoDate,
 } from '../../lib/platform.js';
 import {
@@ -18,6 +16,7 @@ import {
   deleteProjectRecord,
 } from './services/projects.js';
 import { buildProjectKeyConflictMessage, mapProjectCreationError, projectKeyExists } from './utils/project-creation.js';
+import { normalizeProjectKey } from './utils/project-key.js';
 import { resolveRequestActorUserId } from '../auth/utils/request-auth.js';
 import { isValidGitHubRepoUrl } from '../../lib/webhookSignature.js';
 import {
@@ -89,11 +88,12 @@ export function createProjectsRouter() {
 
   router.post('/projects', async (req, res) => {
     const { name, description, key, status, ownerId, workspaceId, teamId } = req.body ?? {};
-    if (!name || !key) {
+    if (!name) {
       res.status(400).json({ error: 'Project name and key are required.' });
       return;
     }
 
+    let normalizedKey = '';
     try {
       const actorUserId = await resolveRequestActorUserId(req);
       if (!actorUserId) {
@@ -106,8 +106,7 @@ export function createProjectsRouter() {
         return;
       }
 
-      const projectId = createId('p');
-      const normalizedKey = normalizeEntityKey(key);
+      normalizedKey = normalizeProjectKey(key);
 
       let targetWorkspaceId = workspaceId as string | undefined;
       if (targetWorkspaceId) {
@@ -155,7 +154,7 @@ export function createProjectsRouter() {
         return;
       }
 
-      const mapped = mapProjectCreationError(error, normalizeEntityKey(key));
+      const mapped = mapProjectCreationError(error, normalizedKey);
       res.status(mapped.status).json({ error: mapped.message });
     }
   });

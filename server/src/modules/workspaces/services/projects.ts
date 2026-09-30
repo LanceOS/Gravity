@@ -11,7 +11,6 @@ import {
   invalidateWorkspaceCache,
   WorkspaceCacheInvalidationReason,
   invalidateUserWorkspacesCache,
-  normalizeEntityKey,
   normalizeIsoDate,
 } from '../../../lib/platform.js';
 import {
@@ -20,6 +19,7 @@ import {
   DEFAULT_TEAM_NAME,
   getDefaultTeamId,
 } from '../utils/default-team.js';
+import { normalizeProjectKey } from '../utils/project-key.js';
 import {
   invalidateProjectWorkspaceCache,
   invalidateProjectMembershipCache,
@@ -95,14 +95,14 @@ export async function listProjectsWithDetails(userId: string, workspaceId?: stri
 export async function createProjectRecord(params: {
   name: string;
   description?: string;
-  key: string;
+  key: unknown;
   status?: string;
   ownerId: string;
   workspaceId?: string;
   teamId?: string;
 }) {
   const projectId = createId('p');
-  const normalizedKey = normalizeEntityKey(params.key);
+  const normalizedKey = normalizeProjectKey(params.key);
   let targetWorkspaceId = params.workspaceId;
 
   await db.transaction(async (tx) => {

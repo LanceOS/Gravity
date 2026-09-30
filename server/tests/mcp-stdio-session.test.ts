@@ -1,7 +1,9 @@
 import { PassThrough } from 'node:stream';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 vi.hoisted(() => vi.resetModules());
+beforeEach(() => vi.stubEnv('MCP_STDIO_ALLOW_HANDSHAKE', 'true'));
+afterEach(() => vi.unstubAllEnvs());
 
 // Mock internal dependencies (same paths used by the module under test)
 vi.mock('../src/modules/mcp/request-handler.js', () => ({
@@ -220,5 +222,177 @@ describe('standard MCP stdio lifecycle', () => {
     expect(verifyConnectionTokenSession).toHaveBeenCalledWith('t1', 'workspace-1', 'user-1', 'hash');
     expect(JSON.parse(read().trim().split('\n').at(-1)!)).toMatchObject({ id: 3, error: { message: 'Invalid or expired token.' } });
     await session.stop();
+  });
+});
+
+describe('stdio handshake attempt protection', () => {
+  beforeEach(() => {
+    vi.mocked(verifyAndConsumeToken).mockReset().mockResolvedValue(null);
+    vi.mocked(isMcpWorkspaceMember).mockReset().mockResolvedValue(true);
+    vi.stubEnv('MCP_STDIO_HANDSHAKE_MAX_ATTEMPTS', '2');
+    vi.stubEnv('MCP_STDIO_HANDSHAKE_WINDOW_MS', '1000');
+  });
+
+  function transport(allowHandshake = true) {
+    const input = new PassThrough();
+    const output = new PassThrough();
+    const session = new McpStdioSession(input, output, { allowHandshake });
+    session.start();
+    let id = 0;
+    return {
+      session,
+      input,
+      output,
+      send: (params: unknown = { token: 'synthetic-token', workspaceId: 'test-workspace' }, method = 'stdio/handshake') => {
+        const requestId = ++id;
+        const response = new Promise<any>((resolve) => {
+          const onData = (data: Buffer) => {
+            const payload = JSON.parse(String(data));
+            if (payload.id !== requestId) return;
+            output.removeListener('data', onData);
+            resolve(payload);
+          };
+          output.on('data', onData);
+        });
+        input.write(JSON.stringify({ jsonrpc: '2.0', id: requestId, method, params }) + '\n');
+        return response;
+      },
+    };
+  }
+
+  function validToken() {
+    vi.mocked(verifyAndConsumeToken).mockResolvedValueOnce({
+      id: 'synthetic-id', tokenHash: 'synthetic-hash', singleUse: false,
+      generatedBy: 'synthetic-user', scopes: ['tools/list'],
+    } as any);
+  }
+
+  it('bounds queued attempts across changing tokens/workspaces and recovers at expiry without consuming blocked tokens', async () => {
+    let now = 10000;
+    vi.spyOn(Date, 'now').mockImplementation(() => now);
+    const t = transport();
+    // Queue multiple requests before verification has completed.
+    await Promise.all([t.send(), t.send({ token: 'different-token', workspaceId: 'different-workspace' })]);
+    validToken();
+    expect((await t.send()).error.code).toBe(-32029);
+    expect(verifyAndConsumeToken).toHaveBeenCalledTimes(2);
+    now += 1000;
+    expect((await t.send()).result.ok).toBe(true);
+    expect(verifyAndConsumeToken).toHaveBeenCalledTimes(3);
+    await t.session.stop();
+  });
+
+  it('resets failures after successful authentication and clears identity on malformed reauthentication', async () => {
+    const t = transport();
+    await t.send();
+    validToken();
+    expect((await t.send()).result.ok).toBe(true);
+    expect((await t.send({ token: '', workspaceId: '' })).error.code).toBe(-32602);
+    expect((await t.send({}, 'tools/list')).error.code).toBe(-32002);
+    expect((await t.send()).error.code).toBe(-32001);
+    expect((await t.send()).error.code).toBe(-32029);
+    await t.session.stop();
+  });
+
+  it('does not share lockout with a second session', async () => {
+    const first = transport();
+    await first.send();
+    await first.send();
+    const second = transport();
+    validToken();
+    expect((await second.send()).result.ok).toBe(true);
+    expect((await first.send()).error.code).toBe(-32029);
+    await first.session.stop();
+    await second.session.stop();
+  });
+
+  it.each(['malformed', 'single-use', 'membership', 'exception'])('counts %s failures', async (failure) => {
+    const t = transport();
+    for (let i = 0; i < 2; i++) {
+      if (failure === 'single-use') vi.mocked(verifyAndConsumeToken).mockResolvedValueOnce({ singleUse: true } as any);
+      if (failure === 'membership') {
+        validToken();
+        vi.mocked(isMcpWorkspaceMember).mockResolvedValueOnce(false);
+      }
+      if (failure === 'exception') vi.mocked(verifyAndConsumeToken).mockRejectedValueOnce(new Error('synthetic failure'));
+      await t.send(failure === 'malformed' ? { token: 7 } : undefined);
+    }
+    const calls = vi.mocked(verifyAndConsumeToken).mock.calls.length;
+    expect((await t.send()).error.code).toBe(-32029);
+    expect(verifyAndConsumeToken).toHaveBeenCalledTimes(calls);
+    await t.session.stop();
+  });
+
+  it.each([undefined, 'false', 'TRUE', '1'])('requires explicit environment consent (%s)', async (setting) => {
+    vi.stubEnv('MCP_STDIO_ALLOW_HANDSHAKE', setting);
+    const t = transport();
+    expect((await t.send()).error.code).toBe(-32601);
+    expect(verifyAndConsumeToken).not.toHaveBeenCalled();
+    await t.session.stop();
+  });
+
+  it('also requires the embedding application to enable handshakes', async () => {
+    const t = transport(false);
+    expect((await t.send()).error.code).toBe(-32601);
+    expect(verifyAndConsumeToken).not.toHaveBeenCalled();
+    await t.session.stop();
+  });
+
+  it.each([
+    { jsonrpc: '1.0' }, { id: null }, { id: {} }, { id: undefined },
+    { params: null }, { params: [] }, { params: 'invalid' },
+  ])('counts malformed envelopes without token verification: %j', async (overrides) => {
+    const t = transport();
+    validToken();
+    expect((await t.send()).result.ok).toBe(true);
+    for (let i = 0; i < 2; i++) {
+      const response = new Promise<any>((resolve) => t.output.once('data', data => resolve(JSON.parse(String(data)))));
+      t.input.write(JSON.stringify({ jsonrpc: '2.0', id: 20 + i, method: 'stdio/handshake',
+        params: { token: 'synthetic-token', workspaceId: 'test-workspace' }, ...overrides }) + '\n');
+      expect((await response).error.code).toBe(-32600);
+    }
+    expect((await t.send()).error.code).toBe(-32029);
+    expect((await t.send({}, 'tools/list')).error.code).toBe(-32002);
+    expect(verifyAndConsumeToken).toHaveBeenCalledTimes(1);
+    await t.session.stop();
+  });
+
+  it('limits a burst of pipelined attempts while draining EOF', async () => {
+    const t = transport();
+    const responses: any[] = [];
+    const completed = new Promise<void>((resolve) => t.output.on('data', data => {
+      responses.push(JSON.parse(String(data)));
+      if (responses.length === 100) resolve();
+    }));
+    t.input.end(Array.from({ length: 100 }, (_, id) => JSON.stringify({
+      jsonrpc: '2.0', id, method: 'stdio/handshake',
+      params: { token: `synthetic-${id}`, workspaceId: `workspace-${id}` },
+    })).join('\n') + '\n');
+    await completed;
+    expect(verifyAndConsumeToken).toHaveBeenCalledTimes(2);
+    expect(responses.filter(response => response.error.code === -32029)).toHaveLength(98);
+    expect(responses.map(response => response.id)).toEqual(Array.from({ length: 100 }, (_, id) => id));
+    await t.session.stop();
+  });
+
+  it('does not extend lockout when repeated blocked requests arrive', async () => {
+    let now = 10000;
+    vi.spyOn(Date, 'now').mockImplementation(() => now);
+    const t = transport();
+    await t.send();
+    await t.send();
+    now += 999;
+    expect((await t.send()).error.code).toBe(-32029);
+    now += 1;
+    validToken();
+    expect((await t.send()).result.ok).toBe(true);
+    await t.session.stop();
+  });
+
+  it.each(['MCP_STDIO_HANDSHAKE_MAX_ATTEMPTS', 'MCP_STDIO_HANDSHAKE_WINDOW_MS'])('rejects invalid %s guards', (key) => {
+    for (const value of ['0', '-1', '', 'NaN', 'Infinity', '1.5', '1junk', '9007199254740992']) {
+      vi.stubEnv(key, value);
+      expect(() => transport()).toThrow(`${key} must be a positive safe integer.`);
+    }
   });
 });
