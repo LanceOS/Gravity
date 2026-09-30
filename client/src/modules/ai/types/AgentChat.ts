@@ -4,7 +4,14 @@ import type { WorkspaceSettings } from '../../../utils/settings';
 
 export type TicketAttachmentScopeMode = 'project' | 'team';
 
+export interface NavigationScope {
+  workspaceId: string;
+  projectIds: string[];
+  teamIds: string[];
+}
+
 export interface AgentChatProps {
+  navigationScope?: NavigationScope;
   onClose?: () => void;
   initialModel: string;
   settings: WorkspaceSettings;

@@ -438,14 +438,21 @@ describe('chat sessions routes', () => {
         .send({
           message: 'What is risky here?',
           context: 'Attached ticket context:\nGRA-202: Export fails on retry.',
+          navigationScope: { workspaceId: 'workspace-1', projectIds: [project.id], teamIds: [] },
           provider: 'anthropic',
         });
 
+      for (const navigationScope of [null, 'team', { workspaceId: 'workspace-1', projectIds: [1], teamIds: [] }, { workspaceId: 'workspace-1', projectIds: [], teamIds: Array(101).fill('team') }]) {
+        const invalid = await ownerApi.post(`/api/v1/projects/${project.id}/chats/${chatId}/stream`)
+          .send({ message: 'Hello', navigationScope });
+        expect(invalid.status).toBe(400);
+      }
       expect(streamResponse.status).toBe(200);
       expect(generateSpy).toHaveBeenCalledTimes(1);
       expect(generateSpy.mock.calls[0]?.[0]).toMatchObject({
         message: 'What is risky here?',
         messageContext: 'Attached ticket context:\nGRA-202: Export fails on retry.',
+        navigationScope: { workspaceId: 'workspace-1', projectIds: [project.id], teamIds: [] },
         provider: 'anthropic',
       });
     } finally {
