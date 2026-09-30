@@ -1,5 +1,5 @@
 import React from 'react';
-import { Portal, runAnime } from '../../utilities';
+import { Portal, getDropdownPosition, runAnime } from '../../utilities';
 import anime from 'animejs';
 
 export interface TooltipProps {
@@ -25,6 +25,57 @@ export function Tooltip({ content, children, style }: TooltipProps) {
   const [show, setShow] = React.useState(false);
   const [isRendered, setIsRendered] = React.useState(false);
   const [tooltipElement, setTooltipElement] = React.useState<HTMLDivElement | null>(null);
+  const triggerRef = React.useRef<HTMLDivElement>(null);
+
+  React.useLayoutEffect(() => {
+    const trigger = triggerRef.current;
+    if (!isRendered || !trigger || !tooltipElement) return;
+
+    let previousRect: DOMRect | undefined;
+    const syncPosition = () => {
+      // The portal lives under body, so use viewport coordinates. Layout sizes
+      // exclude the entrance/exit transform and keep animation out of placement.
+      const triggerRect = trigger.getBoundingClientRect();
+      previousRect = triggerRect;
+      const { left, top } = getDropdownPosition({
+        triggerRect,
+        floatingRect: { width: tooltipElement.offsetWidth, height: tooltipElement.offsetHeight },
+        align: 'center',
+        gap: 6,
+        viewportPadding: 8,
+      });
+      tooltipElement.style.left = `${left}px`;
+      // A multiline tooltip can fit the viewport without fitting wholly on
+      // either side of its trigger. Keep its full box inside the viewport.
+      const maxTop = Math.max(8, window.innerHeight - tooltipElement.offsetHeight - 8);
+      tooltipElement.style.top = `${Math.max(8, Math.min(top, maxTop))}px`;
+    };
+
+    syncPosition();
+    window.addEventListener('scroll', syncPosition, { capture: true, passive: true });
+    window.addEventListener('resize', syncPosition);
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(syncPosition);
+    observer?.observe(trigger);
+    observer?.observe(tooltipElement);
+    // ResizeObserver does not report position-only changes (e.g. a sibling
+    // expanding or an ancestor moving). Track those only while mounted.
+    let frame: number;
+    const trackPosition = () => {
+      const rect = trigger.getBoundingClientRect();
+      if (!previousRect || rect.left !== previousRect.left || rect.top !== previousRect.top
+        || rect.width !== previousRect.width || rect.height !== previousRect.height) {
+        syncPosition();
+      }
+      frame = window.requestAnimationFrame(trackPosition);
+    };
+    frame = window.requestAnimationFrame(trackPosition);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener('scroll', syncPosition, true);
+      window.removeEventListener('resize', syncPosition);
+      observer?.disconnect();
+    };
+  }, [isRendered, tooltipElement, content, style]);
 
   React.useEffect(() => {
     if (show) {
@@ -83,6 +134,7 @@ export function Tooltip({ content, children, style }: TooltipProps) {
 
   return (
     <div
+      ref={triggerRef}
       style={{ position: 'relative', display: 'inline-block' }}
       onMouseEnter={() => setShow(true)}
       onMouseLeave={() => setShow(false)}
@@ -94,7 +146,6 @@ export function Tooltip({ content, children, style }: TooltipProps) {
             ref={setTooltipElement}
             role="tooltip"
             style={{
-              position: 'absolute',
               backgroundColor: 'var(--color-text-primary)',
               color: 'var(--color-surface-app)',
               padding: '4px 8px',
@@ -102,7 +153,15 @@ export function Tooltip({ content, children, style }: TooltipProps) {
               fontSize: '11px',
               zIndex: 9999,
               pointerEvents: 'none',
+              width: 'max-content',
+              maxWidth: 'calc(100vw - 16px)',
+              boxSizing: 'border-box',
+              overflowWrap: 'anywhere',
               ...style,
+              position: 'fixed',
+              right: 'auto',
+              bottom: 'auto',
+              margin: 0,
             }}
           >
             {content}

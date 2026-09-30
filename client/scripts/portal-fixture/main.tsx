@@ -38,7 +38,7 @@ export function Fixture() {
     {scenario === 'drawer' && <Drawer isOpen={open} onClose={close} title="Portal drawer"><button onClick={close}>Close overlay</button><button onClick={restart}>Restart overlay</button></Drawer>}
     <div style={{ position: 'absolute', top: 400, left: params.get('align') === 'mobile' ? 200 : 600 }}>
       {scenario === 'popover' && <Popover isOpen={open} onOpenChange={setOpen} contentClassName={params.get('align') === 'custom' ? 'create-ticket-modal__labels-popover' : params.get('align') === 'mobile' ? 'ticket-filter-popover-content' : ''} align={(['custom', 'mobile'].includes(params.get('align') || '') ? 'right' : params.get('align') || 'right') as 'left' | 'right' | 'center'} trigger={<button>Popover trigger</button>}><GrowingContent /></Popover>}
-      {scenario === 'tooltip' && <Tooltip content="Portal tooltip" style={{ position: 'fixed', top: 360, left: params.get('align') === 'mobile' ? 200 : 600 }}><button>Tooltip trigger</button></Tooltip>}
+      {scenario === 'tooltip' && <Tooltip content="Portal tooltip"><button>Tooltip trigger</button></Tooltip>}
       {scenario === 'select' && <Select aria-label="Portal select" options={[{ value: 'one', label: 'First option' }, { value: 'two', label: 'Second option' }]} />}
       {scenario === 'contextmenu' && <ContextMenuRoot items={[{ label: 'Menu action' }, { label: 'More actions', children: [{ label: 'Nested action' }] }]}><button>Context target</button></ContextMenuRoot>}
     </div>
