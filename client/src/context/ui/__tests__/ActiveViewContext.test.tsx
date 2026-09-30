@@ -2,6 +2,7 @@ import React from 'react';
 import { renderHook, act } from '@testing-library/react';
 import { ActiveViewProvider, useActiveView } from '../ActiveViewContext';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { WORKSPACE_DEFAULT_VIEW_STORAGE_KEY } from '../../../constants/storage';
 
 beforeEach(() => {
   window.localStorage.clear();
@@ -19,7 +20,7 @@ describe('ActiveViewContext', () => {
   });
 
   it('should initialize from localStorage saved board/list preference', () => {
-    window.localStorage.setItem('gravity_active_view', 'list');
+    window.localStorage.setItem(WORKSPACE_DEFAULT_VIEW_STORAGE_KEY, 'list');
     const wrapper = ({ children }: { children: React.ReactNode }) => (
       <ActiveViewProvider>{children}</ActiveViewProvider>
     );
@@ -30,7 +31,7 @@ describe('ActiveViewContext', () => {
   });
 
   it('should fall back to board when localStorage preference is invalid', () => {
-    window.localStorage.setItem('gravity_active_view', 'kanban');
+    window.localStorage.setItem(WORKSPACE_DEFAULT_VIEW_STORAGE_KEY, 'kanban');
     const wrapper = ({ children }: { children: React.ReactNode }) => (
       <ActiveViewProvider>{children}</ActiveViewProvider>
     );

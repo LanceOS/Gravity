@@ -5,6 +5,9 @@ import coffeeTheme from '../themes/coffee.json';
 import marbleBlueTheme from '../themes/marble-blue.json';
 import honeyGlowTheme from '../themes/honey-glow.json';
 import midnightAzureTheme from '../themes/midnight-azure.json';
+import { THEME_STORAGE_KEY } from '../../client/src/constants/storage';
+
+export { THEME_STORAGE_KEY };
 
 export const KNOWN_THEME_COLOR_KEYS = [
   'primary',
@@ -98,8 +101,6 @@ export type ThemePreference =
   | 'midnight-azure'
   | 'system';
 export type ResolvedThemeMode = 'dark' | 'coal-black' | 'coffee' | 'honey-glow' | 'marble-blue' | 'midnight-azure';
-
-export const THEME_STORAGE_KEY = 'gravity_theme';
 
 const knownThemeColorKeySet = new Set<string>(KNOWN_THEME_COLOR_KEYS);
 

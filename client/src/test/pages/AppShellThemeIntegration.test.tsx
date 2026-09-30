@@ -6,15 +6,10 @@ import { ThemeProvider as AppThemeProvider } from '../../context/theme/ThemeCont
 import { ThemeProvider as SettingsThemeProvider } from '../../modules/settings';
 import { WorkspaceShellPage } from '../../pages/WorkspaceShellPage/WorkspaceShellPage.tsx';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import '../../../public/theme-bootstrap.js';
+import '../../theme-bootstrap';
+import { THEME_STORAGE_KEY, WORKSPACE_DEFAULT_VIEW_STORAGE_KEY } from '../../constants/storage';
 import { Sidebar } from '../../components/Sidebar/Sidebar';
 import type { SidebarProps } from '../../components/Sidebar';
-
-declare global {
-  interface Window {
-    gravityBootstrapTheme: () => void;
-  }
-}
 
 const mocks = vi.hoisted(() => ({
   renderSidebar: false,
@@ -507,7 +502,7 @@ describe('AppShellPage theme integration', () => {
     mocks.createLabel.mockResolvedValue({ id: 'created-label' });
     delete (document as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any).modelContext;
     window.localStorage.clear();
-    window.localStorage.setItem('gravity_theme', 'dark');
+    window.localStorage.setItem(THEME_STORAGE_KEY, 'dark');
     document.documentElement.className = '';
     document.documentElement.removeAttribute('data-theme');
     document.documentElement.removeAttribute('data-density');
@@ -575,13 +570,13 @@ describe('AppShellPage theme integration', () => {
       expect(document.documentElement.style.getPropertyValue('--color-surface-elevated')).toBe('rgba(255, 255, 255, 0.94)');
       expect(document.documentElement.style.getPropertyValue('--color-overlay-scrim')).toBe('rgba(30, 44, 65, 0.30)');
       expect(document.documentElement.style.getPropertyValue('--space-base-multiplier')).toBe('0.75');
-      expect(window.localStorage.getItem('gravity_theme')).toBe('marble-blue');
+      expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toBe('marble-blue');
     });
   });
 
   it('applies bootstrap theme/view preferences before React render', () => {
-    window.localStorage.setItem('gravity_theme', 'dark');
-    window.localStorage.setItem('gravity_active_view', 'list');
+    window.localStorage.setItem(THEME_STORAGE_KEY, 'dark');
+    window.localStorage.setItem(WORKSPACE_DEFAULT_VIEW_STORAGE_KEY, 'list');
 
     window.gravityBootstrapTheme();
 

@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useLayoutEffect, useMemo, useState } from 'react';
 import { useTheme as useAppTheme } from '../../../context/theme/ThemeContext';
 import type { ThemeMode as AppThemeMode } from '../../../context/theme/ThemeContext.types';
+import { DENSITY_STORAGE_KEY } from '../../../constants/storage';
 
 export type DensityScale = 'compact' | 'standard';
 
@@ -20,7 +21,7 @@ function safeReadDensitySetting(): DensityScale {
   }
 
   try {
-    const saved = window.localStorage.getItem('ds-density') as DensityScale;
+    const saved = window.localStorage.getItem(DENSITY_STORAGE_KEY) as DensityScale;
     return saved === 'standard' ? 'standard' : 'compact';
   } catch {
     return 'compact';
@@ -61,7 +62,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const setDensity = React.useCallback((newDensity: DensityScale) => {
     setDensityState(newDensity);
-    safeWriteStorageValue('ds-density', newDensity);
+    safeWriteStorageValue(DENSITY_STORAGE_KEY, newDensity);
   }, []);
 
   const toggleTheme = React.useCallback(() => {

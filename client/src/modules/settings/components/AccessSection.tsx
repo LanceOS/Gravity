@@ -3,8 +3,8 @@ import { Mail } from 'lucide-react';
 import { Card, Stack, TextInput, Button, Badge, useCopyToClipboard } from '@library';
 import type { WorkspaceInvite } from '../types';
 import { useSettingsScreenContext } from '../../../context/settings/useSettingsScreenContext';
+import { COPY_FEEDBACK_STORAGE_KEY } from '../../../constants/storage';
 
-const COPY_FEEDBACK_STORAGE_KEY = 'gravity_peer_invite_copy_feedback';
 const COPY_FEEDBACK_DURATION_MS = 2200;
 
 function getInviteStateLabel(invite: WorkspaceInvite) {
