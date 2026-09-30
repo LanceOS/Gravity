@@ -1,11 +1,13 @@
+import { ensureLockedBrowserDependencies } from './locked-browser-dependencies.mjs';
+await ensureLockedBrowserDependencies(import.meta.url);
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { extname, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { chromium } from 'playwright';
-import { build } from 'vite';
+const { chromium } = await import('playwright');
+const { build } = await import('vite');
 
 const outDir = await mkdtemp(resolve(tmpdir(), 'gravity-sidebar-'));
 const artifacts = process.env.GRAVITY_SIDEBAR_TEST_ARTIFACTS;
