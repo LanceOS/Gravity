@@ -341,6 +341,161 @@ describe('TicketMutationProvider', () => {
     notification.mockRestore();
   });
 
+  it('saves debounced updates after Strict Mode effect replay', async () => {
+    vi.useFakeTimers();
+    configureContext();
+    const client = createQueryClient();
+    client.setQueryData(queryKeys.tickets(baseTicket.projectId), [baseTicket]);
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ ...baseTicket, title: 'Changed' }));
+    vi.stubGlobal('fetch', fetchMock);
+    render(<React.StrictMode><QueryClientProvider client={client}>
+      <TicketMutationProvider><Probe /></TicketMutationProvider>
+    </QueryClientProvider></React.StrictMode>);
+    await act(async () => {
+      await currentActions.updateTicket(baseTicket.id, { title: 'Changed' }, { immediate: false });
+      await vi.advanceTimersByTimeAsync(TICKET_UPDATE_DEBOUNCE_MS);
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(client.getQueryData<Ticket[]>(queryKeys.tickets(baseTicket.projectId))?.[0].title).toBe('Changed');
+  });
+
+  it('cancels pending saves on unmount', async () => {
+    vi.useFakeTimers();
+    configureContext();
+    const client = createQueryClient();
+    client.setQueryData(queryKeys.tickets(baseTicket.projectId), [baseTicket]);
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const view = renderWithProvider(client);
+    await act(async () => {
+      await currentActions.updateTicket(baseTicket.id, { title: 'Changed' }, { immediate: false });
+    });
+    view.unmount();
+    await vi.advanceTimersByTimeAsync(TICKET_UPDATE_DEBOUNCE_MS);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('ignores an in-flight debounced response after unmount', async () => {
+    vi.useFakeTimers();
+    configureContext();
+    const client = createQueryClient();
+    client.setQueryData(queryKeys.tickets(baseTicket.projectId), [baseTicket]);
+    let finish!: (response: Response) => void;
+    vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>(resolve => { finish = resolve; })));
+    const notification = vi.spyOn(toast, 'show').mockReturnValue('test');
+    const view = renderWithProvider(client);
+    await act(async () => {
+      await currentActions.updateTicket(baseTicket.id, { title: 'Optimistic' }, { immediate: false });
+      await vi.advanceTimersByTimeAsync(TICKET_UPDATE_DEBOUNCE_MS);
+    });
+    view.unmount();
+    await act(async () => {
+      finish(jsonResponse({ ...baseTicket, title: 'Server response' }));
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(notification).not.toHaveBeenCalled();
+    expect(client.getQueryData<Ticket[]>(queryKeys.tickets(baseTicket.projectId))?.[0].title).toBe('Optimistic');
+    notification.mockRestore();
+  });
+
+  it('rolls back a failed debounced save and preserves queued edits for the next request', async () => {
+    vi.useFakeTimers();
+    configureContext();
+    const client = createQueryClient();
+    client.setQueryData(queryKeys.tickets(baseTicket.projectId), [baseTicket]);
+    let finish!: (response: Response) => void;
+    const fetchMock = vi.fn()
+      .mockImplementationOnce(() => new Promise<Response>(resolve => { finish = resolve; }))
+      .mockResolvedValueOnce(jsonResponse({ ...baseTicket, priority: 'high' }));
+    vi.stubGlobal('fetch', fetchMock);
+    renderWithProvider(client);
+    await act(async () => {
+      await currentActions.updateTicket(baseTicket.id, { title: 'Failed' }, { immediate: false });
+      await vi.advanceTimersByTimeAsync(TICKET_UPDATE_DEBOUNCE_MS);
+      await currentActions.updateTicket(baseTicket.id, { priority: 'high' }, { immediate: false });
+      finish(jsonResponse({ error: 'Offline' }, 500));
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(client.getQueryData<Ticket[]>(queryKeys.tickets(baseTicket.projectId))?.[0]).toMatchObject({
+      title: baseTicket.title, priority: 'high',
+    });
+    await act(async () => { await vi.advanceTimersByTimeAsync(TICKET_UPDATE_DEBOUNCE_MS); });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[1][1].body).toBe(JSON.stringify({ priority: 'high' }));
+  });
+
+  it('queues edits from a child mount effect during Strict Mode initialization', async () => {
+    vi.useFakeTimers();
+    configureContext();
+    const client = createQueryClient();
+    client.setQueryData(queryKeys.tickets(baseTicket.projectId), [baseTicket]);
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ ...baseTicket, title: 'Mount edit' }));
+    vi.stubGlobal('fetch', fetchMock);
+    function SaveOnMount() {
+      const { updateTicket } = useTicketMutations();
+      React.useEffect(() => {
+        void updateTicket(baseTicket.id, { title: 'Mount edit' }, { immediate: false });
+      }, [updateTicket]);
+      return null;
+    }
+    render(<React.StrictMode><QueryClientProvider client={client}>
+      <TicketMutationProvider><SaveOnMount /></TicketMutationProvider>
+    </QueryClientProvider></React.StrictMode>);
+    await act(async () => { await vi.advanceTimersByTimeAsync(TICKET_UPDATE_DEBOUNCE_MS); });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps newer queued edits visible and rolls back to the last confirmed response', async () => {
+    vi.useFakeTimers();
+    configureContext({ activeTicket: baseTicket });
+    const client = createQueryClient();
+    client.setQueryData(queryKeys.tickets(baseTicket.projectId), [baseTicket]);
+    let finishFirst!: (response: Response) => void;
+    const fetchMock = vi.fn()
+      .mockImplementationOnce(() => new Promise<Response>(resolve => { finishFirst = resolve; }))
+      .mockResolvedValueOnce(jsonResponse({ error: 'Offline' }, 500));
+    vi.stubGlobal('fetch', fetchMock);
+    renderWithProvider(client);
+    await act(async () => {
+      await currentActions.updateTicket(baseTicket.id, { title: 'First edit' }, { immediate: false });
+      await vi.advanceTimersByTimeAsync(TICKET_UPDATE_DEBOUNCE_MS);
+      await currentActions.updateTicket(baseTicket.id, { priority: 'high' }, { immediate: false });
+      finishFirst(jsonResponse({ ...baseTicket, title: 'Canonical server title' }));
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(client.getQueryData<Ticket[]>(queryKeys.tickets(baseTicket.projectId))?.[0]).toMatchObject({
+      title: 'Canonical server title', priority: 'high',
+    });
+    await act(async () => { await vi.advanceTimersByTimeAsync(TICKET_UPDATE_DEBOUNCE_MS); });
+    expect(client.getQueryData<Ticket[]>(queryKeys.tickets(baseTicket.projectId))?.[0]).toMatchObject({
+      title: 'Canonical server title', priority: baseTicket.priority,
+    });
+  });
+
+  it('does not undo another ticket save when a debounced request fails', async () => {
+    vi.useFakeTimers();
+    configureContext();
+    const other = { ...baseTicket, id: 'ticket-2', key: 'GRA-2' };
+    const client = createQueryClient();
+    client.setQueryData(queryKeys.tickets(baseTicket.projectId), [baseTicket, other]);
+    let failFirst!: (response: Response) => void;
+    const fetchMock = vi.fn()
+      .mockImplementationOnce(() => new Promise<Response>(resolve => { failFirst = resolve; }))
+      .mockResolvedValueOnce(jsonResponse({ ...other, title: 'Saved other ticket' }));
+    vi.stubGlobal('fetch', fetchMock);
+    renderWithProvider(client);
+    await act(async () => {
+      await currentActions.updateTicket(baseTicket.id, { title: 'Failed' }, { immediate: false });
+      await currentActions.updateTicket(other.id, { title: 'Saved other ticket' }, { immediate: false });
+      await vi.advanceTimersByTimeAsync(TICKET_UPDATE_DEBOUNCE_MS);
+      failFirst(jsonResponse({ error: 'Offline' }, 500));
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(client.getQueryData<Ticket[]>(queryKeys.tickets(baseTicket.projectId))).toMatchObject([
+      { title: baseTicket.title }, { title: 'Saved other ticket' },
+    ]);
+  });
+
   it('delegates moveTicket to the injected move hook', async () => {
     const queryClient = createQueryClient();
     configureContext({ activeTicket: baseTicket });

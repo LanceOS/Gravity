@@ -14,22 +14,8 @@ export type CreateTicketInput = {
   domainId?: string | null;
 };
 
-export type TicketUpdateBatch = {
-  originalTickets: Ticket[];
-  projectId: string;
-  updates: Partial<Ticket>;
-  timerId: number | null;
-  flushRequested: boolean;
-};
-
 export type TicketUpdateOptions = {
   immediate?: boolean;
-};
-
-export type InFlightTicketUpdateBatch = {
-  originalTickets: Ticket[];
-  projectId: string;
-  updates: Partial<Ticket>;
 };
 
 export interface TicketMutationContextType {
