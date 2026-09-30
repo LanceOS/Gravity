@@ -1,3 +1,5 @@
+import { parseApiJson } from './modules/notes/request-body.js';
+import { noteErrorContext, noteErrorHandler } from './modules/notes/errors.js';
 import cors from 'cors';
 import express from 'express';
 import { toNodeHandler } from 'better-auth/node';
@@ -57,6 +59,7 @@ export function createApp() {
   );
 
   app.use('/api/v1', createHealthRouter());
+  app.use('/api/v1/notes', noteErrorContext);
   app.use(requireInitializedServer);
 
   app.get('/', (_req, res) => {
@@ -73,11 +76,12 @@ export function createApp() {
   // runs, so the HMAC-SHA256 signature verifier has access to the original bytes.
   app.use('/api/v1/webhooks/github', express.raw({ type: 'application/json' }));
 
-  // All other routes use the standard JSON body parser.
-  app.use(express.json({ limit: '1mb' }));
+  // Note attachments retain their original byte stream. Other routes parse JSON.
+  app.use(parseApiJson);
 
   app.use(createOAuthAuthorizationRouter());
   app.use('/api/v1', createApiRouter());
+  app.use(noteErrorHandler);
 
   // Serve built client files when available. The build process copies the
   // client's `dist` into `public/` in the final image.
