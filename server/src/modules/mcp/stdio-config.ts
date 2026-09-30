@@ -33,3 +33,21 @@ export function getMcpStdioContext(config: McpStdioConfig): McpContext {
     actorUserId,
   };
 }
+
+/** Read once per embedded session; request parameters cannot change these guards. */
+export function getMcpStdioHandshakeConfig(config: NodeJS.ProcessEnv = process.env) {
+  const positiveInteger = (name: string, fallback: number) => {
+    const raw = config[name];
+    if (raw === undefined) return fallback;
+    const value = Number(raw);
+    if (!/^\d+$/.test(raw) || !Number.isSafeInteger(value) || value <= 0) {
+      throw new Error(`${name} must be a positive safe integer.`);
+    }
+    return value;
+  };
+  return {
+    enabled: config.MCP_STDIO_ALLOW_HANDSHAKE === 'true',
+    maxAttempts: positiveInteger('MCP_STDIO_HANDSHAKE_MAX_ATTEMPTS', 20),
+    windowMs: positiveInteger('MCP_STDIO_HANDSHAKE_WINDOW_MS', 60_000),
+  };
+}

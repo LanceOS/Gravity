@@ -2,6 +2,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+import { testSecrets } from './helpers/test-secrets.js';
 
 function data(result: any): any {
   expect(result.isError).not.toBe(true);
@@ -16,8 +17,8 @@ describe('official MCP SDK stdio interoperability', () => {
       args: ['--import', 'tsx', fileURLToPath(new URL('./fixtures/mcp-stdio-server.ts', import.meta.url))],
       cwd: fileURLToPath(new URL('..', import.meta.url)),
       env: {
+        ...testSecrets,
         DATABASE_URL: 'pgmem://stdio-interoperability', NODE_ENV: 'test', REDIS_ENABLED: 'false',
-        BETTER_AUTH_SECRET: 'test-stdio-secret-12345678901234567890',
         BETTER_AUTH_BASE_URL: 'http://localhost:8080',
         MCP_STDIO_WORKSPACE_ID: 'stdio-workspace', MCP_STDIO_ACTOR_USER_ID: 'stdio-user',
       },

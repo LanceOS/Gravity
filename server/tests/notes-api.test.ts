@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { MetadataRepository } from '../src/modules/notes/repositories.js';
 import { RustFS } from '../src/lib/rustfs.js';
 import { api, createAuthenticatedApi, seedWorkspaceFixture } from './helpers/test-helpers.js';
 
@@ -126,8 +127,59 @@ describe('notes routes', () => {
     const missing = await ownerApi.post(`/api/v1/notes/${id}/cleanup`).set('x-project-id', project.id);
     expect(missing.status).toBe(500);
     expect(missing.body.error).toBe('Media cleanup blocked; see server diagnostics.');
-    expect(diagnostic).toHaveBeenCalledWith('Note media cleanup blocked', expect.objectContaining({ message: expect.stringContaining(`cannot read or parse body for note ${id}`) }));
+    expect(diagnostic).toHaveBeenCalledWith('Note API failure', expect.objectContaining({ requestId: missing.body.requestId, operation: '/notes/:noteId/cleanup' }));
     expect(remove).not.toHaveBeenCalled();
+  });
+
+  it('preserves content and revision after rejected updates', async () => {
+    const ownerApi = await createAuthenticatedApi({ name: 'Validation Owner', email: 'validation@example.com', role: 'owner' });
+    const { project } = await seedWorkspaceFixture({ owner: { id: ownerApi.user.id, name: ownerApi.user.name, email: ownerApi.user.email, role: 'owner' } });
+    const created = await ownerApi.post('/api/v1/notes').set('x-project-id', project.id).send({ title: 'Original', body: 'Original body' });
+    expect(created.status).toBe(201);
+    for (const patch of [{ version: 1, body: {} }, { version: null, body: 'changed' }, { version: 1, title: '' }]) {
+      const rejected = await ownerApi.patch(`/api/v1/notes/${created.body.id}`).set('x-project-id', project.id).send(patch);
+      expect(rejected.status).toBe(400);
+      expect(rejected.body.requestId).toBe(rejected.headers['x-request-id']);
+    }
+    const unchanged = await ownerApi.get(`/api/v1/notes/${created.body.id}`).set('x-project-id', project.id);
+    expect(unchanged.body).toMatchObject({ title: 'Original', body: 'Original body', version: 1 });
+    const diagnostic = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const secret = 'synthetic-private-database-detail';
+    for (const fail of [
+      () => vi.spyOn(RustFS, 'saveFile').mockRejectedValueOnce(new Error(secret)),
+      () => vi.spyOn(MetadataRepository, 'updateNoteMetadata').mockRejectedValueOnce(new Error(secret)),
+    ]) {
+      fail();
+      const failed = await ownerApi.patch(`/api/v1/notes/${created.body.id}`).set('x-project-id', project.id).send({ version: 1, body: 'uncommitted' });
+      expect(failed.status).toBe(500);
+      expect(failed.body).toMatchObject({ code: 'INTERNAL_ERROR', requestId: failed.headers['x-request-id'] });
+      expect(JSON.stringify(failed.body)).not.toContain(secret);
+      const preserved = await ownerApi.get(`/api/v1/notes/${created.body.id}`).set('x-project-id', project.id);
+      expect(preserved.body).toMatchObject({ title: 'Original', body: 'Original body', version: 1 });
+    }
+    expect(JSON.stringify(diagnostic.mock.calls)).not.toContain(secret);
+  });
+
+  it('uses the production parser for rich text, malformed requests and raw attachments', async () => {
+    const owner = await createAuthenticatedApi({ email: 'parser-owner@example.com' });
+    const { project } = await seedWorkspaceFixture({ owner: { ...owner.user, avatarUrl: owner.user.avatar } });
+    const rich = JSON.stringify({ type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Café 😀' }] }] });
+    const created = await owner.post('/api/v1/NOTES/').set('x-project-id', project.id).send({ title: 'Rich text', body: rich });
+    expect(created.status).toBe(201);
+    expect(created.body).toMatchObject({ body: rich, excerpt: 'Café 😀' });
+    const malformed = await owner.post('/api/v1/notes').set('Content-Type', 'application/json').send('{invalid');
+    expect(malformed.status).toBe(400);
+    expect(malformed.body).toMatchObject({ code: 'INVALID_INPUT', requestId: malformed.headers['x-request-id'] });
+    const encoded = await owner.get('/api/v1/notes/%ZZ').set('x-project-id', project.id);
+    expect(encoded.status).toBe(400);
+    expect(encoded.body.code).toBe('INVALID_INPUT');
+    for (const content of ['{raw file}', '']) {
+      const upload = await owner.post(`/api/v1/NOTES/${created.body.id}/MEDIA/?filename=raw.txt`).set('x-project-id', project.id).set('Content-Type', 'application/json').send(content);
+      expect(upload.status).toBe(201);
+      const downloaded = await owner.get(upload.body.url);
+      expect(downloaded.status).toBe(200);
+      expect(downloaded.text).toBe(content);
+    }
   });
 
   it('enforces workspace/project authorization', async () => {
