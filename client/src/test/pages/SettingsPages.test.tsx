@@ -462,6 +462,14 @@ describe('AccountPreferencesPage', () => {
     await user.click(screen.getByRole('option', { name: 'Issues List' }));
     expect(props.onChangeSettings).toHaveBeenCalledWith({ defaultView: 'list' });
 
+    await user.click(screen.getByRole('button', { name: 'Workspace Theme' }));
+    await user.click(screen.getByRole('option', { name: 'Coffee' }));
+    expect(props.onChangeSettings).toHaveBeenCalledWith({ theme: 'coffee' });
+
+    await user.click(screen.getByRole('button', { name: 'Project Layout' }));
+    await user.click(screen.getByRole('option', { name: 'Condensed (High Density)' }));
+    expect(props.onChangeSettings).toHaveBeenCalledWith({ projectLayout: 'condensed' });
+
     await user.click(screen.getByRole('button', { name: 'Back' }));
     expect(props.onBack).toHaveBeenCalledTimes(1);
 
