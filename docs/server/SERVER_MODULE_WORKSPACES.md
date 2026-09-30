@@ -12,8 +12,8 @@ The `workspaces` module (`server/src/modules/workspaces/`) encapsulates the doma
 - **MCP Endpoints**: `src/modules/workspaces/mcp.ts` defines the `WorkspaceMemberTools` class for MCP operations.
 
 ## 4. Flow Steps
-1. **Workspace Creation**: A user sends a POST to `/api/v1/workspaces`. The route logic validates the name/key, creates the workspace, auto-creates a default project using `project-creation.ts` utilities, and sets the owner.
-2. **Project Creation**: Handled via POST `/api/v1/projects`. Validates the project key uniqueness, creates the project record, and maps domains/cycles.
+1. **Workspace Creation**: A user sends a POST to `/api/v1/workspaces`. The route requires a name/key, creates the workspace and settings, and sets the owner. The workspace initially has no default project.
+2. **Project Creation**: Handled via POST `/api/v1/projects`. Validates the project prefix and uniqueness within the workspace, then creates the project record. If no workspace is supplied, the service creates one with the project as its default.
 3. **Membership & Invites**: Members can be invited via unique invite codes. The system processes join requests, allowing workspace owners to approve or reject them.
 
 ## 5. Data Stores and Resources
@@ -31,6 +31,7 @@ Owns and mutates the following PostgreSQL tables via Drizzle ORM, defined locall
 
 ## 6. Interfaces and Contracts
 - **REST APIs**: `GET /api/v1/workspaces`, `POST /api/v1/workspaces`, `POST /api/v1/projects`, etc.
+- **New project keys**: REST, `createProjectRecord`, and seed creation share `utils/project-key.ts`. Keys must be strings containing one or more ASCII letters or digits after trimming surrounding whitespace; letters are stored uppercase. Control characters are rejected anywhere, including surrounding tabs/newlines. REST returns an actionable 400 for invalid keys. This creation policy does not rename existing projects or tickets.
 - **MCP Tool**: `listWorkspaceMembers` returns a normalized roster of members for the authorized workspace context.
 
 ## 7. Key Files and Modules
@@ -39,7 +40,8 @@ Owns and mutates the following PostgreSQL tables via Drizzle ORM, defined locall
 - `mcp.ts`: Exports `WorkspaceMemberTools`, tool definitions, and tool handlers for dynamic MCP interaction.
 - `schema.ts`: Drizzle ORM table definitions for workspaces, projects, and domains.
 - `services/membership.ts`: Abstracted membership verification service (`isWorkspaceMember` and `getProjectWorkspaceId`) for cross-domain usage.
-- `utils/project-creation.ts`: Domain-specific utility for scaffolding default project resources (domains, cycles).
+- `utils/project-creation.ts`: Project-key conflict lookup and creation error mapping.
+- `utils/project-key.ts`: Shared normalization and validation for new project prefixes.
 
 ## 8. Permissions, Guards, or Tenant Boundaries
 - **Strict Tenancy**: Operations require `resolveRequestActorUserId` verification. Workspace routes explicitly check that the actor has the required role (e.g., `owner` for deletions) in the `workspace_members` table.
