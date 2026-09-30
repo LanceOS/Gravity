@@ -20,6 +20,7 @@ export const noteMetadata = pgTable('note_metadata', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({
+  bucketPathIdx: index('note_metadata_bucket_path_idx').on(table.bucketPath),
   projectIdUserIdIdx: index('note_metadata_project_id_user_id_idx').on(table.projectId, table.userId),
   projectIdUserIdUpdatedAtIdx: index('note_metadata_project_id_user_id_updated_at_idx').on(table.projectId, table.userId, table.updatedAt),
   searchIdx: index('note_metadata_search_idx').using('gin', table.searchVector),
@@ -35,3 +36,14 @@ export const noteBodyRevisions = pgTable('note_body_revisions', {
 }, (table) => ({
   recoveryIdx: index('note_body_revisions_recovery_idx').on(table.state, table.createdAt),
 }));
+
+// Retained tombstones also fence late uploads/publication after note deletion.
+export const noteBucketCleanups = pgTable('note_bucket_cleanups', {
+  bucketPath: text('bucket_path').primaryKey(),
+  noteId: text('note_id').notNull(),
+  status: text('status').notNull().default('pending'),
+  attempts: integer('attempts').notNull().default(0),
+  lastError: text('last_error'),
+  nextAttemptAt: timestamp('next_attempt_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, table => ({ recoveryIdx: index('note_bucket_cleanups_recovery_idx').on(table.nextAttemptAt, table.bucketPath) }));

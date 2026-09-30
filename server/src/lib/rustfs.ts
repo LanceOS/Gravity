@@ -9,7 +9,7 @@ import {
   type ListObjectsV2CommandOutput,
 } from '@aws-sdk/client-s3';
 import { env } from '../env.js';
-import { Transform } from 'node:stream';
+import { finished, Transform, type Readable } from 'node:stream';
 import { MAX_LISTED_FILES, MAX_LISTED_KEY_BYTES, MAX_LISTING_PAGES, LIST_PAGE_SIZE } from './object-list-limits.js';
 
 class SizeLimitStream extends Transform {
@@ -28,7 +28,7 @@ class SizeLimitStream extends Transform {
   }
 }
 
-const s3Client = new S3Client({
+const s3Config = {
   endpoint: env.rustfsEndpoint,
   region: 'us-east-1',
   credentials: {
@@ -36,7 +36,10 @@ const s3Client = new S3Client({
     secretAccessKey: env.rustfsSecretKey,
   },
   forcePathStyle: true,
-});
+};
+const s3Client = new S3Client(s3Config);
+// Request bodies cannot be replayed, including by SDK retry middleware.
+const streamingS3Client = new S3Client({ ...s3Config, maxAttempts: 1 });
 
 export class RustFS {
   /**
@@ -79,9 +82,42 @@ export class RustFS {
     stream: NodeJS.ReadableStream,
     contentLength?: number
   ): Promise<void> {
+    // An ended request has already been consumed. Sending it would silently
+    // replace the object with an empty body when ContentLength is unavailable.
+    const sourceState = stream as NodeJS.ReadableStream & Partial<Pick<Readable, 'readableEnded' | 'destroyed'>>;
     const key = `${bucketPath}/${filename}`;
     const limitStream = new SizeLimitStream(10 * 1024 * 1024);
-    stream.pipe(limitStream);
+    const controller = new AbortController();
+    let rejectFailure!: (error: Error) => void;
+    let failed = false;
+    const failure = new Promise<never>((_, reject) => { rejectFailure = reject; });
+    const fail = (error: Error) => {
+      if (failed) return;
+      failed = true;
+      rejectFailure(error);
+      controller.abort(error);
+      stream.unpipe(limitStream);
+      // The HTTP caller owns the source/socket and must still be able to send
+      // an error response (for example 413). Stop reading without destroying it.
+      stream.pause();
+      limitStream.destroy(error);
+    };
+    const onAborted = () => fail(new Error('Upload source aborted'));
+    stream.once('aborted', onAborted);
+    let cleanupSource!: () => void;
+    const sourceDone = new Promise<void>((resolve) => {
+      cleanupSource = finished(stream, { readable: true, writable: false }, error => {
+        if (error) fail(error);
+        else resolve();
+      });
+    });
+    let cleanupBody!: () => void;
+    const bodyDone = new Promise<void>((resolve) => {
+      cleanupBody = finished(limitStream, error => {
+        if (error) fail(error);
+        resolve();
+      });
+    });
 
     const command = new PutObjectCommand({
       Bucket: env.rustfsBucket,
@@ -91,15 +127,34 @@ export class RustFS {
     });
 
     try {
-      await s3Client.send(command);
-    } catch (err: any) {
-      if (err.name === 'NoSuchBucket') {
-        const createBucket = new CreateBucketCommand({ Bucket: env.rustfsBucket });
-        await s3Client.send(createBucket);
-        await s3Client.send(command);
-      } else {
-        throw err;
+      // No delete/rollback: a failed atomic PUT leaves the old object intact.
+      // A connection loss after storage commits has an ambiguous outcome;
+      // deleting here could erase the committed object or a concurrent write.
+      const upload = Promise.resolve().then(() => {
+        if (failed) return;
+        return streamingS3Client.send(command, { abortSignal: controller.signal });
+      });
+      // Attach rejection handlers before pipe(), which may throw synchronously.
+      const completion = Promise.race([Promise.all([upload, sourceDone, bodyDone]), failure]);
+      if (sourceState.readableEnded || sourceState.destroyed) fail(new Error('Upload source is no longer readable'));
+      if ((stream as NodeJS.ReadableStream & { aborted?: boolean }).aborted) onAborted();
+      try {
+        if (!failed) stream.pipe(limitStream);
+      } catch (error) {
+        fail(error instanceof Error ? error : new Error(String(error)));
       }
+      await completion;
+    } catch (error) {
+      fail(error instanceof Error ? error : new Error(String(error)));
+      // Destroy emits its error asynchronously. Keep the observer installed
+      // through teardown even if the SDK ignores cancellation or rejects early.
+      await bodyDone;
+      throw error;
+    } finally {
+      stream.unpipe(limitStream);
+      stream.removeListener('aborted', onAborted);
+      cleanupSource();
+      cleanupBody();
     }
   }
 
@@ -190,6 +245,31 @@ export class RustFS {
     for (const file of files) {
       await this.deleteFile(bucketPath, file);
     }
+  }
+
+  /** One bounded sweep of a permanently deleted prefix; restart at its head on retry. */
+  static async listDeletedBucketPage(bucketPath: string): Promise<{ files: string[]; more: boolean }> {
+    const prefix = `${bucketPath}/`;
+    let response: ListObjectsV2CommandOutput;
+    try {
+      response = await s3Client.send(new ListObjectsV2Command({
+        Bucket: env.rustfsBucket, Prefix: prefix, MaxKeys: 100,
+      }));
+    } catch (error) {
+      if (error instanceof Error && error.name === 'NoSuchBucket') return { files: [], more: false };
+      throw error;
+    }
+    if (typeof response.IsTruncated !== 'boolean' || (response.Contents?.length ?? 0) > 100) {
+      throw new Error('Invalid deleted bucket listing');
+    }
+    const files = (response.Contents ?? []).map(item => {
+      if (typeof item.Key !== 'string' || !item.Key.startsWith(prefix)
+        || Buffer.byteLength(item.Key) > 1024) throw new Error('Invalid deleted bucket key');
+      // Empty suffix deliberately removes a prefix marker as well.
+      return item.Key.slice(prefix.length);
+    });
+    if (response.IsTruncated && files.length === 0) throw new Error('Empty truncated listing');
+    return { files, more: response.IsTruncated };
   }
 
   /**

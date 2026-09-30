@@ -94,3 +94,30 @@ describe('complete object-store inventories', () => {
     expect(send.mock.calls.length).toBeLessThanOrEqual(limit === 'count' ? MAX_LISTED_FILES / 1000 + 1 : Math.ceil(MAX_LISTED_KEY_BYTES / 1_000_000) + 1);
   });
 });
+
+describe('bounded deleted-prefix pages', () => {
+  it('requests one small page and retains prefix markers for deletion', async () => {
+    send.mockResolvedValueOnce({ Contents: [{ Key: prefix }, { Key: `${prefix}body.md` }], IsTruncated: true });
+    expect(await RustFS.listDeletedBucketPage(prefix.slice(0, -1))).toEqual({ files: ['', 'body.md'], more: true });
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send.mock.calls[0][0].input).toMatchObject({ Prefix: prefix, MaxKeys: 100 });
+  });
+
+  it.each([
+    {}, { IsTruncated: true },
+    { IsTruncated: false, Contents: [{}] },
+    { IsTruncated: false, Contents: [{ Key: 'foreign/object' }] },
+    { IsTruncated: false, Contents: [{ Key: prefix + 'x'.repeat(1024) }] },
+    { IsTruncated: false, Contents: Array.from({ length: 101 }, () => ({ Key: prefix + 'x' })) },
+  ])('rejects malformed or oversized pages', async response => {
+    send.mockResolvedValueOnce(response);
+    await expect(RustFS.listDeletedBucketPage(prefix.slice(0, -1))).rejects.toThrow();
+  });
+
+  it('treats only an absent bucket as empty', async () => {
+    send.mockRejectedValueOnce(Object.assign(new Error('missing'), { name: 'NoSuchBucket' }));
+    expect(await RustFS.listDeletedBucketPage(prefix.slice(0, -1))).toEqual({ files: [], more: false });
+    send.mockRejectedValueOnce(new Error('unavailable'));
+    await expect(RustFS.listDeletedBucketPage(prefix.slice(0, -1))).rejects.toThrow('unavailable');
+  });
+});

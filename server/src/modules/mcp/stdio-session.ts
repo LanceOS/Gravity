@@ -366,7 +366,7 @@ export class McpStdioSession {
         try {
           const { verifyAndConsumeToken } = await import('./connection.js');
           if (!this.running) return;
-          const tokenRow = await verifyAndConsumeToken(token, workspaceId, {});
+          const tokenRow = await verifyAndConsumeToken(token, workspaceId, { allowSingleUse: false });
           if (!this.running) return;
           if (!tokenRow || tokenRow.singleUse) {
             this.recordHandshakeFailure();

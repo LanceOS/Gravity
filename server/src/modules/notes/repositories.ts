@@ -1,6 +1,6 @@
 import { and, desc, asc, eq, lt, or, sql } from 'drizzle-orm';
 import { db } from '../../db/index.js';
-import { noteBodyRevisions, noteMetadata } from './schema.js';
+import { noteBodyRevisions, noteBucketCleanups, noteMetadata } from './schema.js';
 import { RustFS } from '../../lib/rustfs.js';
 import { env } from '../../env.js';
 import { withNoteReferenceLock, type NoteTransaction } from './reference-lock.js';
@@ -282,6 +282,8 @@ type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 async function commitRevision<T>(bodyKey: string | undefined, bucketPath: string, persist: (tx: Transaction) => Promise<T>): Promise<T> {
   return withNoteReferenceLock(async (tx) => {
+    const [deleted] = await tx.select().from(noteBucketCleanups).where(eq(noteBucketCleanups.bucketPath, bucketPath)).limit(1);
+    if (deleted) throw new Error('NOTE_DELETED');
     if (bodyKey) {
       // Recovery uses a conditional UPDATE of this same row. Holding its lock
       // until the pointer commits makes publication and abandonment exclusive.

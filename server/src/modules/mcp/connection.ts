@@ -195,7 +195,7 @@ export async function refreshConnectionToken(
   };
 }
 
-export async function verifyAndConsumeToken(rawToken: string, workspaceId: string, opts?: { sourceIp?: string | null }) {
+export async function verifyAndConsumeToken(rawToken: string, workspaceId: string, opts?: { sourceIp?: string | null; allowSingleUse?: boolean }) {
   const secrets = configuredSecrets();
   const knownSecrets = [...new Set([secrets.current, ...Object.values(secrets.keyed), ...secrets.legacy])];
 
@@ -223,6 +223,10 @@ export async function verifyAndConsumeToken(rawToken: string, workspaceId: strin
     // Reject if not active or expired
     if (row.status !== 'active') return null;
     if (row.expiresAt && row.expiresAt <= new Date()) return null;
+
+    // Reject token kinds the caller cannot use before recording any usage.
+    // Other transports retain the atomic single-use consumption path below.
+    if (row.singleUse && opts?.allowSingleUse === false) return null;
 
     // Enforce source IP binding: if the token row is bound to a specific
     // source IP, the caller MUST present a source IP and it MUST match.
