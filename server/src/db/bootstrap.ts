@@ -919,6 +919,20 @@ async function bootstrapDatabase() {
     CREATE INDEX IF NOT EXISTS note_body_revisions_recovery_idx ON note_body_revisions (state, created_at);
   `);
 
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS note_bucket_cleanups (
+      bucket_path TEXT PRIMARY KEY,
+      note_id TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      attempts INTEGER NOT NULL DEFAULT 0,
+      last_error TEXT,
+      next_attempt_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS note_bucket_cleanups_recovery_idx ON note_bucket_cleanups (next_attempt_at, bucket_path);
+    CREATE INDEX IF NOT EXISTS note_metadata_bucket_path_idx ON note_metadata (bucket_path);
+  `);
+
   // Ensure note_metadata has excerpt and full-text search vector columns/indexes
   await pool.query(`
     ALTER TABLE note_metadata ADD COLUMN IF NOT EXISTS excerpt TEXT NOT NULL DEFAULT '';

@@ -77,6 +77,11 @@ vi.mock('../src/lib/rustfs.js', () => {
           if (key.startsWith(prefix)) memfs.delete(key);
         }
       },
+      listDeletedBucketPage: async (bucketPath: string) => {
+        const prefix = `${bucketPath}/`;
+        const files = [...memfs.keys()].filter(key => key.startsWith(prefix)).map(key => key.slice(prefix.length));
+        return { files: files.slice(0, 100), more: files.length > 100 };
+      },
       listFiles: async (bucketPath: string) => {
         const prefix = `${bucketPath}/`;
         const files: string[] = [];

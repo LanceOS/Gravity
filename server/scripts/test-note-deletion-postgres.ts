@@ -28,6 +28,10 @@ RustFS.readFile = async (bucket, file) => {
   return value;
 };
 RustFS.listFiles = async bucket => [...objects.keys()].filter(key => key.startsWith(`${bucket}/`)).map(key => key.slice(bucket.length + 1));
+RustFS.listDeletedBucketPage = async bucket => {
+  const files = await RustFS.listFiles(bucket);
+  return { files: files.slice(0, 100), more: files.length > 100 };
+};
 RustFS.statFile = async (bucket, file) => {
   await RustFS.readFile(bucket, file);
   return { etag: 'synthetic-version', lastModified: new Date(0) };
@@ -137,6 +141,7 @@ try {
   await assert.rejects(f.remove('note'));
   assert.ok(await getNote(f.owner.id, 'project'));
   assert.equal((await RustFS.readFile(f.owner.bucketPath, 'photo.png')).toString(), 'image');
+  assert.equal((await observer.query('select * from note_bucket_cleanups where bucket_path = $1', [f.owner.bucketPath])).rowCount, 0);
   await observer.query('drop trigger reject_note_delete on note_metadata');
   passed++;
   console.log('PASS PostgreSQL rollback preserves metadata and objects');

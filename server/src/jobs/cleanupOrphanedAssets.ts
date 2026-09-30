@@ -1,3 +1,4 @@
+import { recoverDeletedNoteBuckets } from '../modules/notes/services/deleted-note-cleanup.js';
 import { fileURLToPath } from 'node:url';
 import { recoverAbandonedNoteRevisions } from '../modules/notes/services/notes.js';
 import { RustFS } from '../lib/rustfs.js';
@@ -5,6 +6,7 @@ import { MetadataRepository, NotesRepository } from '../modules/notes/repositori
 import { cleanupMedia, type CleanupOptions } from '../modules/notes/services/media-cleanup.js';
 
 async function runCleanup(dryRun = false, options: Omit<CleanupOptions, 'dryRun'> = {}) {
+  const deletedNoteBuckets = await recoverDeletedNoteBuckets({ dryRun });
   const media = await cleanupMedia({
     listNotes: MetadataRepository.listNotesForMediaCleanup,
     getBody: NotesRepository.getBody,
@@ -13,7 +15,7 @@ async function runCleanup(dryRun = false, options: Omit<CleanupOptions, 'dryRun'
     deleteFile: (bucket, file, etag) => RustFS.deleteFile(bucket, file, etag),
   }, { ...options, dryRun });
   const abandonedRevisions = await recoverAbandonedNoteRevisions(dryRun);
-  return { ...media, abandonedRevisions };
+  return { ...media, abandonedRevisions, deletedNoteBuckets };
 }
 
 if (import.meta.url) {
