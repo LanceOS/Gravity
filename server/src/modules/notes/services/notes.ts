@@ -1,3 +1,5 @@
+import { noteBucketCleanups } from '../schema.js';
+import { recoverDeletedNoteBuckets } from './deleted-note-cleanup.js';
 import { randomUUID } from 'node:crypto';
 import { withNoteReferenceLock } from '../reference-lock.js';
 import { MetadataRepository, NotesRepository, NoteRevisionRepository } from '../repositories.js';
@@ -156,6 +158,7 @@ export async function updateNote(
     }, updates.body !== undefined ? tx => validateMediaReferences(updates.body!, tx) : undefined);
   } catch (err: any) {
     if (bodyKey) await discardRevision(bodyKey);
+    if (err.message === 'NOTE_DELETED' || err.message === 'Note not found') throw new Error('NOT_FOUND');
     if (err.message.includes('Optimistic locking failed')) throw new Error('CONFLICT');
     throw err;
   }
@@ -168,19 +171,18 @@ export async function deleteNote(noteId: string, projectId: string) {
     const metadata = await MetadataRepository.getNoteMetadata(noteId, tx);
     if (!metadata || metadata.projectId !== projectId) return null;
     await assertNoteAttachmentsUnshared(metadata, tx);
+    await tx.insert(noteBucketCleanups).values({ bucketPath: metadata.bucketPath, noteId });
     await MetadataRepository.deleteNoteMetadata(noteId, tx);
     return metadata;
   });
   if (!deleted) return false;
 
-  // Only remove storage after metadata deletion is acknowledged. A DB failure
-  // must not leave a visible note whose committed body was already destroyed.
+  // On an ambiguous commit acknowledgement this path is never reached. The
+  // atomic ledger entry authorizes a later recovery run only if commit won.
   try {
-    await NotesRepository.deleteBucket(deleted.bucketPath);
-  } catch (error) {
-    // The note is deleted; a partial object cleanup cannot roll that back.
-    // Durable retry of these orphaned prefixes is tracked in GRAV-257.
-    console.error('Deleted note storage cleanup failed', { noteId });
+    await recoverDeletedNoteBuckets({ bucketPath: deleted.bucketPath });
+  } catch {
+    console.error('Deleted note storage cleanup deferred', { noteId });
   }
   return true;
 }

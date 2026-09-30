@@ -123,8 +123,9 @@ describe('explicit deletion versus note publication', () => {
 
   it('keeps metadata deleted if object cleanup fails after a partial removal', async () => {
     const f = await fixture();
-    vi.spyOn(NotesRepository, 'deleteBucket').mockImplementationOnce(async bucket => {
-      await RustFS.deleteFile(bucket, f.owner.bodyKey);
+    const removeFile = RustFS.deleteFile;
+    vi.spyOn(RustFS, 'deleteFile').mockImplementationOnce(async (...args) => {
+      await removeFile(...args);
       throw new Error('storage unavailable');
     });
     const log = vi.spyOn(console, 'error').mockImplementation(() => {});

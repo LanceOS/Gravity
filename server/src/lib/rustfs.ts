@@ -192,6 +192,31 @@ export class RustFS {
     }
   }
 
+  /** One bounded sweep of a permanently deleted prefix; restart at its head on retry. */
+  static async listDeletedBucketPage(bucketPath: string): Promise<{ files: string[]; more: boolean }> {
+    const prefix = `${bucketPath}/`;
+    let response: ListObjectsV2CommandOutput;
+    try {
+      response = await s3Client.send(new ListObjectsV2Command({
+        Bucket: env.rustfsBucket, Prefix: prefix, MaxKeys: 100,
+      }));
+    } catch (error) {
+      if (error instanceof Error && error.name === 'NoSuchBucket') return { files: [], more: false };
+      throw error;
+    }
+    if (typeof response.IsTruncated !== 'boolean' || (response.Contents?.length ?? 0) > 100) {
+      throw new Error('Invalid deleted bucket listing');
+    }
+    const files = (response.Contents ?? []).map(item => {
+      if (typeof item.Key !== 'string' || !item.Key.startsWith(prefix)
+        || Buffer.byteLength(item.Key) > 1024) throw new Error('Invalid deleted bucket key');
+      // Empty suffix deliberately removes a prefix marker as well.
+      return item.Key.slice(prefix.length);
+    });
+    if (response.IsTruncated && files.length === 0) throw new Error('Empty truncated listing');
+    return { files, more: response.IsTruncated };
+  }
+
   /**
    * Lists all files in the specified bucket path.
    */
