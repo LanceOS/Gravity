@@ -533,6 +533,8 @@ type SecretsOpts = {
 export function setSecretsForTest(opts: SecretsOpts = {}) {
   const { betterAuthSecret, betterAuthOldSecrets, betterAuthOldSecretsMap } = opts;
   const prev = {
+    processSecret: process.env.BETTER_AUTH_SECRET,
+    processOldSecrets: process.env.BETTER_AUTH_OLD_SECRETS,
     betterAuthSecret: env.betterAuthSecret,
     betterAuthOldSecrets: Array.isArray(env.betterAuthOldSecrets) ? [...env.betterAuthOldSecrets] : env.betterAuthOldSecrets,
     betterAuthOldSecretsMap: env.betterAuthOldSecretsMap ? { ...env.betterAuthOldSecretsMap } : env.betterAuthOldSecretsMap,
@@ -560,17 +562,15 @@ export function setSecretsForTest(opts: SecretsOpts = {}) {
     env.betterAuthSecret = prev.betterAuthSecret;
     env.betterAuthOldSecrets = prev.betterAuthOldSecrets;
     env.betterAuthOldSecretsMap = prev.betterAuthOldSecretsMap;
-    if (typeof prev.betterAuthSecret === 'undefined') {
+    if (typeof prev.processSecret === 'undefined') {
       delete process.env.BETTER_AUTH_SECRET;
     } else {
-      process.env.BETTER_AUTH_SECRET = prev.betterAuthSecret as string;
+      process.env.BETTER_AUTH_SECRET = prev.processSecret;
     }
-    if (typeof prev.betterAuthOldSecrets === 'undefined') {
+    if (typeof prev.processOldSecrets === 'undefined') {
       delete process.env.BETTER_AUTH_OLD_SECRETS;
     } else {
-      process.env.BETTER_AUTH_OLD_SECRETS = Array.isArray(prev.betterAuthOldSecrets)
-        ? prev.betterAuthOldSecrets.join(',')
-        : String(prev.betterAuthOldSecrets ?? '');
+      process.env.BETTER_AUTH_OLD_SECRETS = prev.processOldSecrets;
     }
   };
 }

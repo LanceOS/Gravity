@@ -1,10 +1,10 @@
+import { testSecrets } from './helpers/test-secrets.js';
+
+Object.assign(process.env, testSecrets);
 process.env.DATABASE_URL = 'pgmem://gravity';
 process.env.NODE_ENV = 'test';
-process.env.NODE_IDENTITY_MASTER_KEY = 'test-node-master-key';
 // Explicit opt-in for direct loopback fixture deliveries; production never permits it.
 process.env.ALLOW_UNSIGNED_LOCAL_WEBHOOKS = 'true';
-process.env.LOCAL_TESTING_KEK = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
-process.env.BETTER_AUTH_SECRET = 'test-secret-1234567890';
 process.env.BETTER_AUTH_BASE_URL = 'http://localhost:8080';
 process.env.CORS_ORIGINS = 'http://localhost:5173';
 process.env.TRUSTED_ORIGINS = 'http://localhost:5173,http://localhost:8080';
