@@ -72,11 +72,23 @@ through a trusted proxy network. Never replace this policy with Express
 Changing from a shared proxy identity to individual client identities can
 invalidate existing IP-bound MCP credentials; recreate affected credentials.
 
+## Optional CSRF host fallback
+
+CSRF uses the same validated exact-IP/CIDR matcher, but checks only the immediate
+socket peer. With `CSRF_ALLOW_HOST_FALLBACK=true`, a request missing both Origin
+and Referer may pass only with a single `X-Forwarded-Host` explicitly allowed by
+the configured origins. For requests subject to CSRF origin checks, explicit
+disallowed origins always fail; matching Host
+headers cannot override them. Keep fallback disabled unless ingress provides
+source-origin validation and overwrites forwarded hosts with validated values.
+See [CSRF deployment requirements](CSRF_IMPLEMENTATION.md#proxy-deployment-note).
+
 ## Isolated validation
 
 From `server/`, run `node node_modules/vitest/vitest.mjs run --config vitest.proxy.config.ts`
 and `npm run typecheck`. The dedicated suite uses request
 and Redis mocks with no database bootstrap or external services. It covers
 spoofed XFF, direct access, trusted chains/CIDRs, malformed hops, IPv4/IPv6,
-canonical identities, independent nginx client buckets, and ingress directives.
+canonical identities, independent nginx client buckets, ingress directives, and
+CSRF origin/host fallback policy.
 It does not exercise a running nginx instance or deployment network topology.

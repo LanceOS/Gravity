@@ -23,7 +23,7 @@ const previewSchema = scanSchema.extend({ credential: credentialSchema }).strict
 export function createGithubReconciliationRouter() {
   const router = Router();
   const limit = (env.redisEnabled ? createRedisRateLimiter : createRateLimiter)({
-    namespace: 'github.reconciliation', windowMs: 60_000, max: 10,
+    namespace: 'github.reconciliation', failurePolicy: 'closed', windowMs: 60_000, max: 10,
   });
   router.post('/projects/:projectId/github-reconciliation/preview', limit, async (req, res) => {
     try {

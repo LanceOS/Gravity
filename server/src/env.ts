@@ -63,7 +63,6 @@ export const env = {
   aiStreamChunkSize: parsed.AI_STREAM_CHUNK_SIZE,
   mcpStdioWorkspaceId: parsed.MCP_STDIO_WORKSPACE_ID?.trim() || undefined,
   mcpStdioActorUserId: parsed.MCP_STDIO_ACTOR_USER_ID?.trim() || undefined,
-  mcpAgentCommand: parsed.MCP_AGENT_COMMAND?.trim() || undefined,
   mcpEventNamespace: parsed.MCP_EVENT_NAMESPACE || undefined,
   nodeEnv: parsed.NODE_ENV,
   allowEnvAiKeys: parsed.ALLOW_ENV_AI_KEYS,

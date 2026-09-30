@@ -1,6 +1,9 @@
 import { z } from 'zod';
 import { isIP } from 'node:net';
 import ipaddr from 'ipaddr.js';
+import { createTrustedProxyMatcher } from './lib/trusted-proxies.js';
+
+const retiredCommandMessage = 'MCP_AGENT_COMMAND is no longer supported. Unset it and run the MCP stdio entrypoint separately; see docs/mcp/TRANSPORTS.md.';
 
 const envSchema = z.object({
   PORT: z.coerce.number().int().min(1).max(65535).default(8080),
@@ -32,7 +35,8 @@ const envSchema = z.object({
   AI_STREAM_CHUNK_SIZE: z.coerce.number().int().positive().default(48),
   MCP_STDIO_WORKSPACE_ID: z.string().optional(),
   MCP_STDIO_ACTOR_USER_ID: z.string().optional(),
-  MCP_AGENT_COMMAND: z.string().optional(),
+  // Validate the retired setting without exposing it to startup or a child process.
+  MCP_AGENT_COMMAND: z.string().trim().max(0, { message: retiredCommandMessage }).optional(),
   MCP_EVENT_NAMESPACE: z.string().trim().max(128).optional(),
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   ALLOW_ENV_AI_KEYS: z.preprocess((v) => {
@@ -72,7 +76,8 @@ export function parseDeploymentConfig(input: Record<string, unknown>) {
   const errors: string[] = [];
   if (!result.success) {
     throw new Error('Invalid deployment configuration:\n' + result.error.issues.map(issue =>
-      `- ${issue.path.join('.')}: missing or invalid value`).join('\n') + '\nSee docs/deployment-configuration.md.');
+      issue.path[0] === 'MCP_AGENT_COMMAND' ? `- ${retiredCommandMessage}` :
+        `- ${issue.path.join('.')}: missing or invalid value`).join('\n') + '\nSee docs/deployment-configuration.md.');
   }
   const config = result.data;
   const production = config.NODE_ENV === 'production';
@@ -125,12 +130,11 @@ export function parseDeploymentConfig(input: Record<string, unknown>) {
   if (config.ALLOW_UNSIGNED_LOCAL_WEBHOOKS && config.NODE_ENV !== 'development' && config.NODE_ENV !== 'test') {
     fail('ALLOW_UNSIGNED_LOCAL_WEBHOOKS', 'only supported in development/test; production requires signed deliveries.');
   }
-  for (const entry of list(config.TRUSTED_PROXIES)) {
-    const [address, prefix, ...extra] = entry.split('/');
-    const family = isIP(address);
-    if (!family || address.includes('%') || extra.length || (prefix !== undefined && (!/^\d+$/.test(prefix) || Number(prefix) > (family === 4 ? 32 : 128) || (family === 6 && ipaddr.process(address).kind() === 'ipv4' && Number(prefix) < 96)))) {
-      fail('TRUSTED_PROXIES', 'use exact IP addresses or valid CIDRs.');
-    }
+  try {
+    createTrustedProxyMatcher(list(config.TRUSTED_PROXIES));
+  } catch {
+    // Runtime and preflight use the same parser, but diagnostics must not echo inputs.
+    fail('TRUSTED_PROXIES', 'use exact IP addresses or valid CIDRs.');
   }
   if (errors.length) throw new Error(`Invalid deployment configuration:\n${errors.join('\n')}\nSee docs/deployment-configuration.md.`);
   return config;

@@ -21,6 +21,7 @@ interface UseWorkspaceManagementCommandsArgs {
     description?: string;
     sortOrder?: number;
     projectId?: string;
+    teamId?: string;
   }) => Promise<{ id: string } | null | undefined>;
   updateLabel: (labelId: string, updates: { name?: string; color?: string; description?: string; sortOrder?: number }) => Promise<unknown>;
   deleteLabel: (labelId: string) => Promise<boolean | null>;
@@ -40,6 +41,7 @@ interface UseWorkspaceManagementCommandsResult {
     description?: string;
     sortOrder?: number;
     projectId?: string;
+    teamId?: string;
   }) => Promise<void>;
   handleUpdateLabel: (
     labelId: string,
@@ -116,10 +118,12 @@ export function useWorkspaceManagementCommands({
   );
 
   const handleCreateLabel = useCallback(
-    async (labelInput: { name: string; color: string; description?: string; sortOrder?: number; projectId?: string }) => {
-      const projectId = labelInput.projectId || activeProjectId;
-      if (!projectId) {
-        return;
+    async (labelInput: { name: string; color: string; description?: string; sortOrder?: number; projectId?: string; teamId?: string }) => {
+      const projectId = labelInput.teamId ? undefined : labelInput.projectId || activeProjectId;
+      if (!projectId && !labelInput.teamId) {
+        const message = 'Please select a project or team.';
+        setLabelCreateError(message);
+        throw new Error(message);
       }
 
       setLabelCreateLoading(true);
@@ -128,14 +132,14 @@ export function useWorkspaceManagementCommands({
       try {
         const label = await createLabel({
           ...labelInput,
-          projectId,
+          ...(projectId ? { projectId } : {}),
         });
 
         if (!label) {
-          throw new Error('Failed to create label for this project.');
+          throw new Error('Failed to create label.');
         }
       } catch (error) {
-        const message = error instanceof Error ? error.message : 'Failed to create label for this project.';
+        const message = error instanceof Error ? error.message : 'Failed to create label.';
         setLabelCreateError(message, projectId);
         throw error;
       } finally {

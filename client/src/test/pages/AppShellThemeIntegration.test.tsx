@@ -1,12 +1,14 @@
 import type { ReactNode } from 'react';
-import { render, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { ThemeProvider as AppThemeProvider } from '../../context/theme/ThemeContext';
 import { ThemeProvider as SettingsThemeProvider } from '../../modules/settings';
 import { WorkspaceShellPage } from '../../pages/WorkspaceShellPage/WorkspaceShellPage.tsx';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import '../../../public/theme-bootstrap.js';
+import { Sidebar } from '../../components/Sidebar/Sidebar';
+import type { SidebarProps } from '../../components/Sidebar';
 
 declare global {
   interface Window {
@@ -15,6 +17,8 @@ declare global {
 }
 
 const mocks = vi.hoisted(() => ({
+  renderSidebar: false,
+  createLabel: vi.fn(),
   useAuth: vi.fn(),
   useUserDirectory: vi.fn(),
   useActiveProject: vi.fn(),
@@ -87,7 +91,7 @@ vi.mock('../../context/ticket/TicketMutationContext', () => ({
 }));
 
 vi.mock('../../context/label/LabelContext', () => ({
-  useLabels: () => ({ labels: [], globalLabels: [], labelsByProject: new Map(), assignLabelToTicket: vi.fn(), unassignLabelFromTicket: vi.fn(), createLabel: vi.fn(), updateLabel: vi.fn(), deleteLabel: vi.fn() }),
+  useLabels: () => ({ labels: [], globalLabels: [], labelsByProject: new Map(), assignLabelToTicket: vi.fn(), unassignLabelFromTicket: vi.fn(), createLabel: mocks.createLabel, updateLabel: vi.fn(), deleteLabel: vi.fn() }),
 }));
 vi.mock('../../context/cycle/CycleContext', () => ({
   useCycles: () => ({ cycles: [] }),
@@ -140,9 +144,10 @@ vi.mock('../../modules/onboarding', () => ({
 }));
 
 vi.mock('../../layouts/WorkspaceLayout/WorkspaceLayout', () => ({
-  WorkspaceLayout: ({ children, rightPanels }: { children?: ReactNode; rightPanels?: ReactNode }) => (
+  WorkspaceLayout: ({ children, rightPanels, sidebarProps }: { children?: ReactNode; rightPanels?: ReactNode; sidebarProps: SidebarProps }) => (
     <div>
       <div>WorkspaceLayout</div>
+      {mocks.renderSidebar && <Sidebar {...sidebarProps} />}
       {children}
       {rightPanels}
     </div>
@@ -382,12 +387,16 @@ function buildWorkspaceSettings(overrides: Partial<Record<string, unknown>> = {}
   };
 }
 
-function renderAppShell() {
+function renderAppShell(options: { hierarchyMode?: 'flat' | 'teams'; path?: string } = {}) {
   mocks.useWorkspaceDirectory.mockReturnValue(buildWorkspaceDirectory());
   mocks.useAccountSettings.mockReturnValue(buildAccountSettings());
   mocks.useWorkspaceSettings.mockReturnValue(buildWorkspaceSettings());
 
-  const tickets = buildUseTickets();
+  const tickets = buildUseTickets(options.hierarchyMode ? { projects: [
+    { id: 'project-1', name: 'First project', key: 'ONE', status: 'active', workspaceId: 'workspace-1', teamId: 'team-1' },
+    { id: 'project-2', name: 'Second project', key: 'TWO', status: 'active', workspaceId: 'workspace-1', teamId: 'team-2' },
+    { id: 'project-other', name: 'Other workspace project', key: 'OTHER', status: 'active', workspaceId: 'workspace-other' },
+  ] } : {});
   const ticketState = tickets as any;
   mocks.useAuth.mockReturnValue({
     currentUser: ticketState.currentUser ?? null,
@@ -476,8 +485,14 @@ function renderAppShell() {
     <QueryClientProvider client={queryClient}>
       <AppThemeProvider>
         <SettingsThemeProvider>
-          <MemoryRouter initialEntries={['/workspaces/workspace-1']}>
-            <WorkspaceShellPage />
+          <MemoryRouter initialEntries={[options.path || '/workspaces/workspace-1']}>
+            {options.hierarchyMode ? (
+              <Routes>
+                <Route path="/workspaces/:workspaceId" element={<WorkspaceShellPage />} />
+                <Route path="/workspaces/:workspaceId/teams/:teamId" element={<WorkspaceShellPage />} />
+                <Route path="/workspaces/:workspaceId/projects/:projectId" element={<WorkspaceShellPage />} />
+              </Routes>
+            ) : <WorkspaceShellPage />}
           </MemoryRouter>
         </SettingsThemeProvider>
       </AppThemeProvider>
@@ -488,6 +503,8 @@ function renderAppShell() {
 describe('AppShellPage theme integration', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.renderSidebar = false;
+    mocks.createLabel.mockResolvedValue({ id: 'created-label' });
     delete (document as any).modelContext;
     window.localStorage.clear();
     window.localStorage.setItem('gravity_theme', 'dark');
@@ -513,6 +530,40 @@ describe('AppShellPage theme integration', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+  });
+
+  it.each([
+    ['flat', ''], ['teams', ''], ['flat', '/projects/project-2'], ['teams', '/teams/team-2'],
+  ] as const)('creates a label from sidebar right-click in a %s workspace at %s', async (hierarchyMode, routeSuffix) => {
+    mocks.renderSidebar = true;
+    const sidebar = { hierarchyMode, teams: [
+      { id: 'team-1', name: 'First team', projects: [{ id: 'project-1', name: 'First project', key: 'ONE' }], labels: [], cycles: [] },
+      { id: 'team-2', name: 'Second team', projects: [{ id: 'project-2', name: 'Second project', key: 'TWO' }], labels: [], cycles: [] },
+    ] };
+    vi.stubGlobal('fetch', vi.fn((url: string) => Promise.resolve(new Response(JSON.stringify(
+      url.endsWith('/sidebar') ? sidebar : [],
+    ), { status: 200, headers: { 'Content-Type': 'application/json' } }))));
+    const { container } = renderAppShell({ hierarchyMode, path: `/workspaces/workspace-1${routeSuffix}` });
+    await waitFor(() => expect(screen.getAllByText('First project').length).toBeGreaterThan(0));
+    fireEvent.contextMenu(container.querySelector('.app-sidebar .sidebar__content')!);
+    fireEvent.click(await screen.findByText('New Label'));
+    const name = hierarchyMode === 'teams' ? 'Team' : 'Project';
+    const selector = await screen.findByRole('button', { name });
+    const defaultName = routeSuffix ? 'Second' : 'First';
+    expect(selector).toHaveTextContent(`${defaultName} ${hierarchyMode === 'teams' ? 'team' : 'project'}`);
+    fireEvent.click(selector);
+    expect(screen.queryByRole('option', { name: 'Other workspace project' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('option', { name: hierarchyMode === 'teams' ? 'Second team' : 'Second project' }));
+    fireEvent.change(screen.getByLabelText('Label Name'), { target: { value: 'Sidebar label' } });
+    mocks.createLabel.mockRejectedValueOnce(new Error('Selected scope rejected'));
+    fireEvent.click(screen.getByRole('button', { name: 'Create Label' }));
+    expect(await screen.findByText('Selected scope rejected')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Create Label' }));
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'New Label' })).not.toBeInTheDocument());
+    expect(mocks.createLabel).toHaveBeenLastCalledWith({
+      name: 'Sidebar label', color: '#3b82f6', description: '',
+      [hierarchyMode === 'teams' ? 'teamId' : 'projectId']: hierarchyMode === 'teams' ? 'team-2' : 'project-2',
+    });
   });
 
   it('applies account theme settings to root tokens, density, and storage', async () => {

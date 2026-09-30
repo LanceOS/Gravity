@@ -24,7 +24,7 @@ vi.mock('../../project/ActiveProjectContext', () => ({
     activeProjectIdRef: { current: mockActiveProjectId },
   }),
 }));
-let mockProjects: Array<{ id: string; workspaceId?: string }> = [];
+let mockProjects: Array<{ id: string; workspaceId?: string; teamId?: string }> = [];
 vi.mock('../../project/ProjectContext', () => ({
   useProjectContext: () => {
     const projectById = new Map(mockProjects.map((project) => [project.id, project]));
@@ -44,9 +44,9 @@ vi.mock('../../project/ProjectContext', () => ({
   },
 }));
 
-function renderWithProvider(ui: React.ReactNode, activeProjectId: string) {
+function renderWithProvider(ui: React.ReactNode, activeProjectId: string, projects: typeof mockProjects = [{ id: activeProjectId }]) {
   mockActiveProjectId = activeProjectId;
-  mockProjects = [{ id: activeProjectId }];
+  mockProjects = projects;
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: {
@@ -78,6 +78,7 @@ function ContextProbe() {
       >
         Create Label
       </button>
+      <button data-testid="create-team-label-btn" onClick={() => createLabel({ name: 'Team bug', teamId: 'team-2' })}>Create team label</button>
       <button 
         data-testid="assign-label-btn" 
         onClick={() => assignLabelToTicket('ticket-1', 'label-1')}
@@ -91,6 +92,7 @@ function ContextProbe() {
 describe('LabelContext', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.restoreAllMocks();
   });
 
   it('fetches labels and builds derived maps correctly', async () => {
@@ -156,4 +158,23 @@ describe('LabelContext', () => {
       }));
     });
   });
+  it('sends only the selected team and refreshes its label caches', async () => {
+    const invalidate = vi.spyOn(QueryClient.prototype, 'invalidateQueries');
+    vi.mocked(useAuth).mockReturnValue({ currentUser: { id: 'user-1' } } as any);
+    const fetchMock = vi.fn((_url, init) => Promise.resolve(jsonResponse(init?.method === 'POST'
+      ? { id: 'team-label', teamId: 'team-2', projectId: null, name: 'Team bug' } : [])));
+    vi.stubGlobal('fetch', fetchMock);
+    renderWithProvider(<ContextProbe />, 'project-1', [
+      { id: 'project-1', teamId: 'team-1' }, { id: 'project-2', teamId: 'team-2' },
+    ]);
+    fireEvent.click(screen.getByTestId('create-team-label-btn'));
+    await waitFor(() => expect(fetchMock.mock.calls.some(([, init]) => init?.method === 'POST')).toBe(true));
+    const [, request] = fetchMock.mock.calls.find(([, init]) => init?.method === 'POST')!;
+    expect(JSON.parse(request.body)).toEqual({ teamId: 'team-2', name: 'Team bug', color: '#6B7280', description: '', sortOrder: 0 });
+    expect(request.headers).not.toHaveProperty('x-project-id');
+    await waitFor(() => expect(invalidate).toHaveBeenCalledWith({ queryKey: ['teamLabels', 'team-2'] }));
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['labels', { projectId: 'project-2' }], exact: true });
+    expect(invalidate).not.toHaveBeenCalledWith({ queryKey: ['labels', { projectId: 'project-1' }], exact: true });
+  });
+
 });
