@@ -87,6 +87,7 @@ export function Tooltip({ content, children, style }: TooltipProps) {
         setIsRendered(false);
       } else {
         if (tooltipElement) {
+          anime.remove(tooltipElement);
           runAnime({
             targets: tooltipElement,
             opacity: [1, 0],
@@ -112,6 +113,9 @@ export function Tooltip({ content, children, style }: TooltipProps) {
       if (shouldReduceMotion()) {
         return;
       }
+      // Cancel a superseded exit so its completion cannot unmount a tooltip
+      // that has already been reentered.
+      anime.remove(tooltipElement);
       tooltipElement.style.opacity = '0';
       tooltipElement.style.transform = 'translateY(4px)';
       runAnime({
