@@ -35,7 +35,7 @@ export function GeneralSettingsSection({
             <Select
               label="Default View Mode"
               value={settings.defaultView}
-              onChange={(event) => onChangeSettings({ defaultView: event.target.value as WorkspaceSettings['defaultView'] })}
+              onValueChange={(value) => onChangeSettings({ defaultView: value as WorkspaceSettings['defaultView'] })}
               options={VIEW_MODE_OPTIONS}
             />
             {isMobile && (
@@ -48,14 +48,14 @@ export function GeneralSettingsSection({
           <Select
             label="Workspace Theme"
             value={settings.theme}
-            onChange={(event) => onChangeSettings({ theme: event.target.value as WorkspaceSettings['theme'] })}
+            onValueChange={(value) => onChangeSettings({ theme: value as WorkspaceSettings['theme'] })}
             options={THEME_OPTIONS}
           />
 
           <Select
             label="Project Layout"
             value={settings.projectLayout}
-            onChange={(event) => onChangeSettings({ projectLayout: event.target.value as WorkspaceSettings['projectLayout'] })}
+            onValueChange={(value) => onChangeSettings({ projectLayout: value as WorkspaceSettings['projectLayout'] })}
             options={PROJECT_LAYOUT_OPTIONS}
           />
 

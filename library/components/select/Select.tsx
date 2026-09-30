@@ -54,27 +54,29 @@ function getAdjacentEnabledSelectIndex(options: readonly SelectOption[], current
   return currentIndex;
 }
 
-function createSelectChangeEvent(nextValue: string) {
-  return {
-    target: { value: nextValue },
-    currentTarget: { value: nextValue },
-  } as React.ChangeEvent<HTMLSelectElement>;
-}
-
 export interface SelectProps extends React.AriaAttributes, Pick<
   React.ButtonHTMLAttributes<HTMLButtonElement>,
   'id' | 'className' | 'style' | 'disabled' | 'autoFocus' | 'title' | 'tabIndex' | 'onFocus' | 'onBlur' | 'onClick' | 'onKeyDown'
 > {
   name?: string;
   form?: string;
+  /** Controlled selection. Omitting this displays an empty value; selections are not stored internally. */
   value?: React.SelectHTMLAttributes<HTMLSelectElement>['value'];
   [attribute: `data-${string}`]: string | number | boolean | undefined;
   label?: string;
   error?: string;
   options: readonly SelectOption[];
   placeholder?: string;
+  /**
+   * Called with the selected option's value on pointer or keyboard selection
+   * (even when reselecting the current value),
+   * including an empty string when selecting the placeholder. Update `value`
+   * in this callback to reflect the selection. No change event is emitted;
+   * migrate `onChange={event => setValue(event.target.value)}` to
+   * `onValueChange={setValue}`. Trigger interactions use real button events
+   * through `onClick` and `onKeyDown`.
+   */
   onValueChange?: (value: string) => void;
-  onChange?: React.ChangeEventHandler<HTMLSelectElement>;
 }
 
 export function Select({
@@ -83,7 +85,6 @@ export function Select({
   options,
   placeholder,
   onValueChange,
-  onChange,
   className = '',
   id,
   style,
@@ -204,13 +205,7 @@ export function Select({
   }, []);
 
   const commitValue = (nextValue: string) => {
-    if (onChange) {
-      onChange(createSelectChangeEvent(nextValue));
-    }
-
-    if (onValueChange) {
-      onValueChange(nextValue);
-    }
+    onValueChange?.(nextValue);
 
     closeMenu();
   };
