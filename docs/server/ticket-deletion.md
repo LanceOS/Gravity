@@ -41,7 +41,8 @@ retention purge after the recovery window, preserving ticket number counters.
 Restore must retain original IDs and keys, restore parent rows before children
 (or in one statement), and insert dependent rows only after tickets. It must
 validate project access and surviving relationship endpoints before
-reactivating the batch. Tests must include descendant comments/automation metadata,
+reactivating the batch. Client restore must clear the session deletion markers
+used to suppress late save callbacks for physically deleted IDs. Tests must include descendant comments/automation metadata,
 labels, hierarchy links, external relationships, and partial-failure rollback.
 
 ## Validation

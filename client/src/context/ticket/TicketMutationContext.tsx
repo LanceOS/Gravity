@@ -4,7 +4,7 @@ import { useActiveProject } from '../project/ActiveProjectContext';
 import { useTicketFilters } from '../filters/TicketFiltersContext';
 import { useActiveTicket } from './ActiveTicketContext';
 import { useMoveTicket } from '../utils/useMoveTicket';
-import { removeSseTicketSubtree } from '../realtime/sseEventUtils';
+import { isTicketDeletedInSession, removeSseTicketSubtree } from '../realtime/sseEventUtils';
 import { queryKeys } from '../../utils/queryClient';
 import { apiClient } from '../../utils/apiClient';
 import {
@@ -53,6 +53,7 @@ export const TicketMutationProvider: React.FC<{ children: React.ReactNode }> = (
   }, [activeTicket]);
 
   const applyConfirmedTicketUpdate = useCallback((updatedTicket: Ticket) => {
+    if (isTicketDeletedInSession(queryClient, updatedTicket.id)) return;
     queryClient.setQueryData<TicketWithRelations>(queryKeys.ticketDetail(updatedTicket.id), (existing) => (
       existing ? combineTicketDetails(existing, updatedTicket) : (updatedTicket as TicketWithRelations)
     ));
@@ -92,16 +93,21 @@ export const TicketMutationProvider: React.FC<{ children: React.ReactNode }> = (
     };
     const batchManager = new TicketUpdateBatchManager<Partial<Ticket>, Ticket | undefined, Ticket>({
       debounceMs: TICKET_UPDATE_DEBOUNCE_MS,
-      send: ({ id, updates, projectId }) => apiClient.patch<Ticket>(`/tickets/${id}`, updates, {
-        headers: { 'X-Project-Id': projectId },
-      }),
+      send: ({ id, updates, projectId }) => {
+        if (isTicketDeletedInSession(queryClient, id)) return Promise.reject(new Error('Ticket was deleted.'));
+        return apiClient.patch<Ticket>(`/tickets/${id}`, updates, {
+          headers: { 'X-Project-Id': projectId },
+        });
+      },
       getSnapshotAfterSuccess: (updatedTicket) => updatedTicket,
       onSuccess: (updatedTicket, batch, followUp) => {
+        if (isTicketDeletedInSession(queryClient, batch.id)) return;
         applyConfirmedTicketUpdate(updatedTicket);
         if (followUp) applyPendingUpdates(batch.id, followUp.updates);
         toast.show('Ticket saved.', 'success');
       },
       onError: (error, batch, followUp) => {
+        if (isTicketDeletedInSession(queryClient, batch.id)) return;
         console.error('Error updating ticket on server, rolling back:', error);
         toast.show('Unable to save ticket. Please try again.', 'error');
         if (batch.snapshot) applyConfirmedTicketUpdate(batch.snapshot);
@@ -167,6 +173,7 @@ export const TicketMutationProvider: React.FC<{ children: React.ReactNode }> = (
     updates: Partial<Ticket>,
     options?: TicketUpdateOptions
   ) => {
+    if (isTicketDeletedInSession(queryClient, id)) return false;
     const cachedTicket = findCachedTicketByKeyOrId(queryClient, undefined, id, activeProjectIdRef.current);
     const projectId = cachedTicket?.projectId || activeProjectIdRef.current;
     if (!projectId) {
@@ -215,12 +222,14 @@ export const TicketMutationProvider: React.FC<{ children: React.ReactNode }> = (
         updates,
         projectId,
       }).then((updatedTicket) => {
+        if (isTicketDeletedInSession(queryClient, id)) return false;
         applyConfirmedTicketUpdate(updatedTicket);
         toast.show('Ticket saved.', 'success');
         return true;
       }).catch((error) => {
+        if (isTicketDeletedInSession(queryClient, id)) return false;
         console.error('Error updating ticket on server, rolling back:', error);
-        queryClient.setQueryData<Ticket[]>(queryKeys.tickets(projectId), [...previousTickets]);
+        queryClient.setQueryData<Ticket[]>(queryKeys.tickets(projectId), previousTickets.filter(ticket => !isTicketDeletedInSession(queryClient, ticket.id)));
 
         if (wasActiveTicket && activeTicketRef.current?.id === id) {
           setActiveTicket(previousActiveTicket);
@@ -273,6 +282,7 @@ export const TicketMutationProvider: React.FC<{ children: React.ReactNode }> = (
     },
     onSuccess: (result) => {
       removeSseTicketSubtree(queryClient, result?.deletedTickets);
+      for (const ticket of result?.deletedTickets ?? []) batchManagerRef.current?.cancel(ticket.id);
       if (result?.deletedTickets?.some(ticket => ticket.id === activeTicketRef.current?.id)) {
         setActiveTicket(null);
       }
@@ -297,7 +307,7 @@ export const TicketMutationProvider: React.FC<{ children: React.ReactNode }> = (
     onError: (_err: unknown, _id: string, context: { previousTickets?: Ticket[] } | undefined) => {
       const projId = activeProjectIdRef.current;
       if (context?.previousTickets) {
-        queryClient.setQueryData(queryKeys.tickets(projId), [...context.previousTickets]);
+        queryClient.setQueryData(queryKeys.tickets(projId), context.previousTickets.filter(ticket => !isTicketDeletedInSession(queryClient, ticket.id)));
       }
     },
   });

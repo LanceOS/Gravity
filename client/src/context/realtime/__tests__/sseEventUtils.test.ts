@@ -2,7 +2,7 @@ import { QueryClient } from '@tanstack/react-query';
 import { describe, expect, it, vi } from 'vitest';
 import { queryKeys } from '../../../utils/queryClient';
 import type { Ticket } from '../../../types/domain';
-import { removeSseTicketEntries, removeSseTicketSubtree } from '../sseEventUtils';
+import { removeSseTicketEntries, removeSseTicketSubtree, upsertTicketFromSse, upsertSseComment } from '../sseEventUtils';
 
 function makeTicket(overrides: Partial<Ticket>): Ticket {
   return {
@@ -59,6 +59,18 @@ describe('sseEventUtils', () => {
     expect(client.getQueryData(queryKeys.ticketDetail(survivor.id))).toEqual(survivor);
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ['tickets'] });
     expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.ticketDetails() });
+  });
+
+  it('ignores late ticket and comment updates after committed deletion', () => {
+    const client = createQueryClient();
+    const ticket = makeTicket({});
+    client.setQueryData(queryKeys.tickets(ticket.projectId), [ticket]);
+    removeSseTicketSubtree(client, [ticket]);
+    upsertTicketFromSse(client, { ...ticket, title: 'Stale response' });
+    upsertSseComment(client, { id: 'late', ticketId: ticket.id, userId: 'actor', body: 'Stale', createdAt: ticket.createdAt });
+    expect(client.getQueryData(queryKeys.tickets(ticket.projectId))).toEqual([]);
+    expect(client.getQueryData(queryKeys.ticketDetail(ticket.id))).toBeUndefined();
+    expect(client.getQueryData(queryKeys.comments(ticket.id))).toBeUndefined();
   });
 
   it('removes user-scoped ticket caches from exact key queries', () => {
