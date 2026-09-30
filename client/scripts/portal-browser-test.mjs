@@ -1,12 +1,18 @@
+import { ensureLockedBrowserDependencies } from './locked-browser-dependencies.mjs';
+const dependencyProvenance = await ensureLockedBrowserDependencies(import.meta.url);
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { extname, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { chromium } from 'playwright';
-const { build } = await import(process.env.GRAVITY_PORTAL_VITE_MODULE || 'vite');
+const { chromium } = await import('playwright');
+const { build } = await import(process.env.GRAVITY_PORTAL_VITE_VERSION === 'vitest' ? '../node_modules/vitest/node_modules/vite/dist/node/index.js' : 'vite');
 
+const knownScenarios = ['modal', 'drawer', 'popover', 'tooltip', 'select', 'contextmenu', 'toast'];
+const selectedScenarios = process.env.GRAVITY_PORTAL_SCENARIOS?.split(',') ?? knownScenarios;
+assert(selectedScenarios.length > 0 && selectedScenarios.every((name) => knownScenarios.includes(name)),
+  'GRAVITY_PORTAL_SCENARIOS must contain known, comma-separated portal scenarios');
 const outDir = await mkdtemp(resolve(tmpdir(), 'gravity-portal-'));
 const artifacts = process.env.GRAVITY_PORTAL_TEST_ARTIFACTS;
 const reportOnly = process.env.GRAVITY_PORTAL_REPORT_ONLY === '1';
@@ -34,8 +40,7 @@ try {
   browser = await chromium.launch({ headless: true, executablePath: process.env.GRAVITY_PORTAL_BROWSER });
   if (artifacts) await mkdir(artifacts, { recursive: true });
   for (const motion of ['no-preference', 'reduce']) {
-    const cases = ['modal', 'drawer', 'popover', 'tooltip', 'select', 'contextmenu', 'toast'].filter((scenario) =>
-      !process.env.GRAVITY_PORTAL_SCENARIOS || process.env.GRAVITY_PORTAL_SCENARIOS.split(',').includes(scenario)).flatMap((scenario) =>
+    const cases = [...new Set(selectedScenarios)].flatMap((scenario) =>
       (['modal', 'drawer', 'popover'].includes(scenario) ? [false, true] : [false]).flatMap((initial) =>
         (scenario === 'popover' ? ['left', 'right', 'center', 'custom', 'mobile'] : ['right']).map((align) => ({ scenario, initial, align }))));
     for (const { scenario, initial, align } of cases) {
@@ -172,13 +177,13 @@ try {
       }
       check(errors.length === 0, `${name}: browser errors ${errors.join(', ')}`);
       console.info(`CHECKED ${name}`);
-      if (artifacts) await writeFile(resolve(artifacts, 'results.json'), JSON.stringify({ results, failures }, null, 2));
+      if (artifacts) await writeFile(resolve(artifacts, 'results.json'), JSON.stringify({ dependencyProvenance, browserVersion: browser.version(), results, failures }, null, 2));
       await page.close();
     }
   }
   console.info(`${results.length} browser scenarios; ${failures.length} failures`);
   failures.forEach((failure) => console.error(failure));
-  if (artifacts) await writeFile(resolve(artifacts, 'results.json'), JSON.stringify({ results, failures }, null, 2));
+  if (artifacts) await writeFile(resolve(artifacts, 'results.json'), JSON.stringify({ dependencyProvenance, browserVersion: browser.version(), results, failures }, null, 2));
   if (!reportOnly) assert.deepEqual(failures, [], 'Portal consumer acceptance');
 } finally {
   await browser?.close();

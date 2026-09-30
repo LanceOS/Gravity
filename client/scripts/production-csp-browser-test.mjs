@@ -1,5 +1,7 @@
+import { ensureLockedBrowserDependencies } from './locked-browser-dependencies.mjs';
+await ensureLockedBrowserDependencies(import.meta.url);
 import assert from 'node:assert/strict';
-import { chromium } from 'playwright';
+const { chromium } = await import('playwright');
 
 const targetUrl = process.env.GRAVITY_CSP_TEST_URL;
 

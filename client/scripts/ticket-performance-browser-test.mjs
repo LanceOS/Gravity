@@ -1,3 +1,5 @@
+import { ensureLockedBrowserDependencies } from './locked-browser-dependencies.mjs';
+await ensureLockedBrowserDependencies(import.meta.url);
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
@@ -5,8 +7,8 @@ import { tmpdir } from 'node:os';
 import { extname, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
-import { build } from 'esbuild';
-import { chromium } from 'playwright';
+const { build } = await import('esbuild');
+const { chromium } = await import('playwright');
 
 const require = createRequire(import.meta.url);
 const root = fileURLToPath(new URL('../..', import.meta.url));

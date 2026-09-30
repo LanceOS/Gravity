@@ -1,5 +1,9 @@
 # Portal lifecycle acceptance — GRAV-99
 
+> GRAV-255: browser commands now install genuine locked dependencies in a fresh
+> disposable source copy. See [locked dependency validation](LOCKED_BROWSER_DEPENDENCIES.md).
+> Earlier local validation results below predate dependency provenance checks.
+
 Runtime validation on 2026-09-24, starting from main `3fa9012f` (updated from the backlog audit's `83d275a3`).
 
 ## Decision
@@ -29,7 +33,7 @@ This machine's Vite 8 native build crashed with an illegal instruction under Nod
 
 ```sh
 GRAVITY_PORTAL_BROWSER=/opt/brave.com/brave/brave \
-GRAVITY_PORTAL_VITE_MODULE=../node_modules/vitest/node_modules/vite/dist/node/index.js \
+GRAVITY_PORTAL_VITE_VERSION=vitest \
 GRAVITY_PORTAL_TEST_ARTIFACTS=/tmp/grav-99-final \
 npm run -w client test:portal-browser
 ```

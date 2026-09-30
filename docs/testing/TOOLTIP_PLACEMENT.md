@@ -1,5 +1,9 @@
 # Tooltip placement — GRAV-95
 
+> GRAV-255: browser commands now install genuine locked dependencies in a fresh
+> disposable source copy. See [locked dependency validation](LOCKED_BROWSER_DEPENDENCIES.md).
+> Earlier local validation results below predate dependency provenance checks.
+
 Verified against `origin/main` at `ac56708a`. Tooltip still used an unmeasured absolute element inside a body portal. The portal browser fixture manually supplied fixed coordinates, masking the defect.
 
 Tooltip now measures its trigger and mounted portal before paint. It uses fixed viewport coordinates, centers below the trigger with a 6px gap, flips above when there is insufficient room below, and clamps horizontally with 8px viewport padding using the existing dropdown positioning helper. Intrinsic width is limited to the viewport and long words wrap. Layout dimensions exclude the animation transform so entrance/exit motion does not affect placement.
@@ -19,7 +23,7 @@ Non-Docker commands from the repository root (using installed dependencies):
 /usr/bin/node-22 client/node_modules/vitest/vitest.mjs run --root client src/test/library/tooltip-placement.test.tsx src/test/library/feedback.test.tsx src/test/library/overlay-lifecycle.test.tsx
 /usr/bin/node-22 node_modules/typescript/bin/tsc -b client --pretty false
 GRAVITY_PORTAL_BROWSER=/opt/brave.com/brave/brave \
-GRAVITY_PORTAL_VITE_MODULE=../node_modules/vitest/node_modules/vite/dist/node/index.js \
+GRAVITY_PORTAL_VITE_VERSION=vitest \
 GRAVITY_PORTAL_SCENARIOS=tooltip \
 /usr/bin/node-22 client/scripts/portal-browser-test.mjs
 ```
