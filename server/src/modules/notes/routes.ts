@@ -4,7 +4,8 @@ import { Router } from 'express';
 import { getProjectIdFromRequest } from '../../lib/platform.js';
 import { authorizeProjectAccess } from '../workspaces/services/membership.js';
 import { createNote, deleteNote, getNote, listNotes, updateNote, searchNotes, cleanupNoteMedia } from './services/notes.js';
-import { MetadataRepository, NotesRepository } from './repositories.js';
+import { isNoteBodyFile, MetadataRepository, NotesRepository } from './repositories.js';
+import { deleteNoteMedia, MediaReferenceUnavailableError, NoteMediaInUseError } from './services/media-deletion.js';
 import { resolveRequestActorUserId } from '../auth/utils/request-auth.js';
 
 export function createNotesRouter() {
@@ -32,6 +33,10 @@ export function createNotesRouter() {
       const created = await createNote(projectId, auth.userId, req.body.title, req.body.body);
       res.status(201).json(created);
     } catch (error) {
+      if (error instanceof MediaReferenceUnavailableError) {
+        res.status(409).json({ error: error.message });
+        return;
+      }
       logNoteFailure(res, error, req.route.path);
       res.status(500).json({ error: 'Failed to create note.' });
     }
@@ -142,7 +147,9 @@ export function createNotesRouter() {
 
       res.json(updated);
     } catch (error: any) {
-      if (error.message === 'NOT_FOUND') {
+      if (error instanceof MediaReferenceUnavailableError) {
+        res.status(409).json({ error: error.message });
+      } else if (error.message === 'NOT_FOUND') {
         res.status(404).json({ error: 'Note not found.' });
       } else if (error.message === 'CONFLICT') {
         res.status(409).json({ error: 'Version conflict. Note has been modified by another process.' });
@@ -177,8 +184,12 @@ export function createNotesRouter() {
 
       res.json({ success: true });
     } catch (error) {
-      logNoteFailure(res, error, req.route.path);
-      res.status(500).json({ error: 'Failed to delete note.' });
+      if (error instanceof NoteMediaInUseError) {
+        res.status(409).json({ error: error.message });
+      } else {
+        logNoteFailure(res, error, req.route.path);
+        res.status(500).json({ error: 'Note deletion could not be confirmed; see server diagnostics.' });
+      }
     }
   });
 
@@ -360,27 +371,19 @@ export function createNotesRouter() {
         return;
       }
 
-      const noteMeta = await MetadataRepository.getNoteMetadata(noteId);
-      if (!noteMeta || noteMeta.projectId !== projectId) {
+      if (isNoteBodyFile(filename)) {
+        res.status(400).json({ error: 'Filename is reserved for note bodies' });
+        return;
+      }
+      const result = await deleteNoteMedia(noteId, projectId, filename);
+      if (!result) {
         res.status(404).json({ error: 'Note not found.' });
         return;
       }
-
-      // Attempt to detect if file existed before deletion
-      let existed = true;
-      try {
-        await NotesRepository.getAttachment(noteMeta.bucketPath, filename);
-      } catch (err: any) {
-        if (err.code === 'ENOENT') existed = false;
-        else throw err;
-      }
-
-      await NotesRepository.deleteFile(noteMeta.bucketPath, filename);
-
-      res.json({ deleted: existed, remainingReferences: [] });
+      res.json(result);
     } catch (error) {
       logNoteFailure(res, error, req.route.path);
-      res.status(500).json({ error: 'Failed to delete media.' });
+      res.status(500).json({ error: 'Media deletion could not be confirmed; see server diagnostics.' });
     }
   });
 

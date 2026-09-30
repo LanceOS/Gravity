@@ -68,12 +68,14 @@ export function parseMediaReferences(body: string): Map<string, Set<string>> {
   return references;
 }
 
-export async function buildMediaReferenceIndex(deps: MediaCleanupDependencies) {
+export async function buildMediaReferenceIndex(deps: Pick<MediaCleanupDependencies, 'listNotes' | 'getBody'>) {
   const notes = await deps.listNotes();
   const referenced = new Map<string, Set<string>>();
+  const bySource = new Map<string, Map<string, Set<string>>>();
   for (const note of notes) {
     try {
       const refs = parseMediaReferences(await deps.getBody(note.bucketPath, note.bodyKey ?? 'body.md'));
+      bySource.set(note.id, refs);
       for (const [id, files] of refs) {
         if (!referenced.has(id)) referenced.set(id, new Set());
         for (const file of files) referenced.get(id)!.add(file);
@@ -82,7 +84,7 @@ export async function buildMediaReferenceIndex(deps: MediaCleanupDependencies) {
       throw new Error(`Media cleanup blocked: cannot read or parse body for note ${note.id} (${note.bucketPath})`, { cause });
     }
   }
-  return { notes, referenced };
+  return { notes, referenced, bySource };
 }
 
 export async function cleanupMedia(deps: MediaCleanupDependencies, options: CleanupOptions = {}, target?: CleanupNote) {

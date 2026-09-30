@@ -3,6 +3,7 @@ import { db } from '../../db/index.js';
 import { noteBodyRevisions, noteMetadata } from './schema.js';
 import { RustFS } from '../../lib/rustfs.js';
 import { env } from '../../env.js';
+import { withNoteReferenceLock, type NoteTransaction } from './reference-lock.js';
 
 export type NoteMetadata = typeof noteMetadata.$inferSelect;
 
@@ -13,8 +14,8 @@ function buildSearchVector(title: string, excerpt: string) {
 }
 
 export class MetadataRepository {
-  static async listNotesForMediaCleanup() {
-    return db.select().from(noteMetadata);
+  static async listNotesForMediaCleanup(executor: typeof db | NoteTransaction = db) {
+    return executor.select().from(noteMetadata);
   }
 
   /**
@@ -28,7 +29,7 @@ export class MetadataRepository {
     excerpt?: string;
     bucketPath: string;
     bodyKey?: string;
-  }): Promise<NoteMetadata> {
+  }, validateReferences?: (tx: NoteTransaction) => Promise<void>): Promise<NoteMetadata> {
     const excerpt = data.excerpt || '';
     const useSearchVector = typeof env.databaseUrl === 'string' && !env.databaseUrl.startsWith('pgmem://');
 
@@ -49,6 +50,7 @@ export class MetadataRepository {
     }
 
     return commitRevision(data.bodyKey, data.bucketPath, async (tx) => {
+      await validateReferences?.(tx);
       const [record] = await tx.insert(noteMetadata).values(insertValues).returning();
       return record;
     });
@@ -57,8 +59,8 @@ export class MetadataRepository {
   /**
    * Retrieves a note metadata record by ID.
    */
-  static async getNoteMetadata(id: string): Promise<NoteMetadata | null> {
-    const [record] = await db.select().from(noteMetadata).where(eq(noteMetadata.id, id)).limit(1);
+  static async getNoteMetadata(id: string, executor: typeof db | NoteTransaction = db): Promise<NoteMetadata | null> {
+    const [record] = await executor.select().from(noteMetadata).where(eq(noteMetadata.id, id)).limit(1);
     return record || null;
   }
 
@@ -158,7 +160,8 @@ export class MetadataRepository {
   static async updateNoteMetadata(
     id: string,
     currentVersion: number,
-    updates: Partial<{ title: string; excerpt: string; bodyKey: string }>
+    updates: Partial<{ title: string; excerpt: string; bodyKey: string }>,
+    validateReferences?: (tx: NoteTransaction) => Promise<void>
   ): Promise<NoteMetadata> {
     const existing = await this.getNoteMetadata(id);
     if (!existing) throw new Error('Note not found');
@@ -167,6 +170,7 @@ export class MetadataRepository {
     const newExcerpt = updates.excerpt ?? existing.excerpt;
 
     return commitRevision(updates.bodyKey, existing.bucketPath, async (tx) => {
+      await validateReferences?.(tx);
       const [record] = await tx
         .update(noteMetadata)
         .set({
@@ -196,8 +200,8 @@ export class MetadataRepository {
   /**
    * Deletes a note metadata record.
    */
-  static async deleteNoteMetadata(id: string): Promise<void> {
-    await db.delete(noteMetadata).where(eq(noteMetadata.id, id));
+  static async deleteNoteMetadata(id: string, executor: typeof db | NoteTransaction = db): Promise<void> {
+    await executor.delete(noteMetadata).where(eq(noteMetadata.id, id));
   }
 }
 
@@ -277,7 +281,7 @@ export function isNoteBodyFile(filename: string): boolean {
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 async function commitRevision<T>(bodyKey: string | undefined, bucketPath: string, persist: (tx: Transaction) => Promise<T>): Promise<T> {
-  return db.transaction(async (tx) => {
+  return withNoteReferenceLock(async (tx) => {
     if (bodyKey) {
       // Recovery uses a conditional UPDATE of this same row. Holding its lock
       // until the pointer commits makes publication and abandonment exclusive.
