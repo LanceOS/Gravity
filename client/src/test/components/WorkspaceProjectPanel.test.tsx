@@ -467,3 +467,29 @@ describe('WorkspaceProjectPanel', () => {
     });
   });
 });
+
+it('allows restoring a previously saved repository after a newer server update', async () => {
+  const { props, rerender } = renderWorkspaceProjectPanel();
+  const savedUrl = 'https://github.com/org/saved';
+  fireEvent.change(screen.getByLabelText('GitHub Repository URL'), { target: { value: savedUrl } });
+  fireEvent.submit(screen.getByRole('button', { name: 'Save Settings' }).closest('form')!);
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Save Settings' })).toBeDisabled());
+  rerender(<WorkspaceProjectPanel {...props} projects={projects.map(project => project.id === 'project-1' ? { ...project, githubRepoUrl: savedUrl } : project)} />);
+  rerender(<WorkspaceProjectPanel {...props} projects={projects.map(project => project.id === 'project-1' ? { ...project, githubRepoUrl: 'https://github.com/org/newer' } : project)} />);
+  fireEvent.change(screen.getByLabelText('GitHub Repository URL'), { target: { value: savedUrl } });
+  expect(screen.getByRole('button', { name: 'Save Settings' })).toBeEnabled();
+});
+
+it('allows restoring a previously saved label after a newer server update', async () => {
+  const user = userEvent.setup();
+  const label = { id: 'restore-label', projectId: 'project-1', name: 'Original', color: '#f97316', description: '', sortOrder: 0 };
+  const { props, rerender } = renderWorkspaceProjectPanel({ labels: [label] });
+  await user.click(screen.getByRole('button', { name: 'Original' }));
+  fireEvent.change(screen.getAllByLabelText('Label Name')[0], { target: { value: 'Saved' } });
+  await user.click(screen.getByRole('button', { name: 'Save Label' }));
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Save Label' })).toBeDisabled());
+  rerender(<WorkspaceProjectPanel {...props} labels={[{ ...label, name: 'Saved' }]} />);
+  rerender(<WorkspaceProjectPanel {...props} labels={[{ ...label, name: 'Newer' }]} />);
+  fireEvent.change(screen.getAllByLabelText('Label Name')[0], { target: { value: 'Saved' } });
+  expect(screen.getByRole('button', { name: 'Save Label' })).toBeEnabled();
+});

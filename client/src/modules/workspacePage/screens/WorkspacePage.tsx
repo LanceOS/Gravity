@@ -1,5 +1,5 @@
-import { useMemo, useCallback, useState } from 'react';
-import { Button, Timeline, createEmptyRichTextValue, ContextMenu } from '@library';
+import { useMemo, useCallback, useState, useRef } from 'react';
+import { toast, Button, Timeline, createEmptyRichTextValue, ContextMenu } from '@library';
 import type { Cycle, Label, Project, Ticket, User } from '../../../context/TicketContextContext';
 import {
   filterTickets,
@@ -59,7 +59,7 @@ interface WorkspacePageProps {
   onSetFilters: (filters: Partial<TicketFilters>) => void;
   onSetListSort: (sort: TicketListSort) => void;
   onSetView: (view: 'board' | 'list') => void;
-  onUpdateTicket: (id: string, updates: Partial<Ticket>, options?: { immediate?: boolean }) => Promise<void>;
+  onUpdateTicket: (id: string, updates: Partial<Ticket>, options?: { immediate?: boolean }) => Promise<boolean | void>;
   onLoadMoreTickets?: () => void;
   hasMoreTickets?: boolean;
   isLoadingMoreTickets?: boolean;
@@ -241,8 +241,12 @@ export function WorkspacePage({
     });
   }, [filters, onSetFilters]);
 
+  const creatingNoteRef = useRef(false);
+  const [creatingNote, setCreatingNote] = useState(false);
   const handleCreateNote = useCallback(async () => {
-    if (!filters.projectId) return;
+    if (!filters.projectId || creatingNoteRef.current) return;
+    creatingNoteRef.current = true;
+    setCreatingNote(true);
     try {
       const note = await apiClient.post<{ id: string }>(
         '/notes',
@@ -253,11 +257,17 @@ export function WorkspacePage({
         { projectId: filters.projectId }
       );
 
+      if (!note?.id) throw new Error('The server did not return the new note.');
+      toast.show('Note created.', 'success');
       if (note?.id) {
         onSelectNote?.(note.id);
       }
     } catch (err) {
+      toast.show('Unable to create note. Please try again.', 'error');
       console.error('Failed to create note', err);
+    } finally {
+      creatingNoteRef.current = false;
+      setCreatingNote(false);
     }
   }, [filters.projectId, onSelectNote]);
 
@@ -321,7 +331,7 @@ export function WorkspacePage({
           Back to Notes
         </Button>
       ) : (
-        <Button type="button" variant="primary" onClick={handleCreateNote}>
+        <Button type="button" variant="primary" onClick={handleCreateNote} loading={creatingNote}>
           Create New Note
         </Button>
       )}
@@ -369,6 +379,7 @@ export function WorkspacePage({
                   notesSort={notesSort}
                   onOpenCreateTicket={onOpenCreateTicket}
                   onCreateNote={handleCreateNote}
+                  creatingNote={creatingNote}
                   onSetFilters={onSetFilters}
                   setNotesSort={setNotesSort}
                 />
@@ -454,7 +465,7 @@ export function WorkspacePage({
                               ticketsByColumn={groupedTickets}
                               availableTickets={filteredTickets}
                               userAvatarById={userAvatarById}
-                              onMoveTicket={(ticketId, updates) => onUpdateTicket(ticketId, updates, { immediate: true })}
+                              onMoveTicket={async (ticketId, updates) => { await onUpdateTicket(ticketId, updates, { immediate: true }); }}
                               onSelectTicket={onSelectTicket}
                               onOpenCreateTicket={onOpenCreateTicket}
                               onLoadMore={onLoadMoreTickets}

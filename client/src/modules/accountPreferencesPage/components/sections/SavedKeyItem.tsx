@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Button } from '@library';
 import { Trash2 } from 'lucide-react';
 
@@ -13,6 +14,7 @@ export function SavedKeyItem({
   isActive: boolean;
   onRemove: () => void;
 }) {
+  const [pending, setPending] = useState(false);
   const option = getProviderOption(credential.provider);
 
   return (
@@ -33,7 +35,12 @@ export function SavedKeyItem({
         <Button
           variant="danger"
           size="sm"
-          onClick={onRemove}
+          loading={pending}
+          onClick={async () => {
+            if (pending) return;
+            setPending(true);
+            try { await onRemove(); } finally { setPending(false); }
+          }}
           aria-label={`Remove ${option.label} key`}
           title={`Remove ${option.label} key`}
         >

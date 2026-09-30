@@ -1,4 +1,4 @@
-import { createContext, type FormEvent, type JSX, useCallback, useContext, useMemo, type PropsWithChildren, useState } from 'react';
+import { createContext, type FormEvent, type JSX, useCallback, useEffect, useContext, useMemo, type PropsWithChildren, useRef, useState } from 'react';
 
 import { ConfirmDialog } from '../../../components/ConfirmDialog';
 import type { Label } from '../../../context/TicketContextContext';
@@ -28,6 +28,8 @@ type WorkspaceProjectPanelActionOptions = WorkspaceProjectPanelActionCallbacks &
 };
 
 export interface WorkspaceProjectPanelActionsContextValue {
+  projectSettingsUnchanged: boolean;
+  labelUnchanged: boolean;
   isCreateProjectModalOpen: boolean;
   openCreateProjectModal: () => void;
   closeCreateProjectModal: () => void;
@@ -98,6 +100,15 @@ export function WorkspaceProjectPanelActionsContextProvider({
     clearLabelEditor,
   } = useWorkspaceProjectPanelLabelStateContext();
 
+  const pendingActions = useRef(new Set<string>());
+  const [savedProjectInput, setSavedProjectInput] = useState<string | null>(null);
+  const [savedLabelInput, setSavedLabelInput] = useState<string | null>(null);
+  useEffect(() => { setSavedProjectInput(null); }, [managedProject?.id, managedProject?.githubRepoUrl]);
+  useEffect(() => { setSavedLabelInput(null); }, [activeLabel?.id, activeLabel?.name, activeLabel?.color, activeLabel?.description]);
+  const projectInput = JSON.stringify([managedProject?.id, githubRepoUrl.trim()]);
+  const labelInput = JSON.stringify([editingLabelId, editingLabelName.trim(), editingLabelColor, editingLabelDescription.trim()]);
+  const projectSettingsUnchanged = savedProjectInput === projectInput || githubRepoUrl.trim() === (managedProject?.githubRepoUrl || '');
+  const labelUnchanged = savedLabelInput === labelInput || (activeLabel?.name === editingLabelName.trim() && activeLabel.color === editingLabelColor && (activeLabel.description || '') === editingLabelDescription.trim());
   const [labelToDelete, setLabelToDelete] = useState<Label | null>(null);
   const [isDeletingProject, setIsDeletingProject] = useState(false);
   const canDeleteProject = !!onDeleteProject;
@@ -134,6 +145,7 @@ export function WorkspaceProjectPanelActionsContextProvider({
   const createLabel = useCallback(
     async (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
+      if (pendingActions.current.has('createLabel')) return;
       setLabelFormError(null);
 
       const { value, error } = buildValidatedLabelPayload({
@@ -147,6 +159,7 @@ export function WorkspaceProjectPanelActionsContextProvider({
         return;
       }
 
+      pendingActions.current.add('createLabel');
       try {
         await onCreateLabel({
           projectId: managedProject.id,
@@ -161,6 +174,8 @@ export function WorkspaceProjectPanelActionsContextProvider({
         setLabelDescription('');
       } catch (error) {
         setLabelFormError(error instanceof Error ? error.message : 'Failed to create label.');
+      } finally {
+        pendingActions.current.delete('createLabel');
       }
     },
     [
@@ -204,6 +219,8 @@ export function WorkspaceProjectPanelActionsContextProvider({
         return;
       }
 
+      if (pendingActions.current.has('updateLabel') || labelUnchanged) return;
+      pendingActions.current.add('updateLabel');
       setEditingLabelLoading(true);
       setEditingLabelError(null);
 
@@ -213,13 +230,17 @@ export function WorkspaceProjectPanelActionsContextProvider({
           color: value.color,
           description: value.description,
         });
+        setSavedLabelInput(labelInput);
       } catch (error) {
         setEditingLabelError(error instanceof Error ? error.message : 'Failed to update label.');
       } finally {
+        pendingActions.current.delete('updateLabel');
         setEditingLabelLoading(false);
       }
     },
     [
+      labelInput,
+      labelUnchanged,
       editingLabelColor,
       editingLabelDescription,
       editingLabelId,
@@ -268,7 +289,7 @@ export function WorkspaceProjectPanelActionsContextProvider({
   const saveProjectSettings = useCallback(
     async (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
-      if (!managedProject) {
+      if (!managedProject || pendingActions.current.has('project') || projectSettingsUnchanged) {
         return;
       }
 
@@ -278,6 +299,7 @@ export function WorkspaceProjectPanelActionsContextProvider({
         return;
       }
 
+      pendingActions.current.add('project');
       setIsProjectSettingsSaving(true);
       setSettingsFeedback(null);
 
@@ -285,16 +307,18 @@ export function WorkspaceProjectPanelActionsContextProvider({
         await onUpdateProject(managedProject.id, {
           githubRepoUrl: url || null,
         });
+        setSavedProjectInput(projectInput);
         setSettingsFeedback(createProjectSettingsFeedback('success', 'Project settings updated successfully.'));
       } catch (error) {
         setSettingsFeedback(
           createProjectSettingsFeedback('error', error instanceof Error ? error.message : 'Failed to update project settings.')
         );
       } finally {
+        pendingActions.current.delete('project');
         setIsProjectSettingsSaving(false);
       }
     },
-    [githubRepoUrl, managedProject, onUpdateProject, setIsProjectSettingsSaving, setSettingsFeedback]
+    [projectInput, projectSettingsUnchanged, githubRepoUrl, managedProject, onUpdateProject, setIsProjectSettingsSaving, setSettingsFeedback]
   );
 
   const deleteProject = useCallback(async () => {
@@ -320,6 +344,8 @@ export function WorkspaceProjectPanelActionsContextProvider({
 
   const contextValue = useMemo(
     () => ({
+      projectSettingsUnchanged,
+      labelUnchanged,
       isCreateProjectModalOpen: isCreateModalOpen,
       openCreateProjectModal,
       closeCreateProjectModal,
@@ -335,6 +361,8 @@ export function WorkspaceProjectPanelActionsContextProvider({
       canDeleteProject,
     }),
     [
+      projectSettingsUnchanged,
+      labelUnchanged,
       closeCreateProjectModal,
       createLabel,
       createProject,

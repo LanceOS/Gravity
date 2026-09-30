@@ -1,3 +1,4 @@
+import { toast } from '@library';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { User } from '../context/TicketContextContext';
 import {
@@ -98,6 +99,9 @@ export function useAccountSettings({
   const [settingsHydrated, setSettingsHydrated] = useState(false);
   const [savedCredentials, setSavedCredentials] = useState<SavedApiCredential[]>([]);
   const [apiKeyState, setApiKeyState] = useState<'stored' | 'cleared' | 'pending'>('cleared');
+  const savingRef = useRef(false);
+  const draftRevision = useRef(0);
+  const credentialRevision = useRef(0);
   const loadRequestId = useRef(0);
   const saveRequestId = useRef(0);
 
@@ -205,10 +209,13 @@ export function useAccountSettings({
   }, [currentUserId, setTheme, setView]);
 
   const updateSettings = useCallback((updates: Partial<WorkspaceSettings>) => {
+    draftRevision.current++;
     const nextUpdates = { ...updates };
     if (typeof nextUpdates.apiKey === 'string') {
       nextUpdates.apiKey = normalizeApiKeyInput(nextUpdates.apiKey);
     }
+
+    if (nextUpdates.aiProvider !== undefined || nextUpdates.apiKey !== undefined) credentialRevision.current++;
 
     const providerChanged = typeof nextUpdates.aiProvider === 'string';
     if (providerChanged) {
@@ -241,6 +248,10 @@ export function useAccountSettings({
       return;
     }
 
+    if (savingRef.current) return;
+    savingRef.current = true;
+    const submittedRevision = draftRevision.current;
+    const submittedCredentialRevision = credentialRevision.current;
     const currentSaveRequestId = ++saveRequestId.current;
     setSaveLoading(true);
     setSaveSuccess(false);
@@ -273,21 +284,30 @@ export function useAccountSettings({
         activeView,
         requestedTheme
       );
-      setSettings(normalized);
+      if (draftRevision.current === submittedRevision) {
+        setSettings(normalized);
+      } else if (credentialRevision.current === submittedCredentialRevision) {
+        setSettings(current => ({ ...current, apiKey: normalized.apiKey }));
+      }
+      if (credentialRevision.current === submittedCredentialRevision) {
+        setApiKeyState(normalized.apiKey === API_KEY_MASK ? 'stored' : 'cleared');
+      }
       setOriginalSettings(normalized);
       setSavedCredentials(normalizeSavedCredentials(data.savedCredentials));
       setTheme(normalized.theme);
       setView(normalized.defaultView);
       setStoredWorkspaceDefaultView(normalized.defaultView);
-      setApiKeyState(normalized.apiKey === API_KEY_MASK ? 'stored' : 'cleared');
       setTestResult(null);
-      setSaveSuccess(true);
+      setSaveSuccess(draftRevision.current === submittedRevision);
+      toast.show('Account settings saved.', 'success');
     } catch (error) {
       if (currentSaveRequestId === saveRequestId.current) {
         const message = error instanceof Error ? error.message : 'Failed to save account settings.';
         setSaveError(message);
+        toast.show(`${message} Please try saving again.`, 'error');
       }
     } finally {
+      savingRef.current = false;
       if (currentSaveRequestId === saveRequestId.current) {
         setSaveLoading(false);
       }
@@ -299,6 +319,8 @@ export function useAccountSettings({
       return;
     }
 
+    if (savingRef.current) return;
+    savingRef.current = true;
     setSaveLoading(true);
     setSaveError(null);
 
@@ -310,6 +332,8 @@ export function useAccountSettings({
 
       setSavedCredentials(normalizeSavedCredentials(data.savedCredentials));
 
+      toast.show('API key removed.', 'success');
+      setOriginalSettings(current => current?.aiProvider === provider ? { ...current, apiKey: '' } : current);
       // If the removed provider is the active one, reset the key field
       setSettings((current) => {
         if (current.aiProvider !== provider) {
@@ -326,12 +350,16 @@ export function useAccountSettings({
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to remove credential.';
       setSaveError(message);
+      toast.show(`${message} Please try again.`, 'error');
     } finally {
+      savingRef.current = false;
       setSaveLoading(false);
     }
   }, [currentUser, settings.aiProvider]);
 
   const resetProviderDraft = useCallback(() => {
+    draftRevision.current++;
+    credentialRevision.current++;
     const selectedCredential = savedCredentialByProvider.get(settings.aiProvider);
 
     setSettings((current) => ({
@@ -382,12 +410,14 @@ export function useAccountSettings({
     try {
       await patchTutorialCompleted(currentUser.id, false);
 
+      toast.show('Tutorial reset. It will appear next time you reload or sign in.', 'success');
       setTutorialResult({
         success: true,
         message: 'Tutorial reset. It will appear again the next time you reload or sign in.',
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to reset tutorial.';
+      toast.show(`${message} Please try again.`, 'error');
       setTutorialResult({ success: false, message });
     }
   }, [currentUser]);

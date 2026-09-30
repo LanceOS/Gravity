@@ -114,6 +114,7 @@ export function useProjectContextValue({
       });
     },
     onSuccess: (project) => {
+      toast.show('Project created.', 'success');
       if (currentUser) {
         queryClient.setQueryData<Project[]>(queryKeys.projects(currentUser.id), (old) => {
           return old ? [...old, project] : [project];
@@ -129,6 +130,7 @@ export function useProjectContextValue({
     try {
       return await createProjectMutation.mutateAsync(projectInput);
     } catch (error) {
+      toast.show(`${error instanceof Error ? error.message : 'Project operation failed.'} Please try again.`, 'error');
       console.error(error);
       throw error;
     }
@@ -157,6 +159,7 @@ export function useProjectContextValue({
       }
     },
     onSuccess: (project, { id }, context) => {
+      toast.show('Project settings saved.', 'success');
       if (project) {
         const previousWorkspaceId = context?.previousProjects?.find((previousProject) => previousProject.id === id)?.workspaceId;
         invalidateWorkspaceSidebarQueries(project.id, [previousWorkspaceId, project.workspaceId]);
@@ -173,6 +176,7 @@ export function useProjectContextValue({
     try {
       return await updateProjectMutation.mutateAsync({ id, updates });
     } catch (error) {
+      toast.show(`${error instanceof Error ? error.message : 'Project operation failed.'} Please try again.`, 'error');
       console.error(error);
       throw error;
     }
@@ -205,6 +209,7 @@ export function useProjectContextValue({
       }
     },
     onSuccess: (_data, id, context) => {
+      toast.show('Project deleted.', 'success');
       const previousWorkspaceId = context?.previousProjects?.find((previousProject) => previousProject.id === id)?.workspaceId;
       invalidateWorkspaceSidebarQueries(id, [previousWorkspaceId]);
     },
@@ -219,6 +224,7 @@ export function useProjectContextValue({
     try {
       await deleteProjectMutation.mutateAsync(id);
     } catch (error) {
+      toast.show(`${error instanceof Error ? error.message : 'Project operation failed.'} Please try again.`, 'error');
       console.error(error);
       throw error;
     }
@@ -231,6 +237,7 @@ export function useProjectContextValue({
       return data.project;
     },
     onSuccess: (project) => {
+      toast.show('Project joined.', 'success');
       if (currentUser) {
         queryClient.invalidateQueries({ queryKey: queryKeys.projects(currentUser.id) });
         invalidateWorkspaceSidebarQueries(project.id, [project.workspaceId]);
@@ -243,6 +250,7 @@ export function useProjectContextValue({
     try {
       return await joinProjectMutation.mutateAsync(inviteCode);
     } catch (error) {
+      toast.show(`${error instanceof Error ? error.message : 'Project operation failed.'} Please try again.`, 'error');
       console.error(error);
       throw error;
     }

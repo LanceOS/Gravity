@@ -34,7 +34,7 @@ export type InFlightTicketUpdateBatch = {
 
 export interface TicketMutationContextType {
   createTicket: (ticket: CreateTicketInput) => Promise<Ticket | null>;
-  updateTicket: (id: string, updates: Partial<Ticket>, options?: TicketUpdateOptions) => Promise<void>;
+  updateTicket: (id: string, updates: Partial<Ticket>, options?: TicketUpdateOptions) => Promise<boolean | void>;
   deleteTicket: (id: string) => Promise<void>;
   moveTicket: (id: string, sourceProjectId: string, targetProjectId: string) => Promise<boolean>;
 }

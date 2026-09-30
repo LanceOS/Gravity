@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Button, Card, Select, Stack } from '@library';
+import { toast, Alert, Button, Card, Select, Stack } from '@library';
 import { Plus, RefreshCw } from 'lucide-react';
 import type { User } from '../../../../types/domain';
 import { WorkspaceMcpModal } from '../../../workspaces/components/WorkspaceMcpModal';
@@ -41,9 +41,13 @@ export function ExternalAiSection({ currentUser }: { currentUser: User }) {
       await revokeAccountMcpConnection(connection);
       if (!mounted.current) return;
       setNotice(`Connection revoked for ${connection.workspaceName}.`);
+      toast.show(`Connection revoked for ${connection.workspaceName}.`, 'success');
       await refresh();
     } catch (revokeError) {
-      if (mounted.current) setActionError(accountConnectionError(revokeError));
+      if (mounted.current) {
+        setActionError(accountConnectionError(revokeError));
+        toast.show(`${accountConnectionError(revokeError)} Please try again.`, 'error');
+      }
     } finally {
       if (mounted.current) setRevokingId(null);
     }

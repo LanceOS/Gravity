@@ -227,8 +227,8 @@ describe('SettingsPage', () => {
     await user.click(screen.getByRole('button', { name: 'Workspaces' }));
     expect(props.onOpenDirectory).toHaveBeenCalledTimes(1);
 
-    await user.click(screen.getByRole('button', { name: 'Save Changes' }));
-    expect(props.onSaveSettings).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('button', { name: 'Save Changes' })).toBeDisabled();
+    expect(props.onSaveSettings).not.toHaveBeenCalled();
   });
 
   it('switches between sections and handles invite creation and join approval', async () => {
@@ -495,7 +495,8 @@ describe('AccountPreferencesPage', () => {
     await user.click(screen.getByRole('button', { name: /Onboarding/i }));
     expect(screen.getByText('Onboarding and guidance')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Reset & Start Tutorial' }));
-    expect(props.onResetTutorial).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('button', { name: 'Reset & Start Tutorial' })).toBeDisabled();
+    expect(props.onResetTutorial).not.toHaveBeenCalled();
     expect(screen.getByText('Tutorial will replay on next load.')).toBeInTheDocument();
   });
 

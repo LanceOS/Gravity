@@ -1,3 +1,4 @@
+import { NotificationCenter } from '@library';
 import { RouterProvider } from 'react-router-dom';
 import { AppContextProviders } from './context/TicketContext';
 import { router } from './router';
@@ -10,6 +11,7 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <AppContextProviders>
         <RouterProvider router={router} />
+        <NotificationCenter />
       </AppContextProviders>
       <ReactQueryDevtools initialIsOpen={false} />
     </QueryClientProvider>

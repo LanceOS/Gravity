@@ -152,7 +152,6 @@ const TicketContextMenuContent = ({ ticket, availableTickets, onDelete }: Ticket
                 onClick={async () => {
                   if (!isActive) {
                     await updateTicket(ticket.id, { status: opt.value as Ticket['status'] });
-                    toast.show(`Status updated to ${opt.label}`, 'success');
                   }
                 }}
               >
@@ -180,7 +179,6 @@ const TicketContextMenuContent = ({ ticket, availableTickets, onDelete }: Ticket
                 onClick={async () => {
                   if (!isActive) {
                     await updateTicket(ticket.id, { priority: opt.value as Ticket['priority'] });
-                    toast.show(`Priority updated to ${opt.label}`, 'success');
                   }
                 }}
               >
@@ -199,7 +197,6 @@ const TicketContextMenuContent = ({ ticket, availableTickets, onDelete }: Ticket
             onClick={async () => {
               if (ticket.assigneeId !== null) {
                 await updateTicket(ticket.id, { assigneeId: null });
-                toast.show('Ticket unassigned', 'success');
               }
             }}
           >
@@ -225,7 +222,6 @@ const TicketContextMenuContent = ({ ticket, availableTickets, onDelete }: Ticket
                 onClick={async () => {
                   if (!isActive) {
                     await updateTicket(ticket.id, { assigneeId: u.id });
-                    toast.show(`Assigned to ${u.name}`, 'success');
                   }
                 }}
               >
@@ -292,10 +288,10 @@ const TicketContextMenuContent = ({ ticket, availableTickets, onDelete }: Ticket
                   }
                   onClick={async () => {
                     if (isAssigned) {
-                      await unassignLabelFromTicket(ticket.id, l.id);
+                      if (!await unassignLabelFromTicket(ticket.id, l.id)) return;
                       toast.show(`Removed label: ${l.name}`, 'success');
                     } else {
-                      await assignLabelToTicket(ticket.id, l.id);
+                      if (!await assignLabelToTicket(ticket.id, l.id)) return;
                       toast.show(`Added label: ${l.name}`, 'success');
                     }
                   }}
@@ -316,7 +312,6 @@ const TicketContextMenuContent = ({ ticket, availableTickets, onDelete }: Ticket
             onClick={async () => {
               if (ticket.cycleId !== null) {
                 await updateTicket(ticket.id, { cycleId: null });
-                toast.show('Removed from cycle', 'success');
               }
             }}
           >
@@ -331,7 +326,6 @@ const TicketContextMenuContent = ({ ticket, availableTickets, onDelete }: Ticket
                 onClick={async () => {
                   if (!isActive) {
                     await updateTicket(ticket.id, { cycleId: c.id });
-                    toast.show(`Assigned to cycle ${c.name}`, 'success');
                   }
                 }}
               >
@@ -358,8 +352,7 @@ const TicketContextMenuContent = ({ ticket, availableTickets, onDelete }: Ticket
                   const success = await addTicketDependency(ticket.id, selectedTicket.id);
                   if (success) {
                     toast.show(`${ticket.key} now depends on ${selectedTicket.key}`, 'success');
-                  } else {
-                    toast.show(`Failed to assign ${selectedTicket.key} as a dependency`, 'error');
+
                   }
                 }}
               />
@@ -379,8 +372,7 @@ const TicketContextMenuContent = ({ ticket, availableTickets, onDelete }: Ticket
                   const success = await addTicketBlocker(ticket.id, selectedTicket.id);
                   if (success) {
                     toast.show(`${selectedTicket.key} now blocks ${ticket.key}`, 'success');
-                  } else {
-                    toast.show(`Failed to assign ${selectedTicket.key} as a blocker`, 'error');
+
                   }
                 }}
               />

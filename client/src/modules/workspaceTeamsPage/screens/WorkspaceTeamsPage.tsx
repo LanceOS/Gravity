@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Button, CircularColorInput, Popover, Textarea, TextInput } from '@library';
+import { toast, Button, CircularColorInput, Popover, Textarea, TextInput } from '@library';
 import { apiClient } from '../../../utils/apiClient';
 import { queryKeys } from '../../../utils/queryClient';
 import { addLabelToTeam, addSidebarTeam, removeSidebarTeam, updateSidebarTeam } from '../../../utils/sidebarTreeMutations';
@@ -64,6 +64,11 @@ export function WorkspaceTeamsPage({
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [reassignTeamById, setReassignTeamById] = useState<Record<string, string>>({});
+  const pendingActionRef = useRef(false);
+  const [savedTeamDraft, setSavedTeamDraft] = useState<string | null>(null);
+  useEffect(() => { setSavedTeamDraft(null); }, [selectedTeam?.id, selectedTeam?.name, selectedTeam?.description, selectedTeam?.color]);
+  const teamDraftKey = JSON.stringify([selectedTeamId, editDraft]);
+  const teamUnchanged = savedTeamDraft === teamDraftKey || (selectedTeam?.name === editDraft.name.trim() && (selectedTeam.description || '') === editDraft.description.trim() && (selectedTeam.color || DEFAULT_TEAM_COLOR) === editDraft.color);
   const [savingAction, setSavingAction] = useState('');
   const [feedback, setFeedback] = useState<WorkspaceTeamsPageFeedback | null>(null);
   const [isCreateLabelOpen, setIsCreateLabelOpen] = useState(false);
@@ -116,12 +121,14 @@ export function WorkspaceTeamsPage({
   const handleCreateTeamRef = useRef<() => Promise<void>>(async () => undefined);
 
   const handleCreateTeam = async () => {
+    if (pendingActionRef.current) return;
     const name = createDraft.name.trim();
     if (!name) {
       setFeedback({ type: 'error', message: 'Team name is required.' });
       return;
     }
 
+    pendingActionRef.current = true;
     setSavingAction('create');
     setFeedback(null);
 
@@ -135,56 +142,50 @@ export function WorkspaceTeamsPage({
       addSidebarTeam(queryClient, workspaceId, toSidebarTeam(createdTeam));
       setCreateDraft(getInitialDraft());
       setFeedback({ type: 'success', message: 'Team created.' });
+      toast.show('Team created.', 'success');
       setIsCreateModalOpen(false);
       setSelectedTeamId(createdTeam.id);
       await refreshTeams();
     } catch (error) {
+      toast.show(`${error instanceof Error ? error.message : 'Operation failed.'} Please try again.`, 'error');
       setFeedback({
         type: 'error',
         message: error instanceof Error ? error.message : 'Failed to create team.',
       });
     } finally {
+      pendingActionRef.current = false;
       setSavingAction('');
     }
   };
 
   handleCreateTeamRef.current = handleCreateTeam;
 
-  const handleUpdateTeam = (teamId: string) => {
+  const handleUpdateTeam = async (teamId: string) => {
+    if (pendingActionRef.current || teamUnchanged) return;
     const name = editDraft.name.trim();
     if (!name) {
       setFeedback({ type: 'error', message: 'Team name is required.' });
       return;
     }
-
+    pendingActionRef.current = true;
     setSavingAction(`update:${teamId}`);
     setFeedback(null);
-
-    const description = editDraft.description.trim();
-    const color = editDraft.color;
-
-    updateSidebarTeam(queryClient, workspaceId, teamId, (currentTeam) => ({
-      ...currentTeam,
-      name,
-      description,
-      color,
-    }));
-
-    setFeedback({ type: 'success', message: 'Team updated.' });
-    setSavingAction('');
-
-    apiClient
-      .patch<Team>(`/teams/${teamId}`, { name, description, color })
-      .then(() => {
-        void queryClient.invalidateQueries({ queryKey: queryKeys.workspaceSidebarTree(workspaceId) });
-      })
-      .catch((error) => {
-        void queryClient.invalidateQueries({ queryKey: queryKeys.workspaceSidebarTree(workspaceId) });
-        setFeedback({
-          type: 'error',
-          message: error instanceof Error ? error.message : 'Failed to update team.',
-        });
-      });
+    try {
+      const updates = { name, description: editDraft.description.trim(), color: editDraft.color };
+      await apiClient.patch<Team>(`/teams/${teamId}`, updates);
+      updateSidebarTeam(queryClient, workspaceId, teamId, currentTeam => ({ ...currentTeam, ...updates }));
+      setSavedTeamDraft(teamDraftKey);
+      setFeedback({ type: 'success', message: 'Team updated.' });
+      toast.show('Team saved.', 'success');
+      void queryClient.invalidateQueries({ queryKey: queryKeys.workspaceSidebarTree(workspaceId) });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to update team.';
+      setFeedback({ type: 'error', message });
+      toast.show(`${message} Please try saving again.`, 'error');
+    } finally {
+      pendingActionRef.current = false;
+      setSavingAction('');
+    }
   };
 
   const handleReassignChange = (teamId: string, reassignTeamId: string) => {
@@ -195,6 +196,7 @@ export function WorkspaceTeamsPage({
   };
 
   const handleCreateTeamLabel = async (team: SidebarTeam) => {
+    if (pendingActionRef.current) return;
     const name = labelDraft.name.trim();
     if (!name) {
       setFeedback({ type: 'error', message: 'Label name is required.' });
@@ -202,6 +204,7 @@ export function WorkspaceTeamsPage({
     }
 
     const sortOrder = getNextLabelSortOrder(team.labels ?? []);
+    pendingActionRef.current = true;
     setSavingAction(`create-label:${team.id}`);
     setFeedback(null);
 
@@ -229,19 +232,23 @@ export function WorkspaceTeamsPage({
       });
 
       setLabelDraft({ name: '', color: DEFAULT_TEAM_LABEL_COLOR, description: '' });
+      toast.show('Team label created.', 'success');
       setFeedback({ type: 'success', message: `Created label "${name}" for ${team.name}.` });
       await refreshTeams();
     } catch (error) {
+      toast.show(`${error instanceof Error ? error.message : 'Operation failed.'} Please try again.`, 'error');
       setFeedback({
         type: 'error',
         message: error instanceof Error ? error.message : 'Failed to create label.',
       });
     } finally {
+      pendingActionRef.current = false;
       setSavingAction('');
     }
   };
 
   const handleDeleteTeam = async (team: SidebarTeam) => {
+    if (pendingActionRef.current) return;
     const reassignOptions = sortedTeams.filter((candidate) => candidate.id !== team.id);
     const reassignTeamId = reassignTeamById[team.id] || undefined;
     const hasReferences = getTeamReferenceCount(team) > 0;
@@ -253,6 +260,7 @@ export function WorkspaceTeamsPage({
       return;
     }
 
+    pendingActionRef.current = true;
     setSavingAction(`delete:${team.id}`);
     setFeedback(null);
 
@@ -269,11 +277,13 @@ export function WorkspaceTeamsPage({
       setFeedback({ type: 'success', message: 'Team deleted.' });
       await refreshTeams();
     } catch (error) {
+      toast.show(`${error instanceof Error ? error.message : 'Operation failed.'} Please try again.`, 'error');
       setFeedback({
         type: 'error',
         message: error instanceof Error ? error.message : 'Failed to delete team.',
       });
     } finally {
+      pendingActionRef.current = false;
       setSavingAction('');
     }
   };
@@ -597,7 +607,7 @@ export function WorkspaceTeamsPage({
               </div>
 
               <FormSection.Actions className="workspace-teams-page__actions-row">
-                <Button type="submit" variant="primary" size="sm" disabled={savingAction === `update:${selectedTeamForEditor.id}`}>
+                <Button type="submit" variant="primary" size="sm" disabled={Boolean(savingAction) || teamUnchanged}>
                   <span>{savingAction === `update:${selectedTeamForEditor.id}` ? 'Saving...' : 'Save Team'}</span>
                 </Button>
               </FormSection.Actions>

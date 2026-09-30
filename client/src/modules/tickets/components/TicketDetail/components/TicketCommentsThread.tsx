@@ -1,3 +1,4 @@
+import { useActionStatus } from '../../../../../hooks/useActionStatus';
 import React, { useState, useCallback } from 'react';
 import type { Comment, Ticket } from '../../../../../context/TicketContextContext';
 import {
@@ -31,11 +32,16 @@ function TicketCommentForm({
 }) {
   const [commentInput, setCommentInput] = useState(createEmptyRichTextValue());
 
-  const handlePostComment = (e: React.FormEvent<HTMLFormElement>) => {
+  const [commentSession, setCommentSession] = useState(0);
+  const posting = useActionStatus(JSON.stringify([ticketId, commentSession, commentInput]));
+  const handlePostComment = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!isRichTextEmpty(commentInput)) {
-      onAddComment(ticketId, commentInput);
-      setCommentInput(createEmptyRichTextValue());
+      const saved = await posting.run(async () => onAddComment(ticketId, commentInput), 'Comment posted.', 'Unable to post comment.');
+      if (saved) {
+        setCommentInput(current => current === commentInput ? createEmptyRichTextValue() : current);
+        setCommentSession(current => current + 1);
+      }
     }
   };
 
@@ -49,6 +55,8 @@ function TicketCommentForm({
       />
       <Button
         type="submit"
+        loading={posting.pending}
+        disabled={posting.completed || isRichTextEmpty(commentInput)}
         variant="primary"
       >
         <Send size={12} />
@@ -71,6 +79,7 @@ export const TicketCommentsThread: React.FC<TicketCommentsThreadProps> = ({
   const [editingCommentBody, setEditingCommentBody] = useState<string>('');
   const [deletingCommentId, setDeletingCommentId] = useState<string | null>(null);
 
+  const editing = useActionStatus(JSON.stringify([editingCommentId, editingCommentBody]));
   const closeCommentMenu = useCallback(() => setOpenMenuCommentId(null), []);
 
   return (
@@ -257,10 +266,12 @@ export const TicketCommentsThread: React.FC<TicketCommentsThreadProps> = ({
                     />
                     <div style={{ display: 'flex', gap: '6px', alignSelf: 'flex-end' }}>
                       <Button
+                        loading={editing.pending}
+                        disabled={editing.disabled || isRichTextEmpty(editingCommentBody) || editingCommentBody === comment.body}
                         onClick={async () => {
                           if (!isRichTextEmpty(editingCommentBody)) {
-                            await onUpdateComment(activeTicket.id, comment.id, editingCommentBody);
-                            setEditingCommentId(null);
+                            const saved = await editing.run(async () => onUpdateComment(activeTicket.id, comment.id, editingCommentBody), 'Comment saved.', 'Unable to save comment.');
+                            if (saved) setEditingCommentId(null);
                           }
                         }}
                         variant="primary"

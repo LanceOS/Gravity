@@ -1,3 +1,4 @@
+import { useActionStatus } from '../../../../hooks/useActionStatus';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import type { Ticket } from '../../../../context/TicketContextContext';
 import { Button, Select, Textarea, Popover, RichTextEditor, createEmptyRichTextValue } from '@library';
@@ -31,6 +32,7 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
   const [assigneeId, setAssigneeId] = useState('');
   const [labelIds, setLabelIds] = useState<string[]>([]);
   const [cycleId, setCycleId] = useState('');
+  const submission = useActionStatus(JSON.stringify([title, description, projectId, status, priority, assigneeId, labelIds, cycleId]));
   const [formError, setFormError] = useState<string | null>(null);
   const projectLabels = useMemo(
     () => labels.filter((label) => label.projectId === projectId || !label.projectId),
@@ -85,7 +87,7 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
       return;
     }
 
-    const created = await onSubmitTicket({
+    const created = await submission.run(() => onSubmitTicket({
       title: title.trim(),
       description,
       status,
@@ -95,14 +97,14 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
       cycleId: cycleId || null,
       assigneeId: assigneeId || null,
       parentId: parentId || null
-    });
+    }), 'Ticket created.', 'Failed to create the ticket.');
 
     if (created) {
       onClose();
     } else {
       setFormError('Failed to create the ticket.');
     }
-  }, [title, description, status, priority, projectId, labelIds, cycleId, assigneeId, parentId, onSubmitTicket, onClose]);
+  }, [title, description, status, priority, projectId, labelIds, cycleId, assigneeId, parentId, onSubmitTicket, onClose, submission]);
 
   // Handle keyboard shortcut Esc to close
   useEffect(() => {
@@ -318,7 +320,7 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
           <Button type="button" variant="secondary" onClick={onClose}>
             Cancel
           </Button>
-          <Button type="submit" form="create-ticket-form" variant="primary" style={{ padding: '6px 16px' }}>
+          <Button type="submit" loading={submission.pending} disabled={submission.completed} form="create-ticket-form" variant="primary" style={{ padding: '6px 16px' }}>
             {parentTicket ? 'Create Subtask' : 'Create Issue'}
           </Button>
         </ModalDialog.Actions>

@@ -25,6 +25,7 @@ export interface SettingsScreenData {
   settingsLoading: boolean;
   saveLoading: boolean;
   saveSuccess: boolean;
+  hasChanges?: boolean;
   saveError: string | null;
   inviteError: string | null;
   invitesLoading: boolean;

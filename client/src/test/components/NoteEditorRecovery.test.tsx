@@ -9,6 +9,7 @@ import { ApiError } from '../../utils/apiClient';
 import type { Note } from '../../modules/notes/types';
 
 vi.mock('@library', () => ({
+  toast: { show: vi.fn() },
   Button: ({ children, size, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { size?: string }) => <button data-size={size} {...props}>{children}</button>,
   createEmptyRichTextValue: () => '',
 

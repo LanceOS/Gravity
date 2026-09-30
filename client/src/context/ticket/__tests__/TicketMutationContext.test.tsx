@@ -1,3 +1,4 @@
+import { toast } from '@library';
 import React from 'react';
 import { act, render } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -318,6 +319,26 @@ describe('TicketMutationProvider', () => {
 
     expect(queryClient.getQueryData<Ticket[]>(queryKeys.tickets('project-1'))).toEqual([]);
     expect(setActiveTicket).toHaveBeenCalledWith(null);
+  });
+
+  it('awaits ticket persistence and reports failure without a success toast', async () => {
+    configureContext({ activeTicket: baseTicket });
+    const client = createQueryClient();
+    client.setQueryData(queryKeys.tickets(baseTicket.projectId), [baseTicket]);
+    let finish!: (response: Response) => void;
+    vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>(resolve => { finish = resolve; })));
+    const notification = vi.spyOn(toast, 'show').mockReturnValue('test');
+    renderWithProvider(client);
+    let saving!: Promise<boolean | void>;
+    let settled = false;
+    act(() => { saving = currentActions.updateTicket(baseTicket.id, { title: 'Changed' }); saving.then(() => { settled = true; }); });
+    await act(async () => { await Promise.resolve(); });
+    expect(settled).toBe(false);
+    expect(notification).not.toHaveBeenCalled();
+    await act(async () => { finish(jsonResponse({ error: 'Offline' }, 500)); expect(await saving).toBe(false); });
+    expect(notification).toHaveBeenCalledExactlyOnceWith('Offline Please try again.', 'error');
+    expect(client.getQueryData<Ticket[]>(queryKeys.tickets(baseTicket.projectId))?.[0].title).toBe(baseTicket.title);
+    notification.mockRestore();
   });
 
   it('delegates moveTicket to the injected move hook', async () => {

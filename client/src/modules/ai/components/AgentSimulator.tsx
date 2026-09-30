@@ -3,7 +3,7 @@ import { useProjectContext } from '../../../context/project/ProjectContext';
 import { Terminal, X, Play, Loader2, AlertCircle } from 'lucide-react';
 import type { AgentLogEntry, AgentSimulatorProps } from '../types/AgentSimulator';
 import { delay, getInitialAgentLogs } from '../utils/AgentSimulator';
-import { Button, Textarea } from '@library';
+import { toast, Button, Textarea } from '@library';
 import { apiClient } from '../../../utils/apiClient';
 
 type McpToolResult = Record<string, unknown>;
@@ -20,6 +20,7 @@ export const AgentSimulator: React.FC<AgentSimulatorProps> = ({ onClose }) => {
   const { fetchInitialData } = useProjectContext();
   const [prompt, setPrompt] = useState('Create a backend ticket for setup auth, assign to bob, and add comment "Lance is waiting"');
   const [logs, setLogs] = useState<AgentLogEntry[]>(getInitialAgentLogs);
+  const [completedPrompt, setCompletedPrompt] = useState<string | null>(null);
   const [isRunning, setIsRunning] = useState(false);
   const terminalEndRef = useRef<HTMLDivElement>(null);
 
@@ -38,7 +39,7 @@ export const AgentSimulator: React.FC<AgentSimulatorProps> = ({ onClose }) => {
     await delay(1200);
 
     try {
-      const data = await apiClient.post<{ result?: { content?: { text?: string }[] }; error?: { message?: string } }>(
+      const data = await apiClient.post<{ result?: { isError?: boolean; content?: { text?: string }[] }; error?: { message?: string } }>(
         '/mcp/sse',
         {
           jsonrpc: '2.0',
@@ -55,6 +56,7 @@ export const AgentSimulator: React.FC<AgentSimulatorProps> = ({ onClose }) => {
         throw new Error(data.error.message);
       }
 
+      if (data.result?.isError) throw new Error(data.result.content?.[0]?.text || 'Tool execution failed.');
       const textResult = data.result?.content?.[0]?.text || '';
       addLog('success', `✅ Tool execution completed. Result:\n${textResult}`);
       
@@ -68,7 +70,7 @@ export const AgentSimulator: React.FC<AgentSimulatorProps> = ({ onClose }) => {
 
   const handleRunSimulation = async (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!prompt.trim() || isRunning) return;
+    if (!prompt.trim() || isRunning || completedPrompt === prompt) return;
 
     setIsRunning(true);
     setLogs([
@@ -120,8 +122,11 @@ export const AgentSimulator: React.FC<AgentSimulatorProps> = ({ onClose }) => {
       addLog('success', '🏆 [Simulation Complete]: Gravity workspace has been modified in real-time by the MCP Agent. The UI has refreshed automatically via SSE live events!');
       
       // Request initial reload in case SSE fails
+      setCompletedPrompt(prompt);
+      toast.show('Agent simulation completed.', 'success');
       fetchInitialData();
     } catch (error) {
+      toast.show('Simulation failed. Review the log and existing tickets before retrying; earlier actions may have succeeded.', 'error');
       addLog('error', '⚠️ Simulation halted due to execution failure.');
     } finally {
       setIsRunning(false);
@@ -248,7 +253,7 @@ export const AgentSimulator: React.FC<AgentSimulatorProps> = ({ onClose }) => {
             type="submit" 
             variant="primary"
             fullWidth
-            disabled={isRunning}
+            disabled={isRunning || completedPrompt === prompt}
             leftIcon={isRunning ? <Loader2 size={14} className="animate-spin" style={{ animation: 'spin 1s linear infinite' }} /> : <Play size={14} fill="currentColor" />}
           >
             {isRunning ? 'Simulation Active...' : 'Run MCP Agent'}

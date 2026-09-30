@@ -67,6 +67,7 @@ export function SettingsScreen(props: SettingsScreenProps) {
     settingsLoading,
     saveLoading,
     saveSuccess,
+    hasChanges = !saveSuccess,
     saveError,
     inviteError,
     onBackToWorkspace,
@@ -123,7 +124,7 @@ export function SettingsScreen(props: SettingsScreenProps) {
               Workspaces
             </Button>
           ) : (
-            <Button variant="accent" size="sm" onClick={onSaveSettings} loading={saveLoading}>
+            <Button variant="accent" size="sm" onClick={onSaveSettings} loading={saveLoading} disabled={settingsLoading || !hasChanges}>
               {saveSuccess ? 'Changes Saved' : 'Save Changes'}
             </Button>
           )
@@ -233,7 +234,7 @@ export function SettingsScreen(props: SettingsScreenProps) {
                   variant="accent"
                   size="lg"
                   onClick={onSaveSettings}
-                  loading={saveLoading}
+                  loading={saveLoading} disabled={settingsLoading || !hasChanges}
                   style={{ width: '100%', justifyContent: 'center' }}
                 >
                   {saveSuccess ? 'Changes Saved' : 'Save Changes'}

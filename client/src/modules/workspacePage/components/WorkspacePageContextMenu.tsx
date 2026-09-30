@@ -16,6 +16,7 @@ interface WorkspacePageContextMenuProps {
   notesSort: 'desc' | 'asc';
   onOpenCreateTicket: () => void;
   onCreateNote: () => void;
+  creatingNote?: boolean;
   onSetFilters: (filters: Partial<TicketFilters>) => void;
   setNotesSort: (sort: 'desc' | 'asc') => void;
 }
@@ -32,6 +33,7 @@ export const WorkspacePageContextMenu = memo(function WorkspacePageContextMenu({
   notesSort,
   onOpenCreateTicket,
   onCreateNote,
+  creatingNote,
   onSetFilters,
   setNotesSort,
 }: WorkspacePageContextMenuProps) {
@@ -223,7 +225,7 @@ export const WorkspacePageContextMenu = memo(function WorkspacePageContextMenu({
 
       {activeNotesMenu ? (
         <>
-          <ContextMenu.Item icon={<Plus size={14} />} onClick={onCreateNote}>
+          <ContextMenu.Item icon={<Plus size={14} />} onClick={onCreateNote} disabled={creatingNote}>
             Create New Note
           </ContextMenu.Item>
           <ContextMenu.Item icon={<Activity size={14} />}>

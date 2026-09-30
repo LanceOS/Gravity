@@ -1,3 +1,4 @@
+import { MemoryRouter, Routes, Route, useNavigate } from 'react-router-dom';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createRef, type ReactElement } from 'react';
@@ -134,6 +135,23 @@ describe('library feedback components', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('keeps save feedback visible across route navigation and notification remounts', async () => {
+    function SavePage() {
+      const navigate = useNavigate();
+      return <button onClick={() => { toast.show('Preferences saved before continuing', 'success'); navigate('/next'); }}>Continue</button>;
+    }
+    const view = render(<MemoryRouter><NotificationCenter /><Routes>
+      <Route path="/" element={<SavePage />} />
+      <Route path="/next" element={<div>Next page</div>} />
+    </Routes></MemoryRouter>);
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Continue' }));
+    expect(screen.getByText('Next page')).toBeInTheDocument();
+    expect(screen.getByText('Preferences saved before continuing')).toBeInTheDocument();
+    view.unmount();
+    render(<NotificationCenter />);
+    expect(screen.getByText('Preferences saved before continuing')).toBeInTheDocument();
   });
 
   it('handles confirm, tooltip, and popover interactions', async () => {

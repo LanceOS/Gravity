@@ -1,3 +1,4 @@
+import { toast } from '@library';
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import type { Message, SendMessageOptions } from '../types/AgentChat';
 import type { WorkspaceSettings } from '../../../utils/settings';
@@ -306,7 +307,9 @@ export const ChatContextProvider: React.FC<ChatProviderProps> = ({
 
       if (aiResponse) {
         setMessages([...newMessages, { role: 'assistant', content: aiResponse }]);
+        toast.show('Response generated.', 'success');
       } else {
+        toast.show('The provider returned an empty response. Please retry.', 'error');
         setMessages([...newMessages, { role: 'system', content: `Sorry, I got an empty response from ${getProviderName(settings.aiProvider)}.` }]);
       }
     } catch (error) {
@@ -315,6 +318,7 @@ export const ChatContextProvider: React.FC<ChatProviderProps> = ({
       console.error(error);
 
       if (error instanceof Error && error.message === CLOUD_PROJECT_REQUIRED_MESSAGE) {
+        toast.show(error.message, 'error');
         setMessages([...newMessages, { role: 'system', content: error.message }]);
         return;
       }
@@ -336,6 +340,7 @@ export const ChatContextProvider: React.FC<ChatProviderProps> = ({
       }
       const errorContent = `### ⚠️ Connection Error\n\nFailed to contact the **${providerLabel}** API.\n\n${detail}`;
 
+      toast.show(`Generation failed. ${detail.replaceAll('**', '')}`, 'error');
       setErrorState(errorContent);
       setMessages([...newMessages, { role: 'system', content: errorContent }]);
     } finally {

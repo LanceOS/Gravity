@@ -188,12 +188,13 @@ function ToastItemComponent({ item, onExited }: ToastItemComponentProps) {
 }
 
 export function Toast() {
-  const [toasts, setToasts] = React.useState<ToastItem[]>([]);
+  const [toasts, setToasts] = React.useState<ToastItem[]>(() => toastsGlobalStack);
   const [localToasts, setLocalToasts] = React.useState<(ToastItem & { isExiting?: boolean })[]>([]);
 
   React.useEffect(() => {
     const listener = (newToasts: ToastItem[]) => setToasts(newToasts);
     toastListeners.push(listener);
+    listener(toastsGlobalStack);
     return () => {
       toastListeners = toastListeners.filter((l) => l !== listener);
     };
@@ -227,6 +228,9 @@ export function Toast() {
   return (
     <Portal>
       <div
+        aria-live="polite"
+        aria-relevant="additions"
+        aria-label="Notifications"
         style={{
           position: 'fixed',
           bottom: '20px',

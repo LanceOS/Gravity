@@ -25,7 +25,7 @@ export function WorkspaceProjectLabelEditor({
     setEditingLabelDescription,
     clearLabelEditor,
   } = useWorkspaceProjectPanelLabelStateContext();
-  const { updateLabel, deleteLabel } = useWorkspaceProjectPanelActionsContext();
+  const { labelUnchanged, updateLabel, deleteLabel } = useWorkspaceProjectPanelActionsContext();
 
   if (!activeLabel) {
     return null;
@@ -82,7 +82,7 @@ export function WorkspaceProjectLabelEditor({
             type="submit"
             variant="primary"
             loading={editingLabelLoading}
-            disabled={isLabelBusy || !editingLabelName.trim()}
+            disabled={isLabelBusy || labelUnchanged || !editingLabelName.trim()}
           >
             <PencilLine size={14} />
             <span>Save Label</span>

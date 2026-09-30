@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Button, Stack, Card } from '@library';
 
 import { StatusNotice } from '../StatusNotice';
@@ -19,6 +20,8 @@ export function OnboardingSection({
   const tutorialResult = runtimeTutorialResult ?? contextTutorialResult;
   const onResetTutorial = runtimeOnResetTutorial ?? contextOnResetTutorial;
 
+  const [pending, setPending] = useState(false);
+
   return (
     <Card className="account-preferences-page__section-card">
       <Stack gap="var(--space-lg)">
@@ -30,7 +33,11 @@ export function OnboardingSection({
         </div>
 
         <div>
-          <Button className="account-preferences-page__button-secondary" variant="default" onClick={onResetTutorial}>
+          <Button className="account-preferences-page__button-secondary" variant="default" loading={pending} disabled={tutorialResult?.success} onClick={async () => {
+            if (pending) return;
+            setPending(true);
+            try { await onResetTutorial(); } finally { setPending(false); }
+          }}>
             Reset & Start Tutorial
           </Button>
         </div>

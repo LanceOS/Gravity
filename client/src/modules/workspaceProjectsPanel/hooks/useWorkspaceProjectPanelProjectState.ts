@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
+import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 
 import type { Project } from '../../../context/TicketContextContext';
 import type { ProjectSettingsFeedback } from '../types/WorkspaceProjectPanel';
@@ -65,6 +65,7 @@ export function useWorkspaceProjectPanelProjectState({
   const [isProjectSettingsSaving, setIsProjectSettingsSaving] = useState(false);
   const [settingsFeedback, setSettingsFeedback] = useState<ProjectSettingsFeedback>(null);
   const [githubRepoUrl, setGithubRepoUrl] = useState('');
+  const repositoryBaseline = useRef<{ id: string; url: string } | null>(null);
 
   const projectLookup = useMemo(() => createProjectLookup(projects), [projects]);
 
@@ -90,15 +91,16 @@ export function useWorkspaceProjectPanelProjectState({
   }, [activeProjectId, projects]);
 
   useEffect(() => {
-    if (!managedProject) {
-      setGithubRepoUrl('');
-      setSettingsFeedback(null);
-      return;
-    }
-
-    setGithubRepoUrl(managedProject.githubRepoUrl || '');
-    setSettingsFeedback(null);
-  }, [managedProject]);
+    const previous = repositoryBaseline.current;
+    const id = managedProject?.id ?? '';
+    const url = managedProject?.githubRepoUrl || '';
+    const switchedProject = previous?.id !== id;
+    // Optimistic mutation data must not become the baseline for a failed save.
+    if (!switchedProject && isProjectSettingsSaving) return;
+    repositoryBaseline.current = { id, url };
+    setGithubRepoUrl(current => switchedProject || current.trim() === (previous?.url ?? '') ? url : current);
+    if (switchedProject) setSettingsFeedback(null);
+  }, [managedProject?.id, managedProject?.githubRepoUrl, isProjectSettingsSaving]);
 
   return {
     managedProjectId,

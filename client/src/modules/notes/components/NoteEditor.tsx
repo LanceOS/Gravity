@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useSyncExternalStore } from 'react';
 import { Check } from 'lucide-react';
 import {
+  toast,
   Button,
   RichTextEditor,
   type RichTextEditorHandle,
@@ -79,6 +80,7 @@ function NoteEditorSession({ projectId, noteId, onTitleChange }: NoteEditorProps
     if (mounted.current) setReloadError(null);
     Promise.resolve(saveNote(updates, pendingDraft.version, retry)).then((updated) => {
       if (!updated) return;
+      toast.show('Note saved.', 'success');
       versionRef.current = updated.version;
       const retained = readDraft(draftKey);
       if (retained && retained.revision === pendingDraft.revision) {
@@ -88,6 +90,7 @@ function NoteEditorSession({ projectId, noteId, onTitleChange }: NoteEditorProps
       }
       if (mounted.current) setReloadError(null);
     }).catch(() => {
+      toast.show('Unable to save note. Your draft is preserved; use Retry save. For a version conflict, download your draft before reloading.', 'error');
       // The shared save queue exposes the failure; leave the draft intact.
     }).finally(() => {
       if (pendingRef.current === snapshot) pendingRef.current = null;
@@ -115,6 +118,7 @@ function NoteEditorSession({ projectId, noteId, onTitleChange }: NoteEditorProps
       if (!mounted.current || reloadingRef.current) return;
       editorRef.current?.insertImage({ src: url, alt: file.name, title: file.name });
     } catch (err) {
+      toast.show('Unable to upload file. Please select the file and try again.', 'error');
       console.error('Failed to upload file:', err);
     }
   };

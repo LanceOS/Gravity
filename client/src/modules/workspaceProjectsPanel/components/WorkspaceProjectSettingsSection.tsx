@@ -10,7 +10,7 @@ import { WorkspaceProjectDeleteModal } from './WorkspaceProjectDeleteModal';
 export function WorkspaceProjectSettingsSection() {
   const { managedProject, isProjectSettingsSaving, settingsFeedback: stateSettingsFeedback, setGithubRepoUrl, githubRepoUrl } =
     useWorkspaceProjectPanelProjectStateContext();
-  const { saveProjectSettings, deleteProject, isDeletingProject, canDeleteProject } = useWorkspaceProjectPanelActionsContext();
+  const { projectSettingsUnchanged, saveProjectSettings, deleteProject, isDeletingProject, canDeleteProject } = useWorkspaceProjectPanelActionsContext();
   const [isDeleteProjectModalOpen, setIsDeleteProjectModalOpen] = useState(false);
 
   const handleOpenDeleteProjectModal = () => {
@@ -66,7 +66,7 @@ export function WorkspaceProjectSettingsSection() {
           align="between"
           style={{ minHeight: '36px' }}
         >
-          <Button type="submit" variant="primary" loading={isProjectSettingsSaving} style={{ minHeight: '36px' }}>
+          <Button type="submit" variant="primary" loading={isProjectSettingsSaving} disabled={projectSettingsUnchanged} style={{ minHeight: '36px' }}>
             Save Settings
           </Button>
 
