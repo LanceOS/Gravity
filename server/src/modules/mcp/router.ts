@@ -119,8 +119,8 @@ export class McpRouterFactory {
   create() {
     const router = Router();
     const createLimiter = env.redisEnabled ? createRedisRateLimiter : createRateLimiter;
-    const transportIpLimiter = createLimiter({ namespace: 'mcp.transport.ip', windowMs: 60_000, max: 300, keyFn: (req) => `ip:${getRequestSourceIp(req) ?? 'unknown'}` });
-    const workspaceLimiter = createLimiter({ namespace: 'mcp.transport.workspace', windowMs: 60_000, max: 120, keyFn: (req) => `workspace:${requestWorkspaceId(req)}` });
+    const transportIpLimiter = createLimiter({ namespace: 'mcp.transport.ip', failurePolicy: 'closed', windowMs: 60_000, max: 300, keyFn: (req) => `ip:${getRequestSourceIp(req) ?? 'unknown'}` });
+    const workspaceLimiter = createLimiter({ namespace: 'mcp.transport.workspace', failurePolicy: 'closed', windowMs: 60_000, max: 120, keyFn: (req) => `workspace:${requestWorkspaceId(req)}` });
     const paths = ['/mcp', '/mcp/sse', '/workspaces/:workspaceId/mcp'];
     router.get(paths, (_req, res) => { res.set('Allow', 'POST').status(405).end(); });
     router.delete(paths, (_req, res) => { res.set('Allow', 'POST').status(405).end(); });

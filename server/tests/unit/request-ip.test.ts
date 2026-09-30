@@ -72,7 +72,7 @@ describe('rate limit consumers and ingress', () => {
   it('uses the same identities for Redis buckets without connecting to Redis', async () => {
     const evaluate = vi.fn().mockResolvedValue([1, 1, 0]);
     const client = { isReady: true, isOpen: true, eval: evaluate } as unknown as RedisClientType;
-    const limiter = createRedisRateLimiter({ namespace: 'proxy', max: 1, windowMs: 60000, client });
+    const limiter = createRedisRateLimiter({ failurePolicy: 'closed', namespace: 'proxy', max: 1, windowMs: 60000, client });
     await invoke(limiter, '192.0.2.10');
     await invoke(limiter, '203.0.113.99, 192.0.2.10');
     await invoke(limiter, '192.0.2.11');
