@@ -3,7 +3,7 @@ import { beginServerInitialization, completeServerInitialization } from '../lib/
 
 // Bump whenever the bootstrapped schema contract changes. This is separate from
 // Drizzle's SQL journal: production currently applies schema through bootstrap.
-export const REQUIRED_SCHEMA_VERSION = 1;
+export const REQUIRED_SCHEMA_VERSION = 2;
 
 export async function initializeSchema(pool: Pick<Pool, 'query'>, migrate: () => Promise<void>) {
   beginServerInitialization();

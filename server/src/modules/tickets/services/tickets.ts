@@ -983,7 +983,6 @@ export async function createTicketRecord(input: {
   createdAt?: Date;
   updatedAt?: Date;
 }) {
-  const key = await nextTicketKey(input.projectId);
   const ticketId = createId('ti');
   const sanitizedTitle = sanitizeTitle(input.title);
   const sanitizedDescription = sanitizeEditorContentForPersistence(input.description ?? '', {
@@ -999,6 +998,7 @@ export async function createTicketRecord(input: {
     await lockTicketProjectScopes(tx, [projectScope]);
     await assertAssigneeInProjectScope(tx, projectScope, nextAssigneeId);
     await assertTicketRelationships(tx, projectScope, ticketId, input.cycleId, input.parentId);
+    const key = await nextTicketKey(tx, input.projectId);
     const rows = await tx
       .insert(tickets)
       .values({

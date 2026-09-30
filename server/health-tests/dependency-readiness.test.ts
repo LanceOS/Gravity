@@ -14,11 +14,12 @@ vi.mock('../src/lib/redis.js', () => ({ client: { get isReady() { return state.r
 vi.mock('../src/lib/server-lifecycle.js', () => ({
   isServerInitialized: () => state.initialized, isServerShuttingDown: () => state.shuttingDown,
 }));
+const { REQUIRED_SCHEMA_VERSION } = await import('../src/db/schema-version.js');
 const { checkReadiness } = await import('../src/lib/dependency-readiness.js');
 beforeEach(() => {
   state.rateLimiting = true;
   state.initialized = state.postgres = state.storage = state.redis = state.schemaReady = true;
-  state.shuttingDown = false; state.version = 1;
+  state.shuttingDown = false; state.version = REQUIRED_SCHEMA_VERSION;
   state.query.mockReset().mockImplementation(async (sql: string) => {
     if (!state.postgres) throw new Error('database credentials');
     return { rows: sql.includes('version') ? [{ version: state.version, ready: state.schemaReady }] : [] };
@@ -38,7 +39,7 @@ it.each(['postgres', 'storage', 'redis'] as const)('detects required %s loss and
 it('rejects wrong, incomplete and missing schema versions', async () => {
   state.version = 0;
   expect((await checkReadiness()).checks.schema.status).toBe('unavailable');
-  state.version = 1; state.schemaReady = false;
+  state.version = REQUIRED_SCHEMA_VERSION; state.schemaReady = false;
   expect((await checkReadiness()).status).toBe('unavailable');
   state.schemaReady = true;
   state.query.mockResolvedValue({ rows: [] });

@@ -1,3 +1,4 @@
+import { migrateTicketKeyCounters } from './ticket-key-counters.js';
 import { initializeSchema } from './schema-version.js';
 import { getMigrations } from 'better-auth/db/migration';
 import { auth } from '../modules/auth/auth.js';
@@ -1031,4 +1032,5 @@ async function bootstrapDatabase() {
     CREATE INDEX IF NOT EXISTS chat_messages_session_id_created_at_idx
       ON chat_messages (session_id, created_at);
   `);
+  await migrateTicketKeyCounters(pool, env.databaseUrl.startsWith('pgmem://'));
 }

@@ -1,5 +1,11 @@
-import { index, pgTable, primaryKey, jsonb, text, timestamp, check } from 'drizzle-orm/pg-core';
+import { bigint, index, pgTable, primaryKey, jsonb, text, timestamp, check } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
+
+// No foreign key: deleting a project must not release its external identities.
+export const ticketKeyCounters = pgTable('ticket_key_counters', {
+  prefix: text('prefix').primaryKey(),
+  lastValue: bigint('last_value', { mode: 'bigint' }).notNull(),
+});
 
 export const tickets = pgTable('tickets', {
   id: text('id').primaryKey(),
