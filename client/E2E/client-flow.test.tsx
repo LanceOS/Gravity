@@ -1,8 +1,7 @@
-import React from 'react';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
-import App from '../src/App';
+import { renderMockApp } from './renderMockApp';
 import { dbState } from './setup';
 import { router } from '../src/router';
 
@@ -15,14 +14,14 @@ describe('Gravity Client End-to-End User Journey', () => {
 
     // Start with a fresh render of the full Application
     await router.navigate('/');
-    render(<App />);
+    await renderMockApp();
 
     // ==========================================
     // PHASE 1: Sign-Up & Sign-In Screen Flow
     // ==========================================
     // Assert we start on the Auth screen since currentUser is null initially
     // We wait asynchronously for the initial session check to resolve and the AuthScreen to mount
-    const bannerText = await screen.findByText('Production-grade Project Management Workspace');
+    const bannerText = await screen.findByRole('heading', { name: 'Gravity', level: 1 });
     expect(bannerText).toBeInTheDocument();
     
     // Toggle to Sign Up form
@@ -222,5 +221,5 @@ describe('Gravity Client End-to-End User Journey', () => {
     });
 
 
-  }, 15000);
+  });
 });

@@ -1,8 +1,7 @@
-import React from 'react';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
-import App from '../src/App';
+import { renderMockApp } from './renderMockApp';
 import { dbState, resetMockDb } from './setup';
 import { router } from '../src/router';
 
@@ -78,7 +77,7 @@ describe('Relationship cleanup on status transition to done E2E', () => {
 
     // 2. Navigate and render App
     await router.navigate('/workspaces/wsp-1/projects/prj-1/tickets');
-    render(<App />);
+    await renderMockApp();
 
     // 3. Open completed ticket (TST-1) details by clicking its card on the board
     const completedCard = await screen.findByText(completedTicket.title);

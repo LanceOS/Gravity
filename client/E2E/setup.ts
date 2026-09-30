@@ -1,11 +1,12 @@
 import * as matchers from '@testing-library/jest-dom/matchers';
 import { afterEach, beforeEach, expect, vi } from 'vitest';
-import { act, cleanup } from '@testing-library/react';
+import { act, cleanup, configure } from '@testing-library/react';
 import { queryClient } from '../src/utils/queryClient';
-import { router } from '../src/router';
 import { transferableAbortController } from 'node:util';
 
 expect.extend(matchers);
+// Full-app navigation includes asynchronous route imports and React Query updates.
+configure({ asyncUtilTimeout: 5000 });
 
 // Node's fetch Request and jsdom's AbortSignal can come from incompatible realms.
 // React Router uses both, so keep its abort primitives in the fetch realm.
@@ -1968,6 +1969,8 @@ globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) =>
 
 beforeEach(() => {
   resetMockDb();
+  window.localStorage.clear();
+  window.sessionStorage.clear();
   queryClient.clear();
   const fetchMock = globalThis.fetch as unknown as { mockClear?: () => void };
   fetchMock.mockClear?.();

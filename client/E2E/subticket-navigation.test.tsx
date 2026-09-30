@@ -1,8 +1,7 @@
-import React from 'react';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
-import App from '../src/App';
+import { renderMockApp } from './renderMockApp';
 import { dbState } from './setup';
 import { router } from '../src/router';
 
@@ -55,7 +54,7 @@ describe('Sub-ticket navigation E2E', () => {
 
     // Render the full App
     await router.navigate('/workspaces/wsp-1/projects/prj-1/tickets');
-    render(<App />);
+    await renderMockApp();
 
     // Parent ticket should appear on the board/list
     const parentCard = await screen.findByText(parentTicket.title);
