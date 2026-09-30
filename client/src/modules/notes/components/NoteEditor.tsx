@@ -11,6 +11,7 @@ import {
 import { useNote } from '../hooks/useNote';
 import './NoteEditor.css';
 import { readDraft, writeDraft, subscribeDraft } from './noteDrafts';
+import { NOTE_IMAGE_ACCEPT, validateNoteImage } from '../utils/noteMedia';
 
 interface NoteEditorProps {
   projectId: string;
@@ -38,6 +39,9 @@ export function NoteEditor(props: NoteEditorProps) {
 function NoteEditorSession({ projectId, noteId, onTitleChange }: NoteEditorProps) {
   const { note, loading, saving, saveError, savedAt, saveNote, uploadMedia, reloadNote } = useNote(projectId, noteId);
 
+  const [uploading, setUploading] = useState(false);
+  const uploadingRef = useRef(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [reloading, setReloading] = useState(false);
   const reloadingRef = useRef(false);
   const [isDragging, setIsDragging] = useState(false);
@@ -113,13 +117,24 @@ function NoteEditorSession({ projectId, noteId, onTitleChange }: NoteEditorProps
   }, []);
 
   const handleFileUpload = async (file: File) => {
+    if (!note || reloadingRef.current || uploadingRef.current) return;
+    setUploadError(null);
+    const validationError = validateNoteImage(file);
+    if (validationError) {
+      setUploadError(validationError);
+      return;
+    }
+    uploadingRef.current = true;
+    setUploading(true);
     try {
       const url = await uploadMedia(file);
       if (!mounted.current || reloadingRef.current) return;
       editorRef.current?.insertImage({ src: url, alt: file.name, title: file.name });
     } catch (err) {
-      toast.show('Unable to upload file. Please select the file and try again.', 'error');
-      console.error('Failed to upload file:', err);
+      if (mounted.current) setUploadError(err instanceof Error ? err.message : 'Unable to upload image. Please try again.');
+    } finally {
+      uploadingRef.current = false;
+      if (mounted.current) setUploading(false);
     }
   };
 
@@ -167,6 +182,7 @@ function NoteEditorSession({ projectId, noteId, onTitleChange }: NoteEditorProps
   };
 
   const reload = async () => {
+    if (uploadingRef.current) return;
     if (!window.confirm('Discard your local edits and load the server version? Download your draft first to keep a copy.')) return;
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     reloadingRef.current = true;
@@ -212,8 +228,10 @@ function NoteEditorSession({ projectId, noteId, onTitleChange }: NoteEditorProps
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      handleFileUpload(e.target.files[0]);
+      void handleFileUpload(e.target.files[0]);
     }
+    // Allow choosing the same file again after an upload failure.
+    e.target.value = '';
   };
 
   const onDragOver = (e: React.DragEvent) => {
@@ -246,6 +264,10 @@ function NoteEditorSession({ projectId, noteId, onTitleChange }: NoteEditorProps
       onDrop={onDrop}
     >
       <div className="note-editor__header">
+        <Button size="sm" type="button" disabled={!note || reloading || uploading}
+          onClick={() => fileInputRef.current?.click()}>
+          {uploading ? 'Uploading image…' : 'Attach image'}
+        </Button>
         <div className="note-editor__status" role="status">
           {reloadError ? (
             <span className="note-editor__status--error">Failed to reload: {reloadError}</span>
@@ -265,15 +287,18 @@ function NoteEditorSession({ projectId, noteId, onTitleChange }: NoteEditorProps
         <div className="note-editor__recovery">
           <Button size="sm" type="button" onClick={() => triggerSave(true)} disabled={saving || reloading}>Retry save</Button>
           <Button size="sm" type="button" onClick={downloadDraft}>Download draft</Button>
-          <Button size="sm" type="button" onClick={reload} disabled={saving || reloading}>Reload server version</Button>
+          <Button size="sm" type="button" onClick={reload} disabled={saving || reloading || uploading}>Reload server version</Button>
         </div>
       )}
+
+      {uploadError && <p role="alert" className="note-editor__status--error">Unable to attach image: {uploadError}</p>}
 
       <input
         type="file"
         ref={fileInputRef}
         style={{ display: 'none' }}
-        accept="image/*,.svg"
+        aria-label="Attach image file"
+        accept={NOTE_IMAGE_ACCEPT}
         onChange={handleFileChange}
       />
 

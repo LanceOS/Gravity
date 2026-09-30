@@ -63,3 +63,45 @@ A background job handles cleanup:
 3. It parses the markdown for `api/v1/notes/:noteId/media/:filename` regex patterns.
 4. It compares the referenced files against a `ListObjectsV2Command` listing.
 5. Any unreferenced files are systematically deleted from RustFS to reclaim storage space.
+
+### Browser note-image uploads
+
+`POST /api/v1/notes/:noteId/media?filename=...` returns a same-origin URL of the form
+`/api/v1/notes/:noteId/media/:filename?projectId=...`. Store the complete returned
+URL in the note body: browser image requests carry session cookies, but cannot
+supply the `x-project-id` header. The query parameter selects the project; it is
+not a credential. GET still authorizes the session's project membership and
+checks that the note belongs to that project before reading storage. Responses
+use `Cache-Control: private, no-store` so later reads recheck authorization.
+Previously persisted URLs without a project query also work: GET authenticates
+the caller, resolves the project from note metadata, then checks membership
+before reading the attachment. An explicitly supplied project still must match
+the note. No note-body migration is needed.
+
+The NoteEditor **Attach image** button and file-drop handler insert PNG, JPEG,
+WebP and GIF images. SVG and non-image API attachments are not offered by this
+image-only control. Filename extensions are case-insensitive; filenames must use
+ASCII letters, numbers, dots, hyphens or underscores, and the upload limit is
+10 MiB. The client rejects incompatible nonempty MIME declarations; files whose
+browser MIME is empty use the extension policy. This is picker validation, not
+content sniffing. Validation and server failures appear inline, and users can
+select the same file again to retry.
+
+Regression coverage uses the normal server test setup (`pg-mem` and in-memory
+RustFS), never deployment data. Run from the repository root with the required
+test-only `NODE_IDENTITY_MASTER_KEY` set:
+
+```sh
+npm exec -w server -- vitest run tests/note-media-urls.test.ts
+npm exec -w client -- vitest run src/test/components/NoteEditor.test.tsx
+# Requires Playwright Chromium (npx playwright install chromium).
+GRAVITY_NOTE_MEDIA_BROWSER=1 npm exec -w server -- vitest run tests/note-media.browser.test.ts
+```
+
+Set `GRAVITY_CHROMIUM_PATH` to use an existing Chromium executable instead of
+the Playwright-managed installation.
+
+The opt-in browser test builds the actual NoteEditor fixture, uploads through the
+real API, waits for save acknowledgement, checks image decoding and persisted
+reload for both canonical and legacy unscoped URLs, exercises filename/type
+errors, and checks missing-session, nonmember, and mismatched-project rejection.

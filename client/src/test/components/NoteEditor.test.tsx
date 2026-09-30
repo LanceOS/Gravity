@@ -224,4 +224,57 @@ describe('NoteEditor', () => {
     expect(mockUploadMedia).toHaveBeenCalledWith(file);
     expect(screen.getByTestId('rich-text-editor')).toHaveValue('Test body\n![test.png](/image.png)');
   });
+  it('opens the image picker from a visible control with explicit accepted extensions', () => {
+    render(<NoteEditor projectId="proj-1" noteId="note-1" />);
+    const input = screen.getByLabelText('Attach image file');
+    const click = vi.spyOn(input, 'click');
+    fireEvent.click(screen.getByRole('button', { name: 'Attach image' }));
+    expect(click).toHaveBeenCalledOnce();
+    expect(input).toHaveAttribute('accept', '.png,.jpg,.jpeg,.webp,.gif');
+  });
+
+  it.each([
+    ['vector.svg', 'image/svg+xml', 'Choose a PNG'],
+    ['video.mp4', 'video/mp4', 'Choose a PNG'],
+    ['disguised.png', 'image/svg+xml', 'Choose a PNG'],
+    ['my photo.png', 'image/png', 'Rename the file'],
+  ])('rejects unsupported dropped file %s with a visible error', async (name, type, message) => {
+    render(<NoteEditor projectId="proj-1" noteId="note-1" />);
+    await act(async () => {
+      fireEvent.drop(screen.getByTestId('rich-text-editor'), { dataTransfer: { files: [new File(['x'], name, { type })] } });
+    });
+    expect(screen.getByRole('alert')).toHaveTextContent(message);
+    expect(mockUploadMedia).not.toHaveBeenCalled();
+  });
+
+  it('shows upload failures and permits retrying the same file', async () => {
+    mockUploadMedia.mockRejectedValueOnce(new Error('Storage unavailable'));
+    render(<NoteEditor projectId="proj-1" noteId="note-1" />);
+    const input = screen.getByLabelText('Attach image file');
+    const file = new File(['x'], 'test.png', { type: 'image/png' });
+    await act(async () => { fireEvent.change(input, { target: { files: [file] } }); });
+    expect(screen.getByRole('alert')).toHaveTextContent('Storage unavailable');
+    expect(input).toHaveValue('');
+    await act(async () => { fireEvent.change(input, { target: { files: [file] } }); });
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(mockUploadMedia).toHaveBeenCalledTimes(2);
+  });
+
+  it('blocks concurrent attachment uploads and reload while an upload is pending', async () => {
+    let finish!: (url: string) => void;
+    mockUploadMedia.mockImplementationOnce(() => new Promise<string>(resolve => { finish = resolve; }));
+    render(<NoteEditor projectId="proj-1" noteId="note-1" />);
+    fireEvent.change(screen.getByLabelText('Note title'), { target: { value: 'Dirty title' } });
+    const input = screen.getByLabelText('Attach image file');
+    const file = new File(['x'], 'photo.png', { type: 'image/png' });
+    await act(async () => { fireEvent.change(input, { target: { files: [file] } }); });
+    expect(screen.getByRole('button', { name: 'Reload server version' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Uploading image…' })).toBeDisabled();
+    await act(async () => { fireEvent.drop(screen.getByTestId('rich-text-editor'), { dataTransfer: { files: [file] } }); });
+    expect(mockUploadMedia).toHaveBeenCalledTimes(1);
+    await act(async () => { finish('/image.png'); });
+    expect(screen.getByRole('button', { name: 'Reload server version' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Attach image' })).toBeEnabled();
+  });
+
 });
