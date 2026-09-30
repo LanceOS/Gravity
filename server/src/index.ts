@@ -105,7 +105,7 @@ async function main() {
   // MCP stdio requires exclusive use of stdout for JSON-RPC responses, but the
   // API server logs to stdout.
   // Run `server/src/modules/mcp/stdio.ts` as a separate process when stdio is needed.
-  if (env.mcpAgentCommand || env.mcpStdioWorkspaceId || env.mcpStdioActorUserId) {
+  if (env.mcpStdioWorkspaceId || env.mcpStdioActorUserId) {
     console.warn(
       'Embedded MCP agent spawning is disabled in this process. Start server/src/modules/mcp/stdio.ts separately when needed.',
     );
