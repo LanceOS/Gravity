@@ -3,7 +3,7 @@ import React from 'react';
 type RefForwardingChild = React.ReactElement<React.RefAttributes<Element>>;
 
 export interface ClickAwayListenerProps {
-  children: React.ReactElement;
+  children: RefForwardingChild;
   onClickAway: (event: PointerEvent | MouseEvent | TouchEvent) => void;
   active?: boolean;
 }

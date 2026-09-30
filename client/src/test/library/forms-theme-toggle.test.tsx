@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { THEME_STORAGE_KEY } from '../../constants/storage';
 import {
   Autocomplete,
@@ -399,24 +399,26 @@ describe('library forms and theme toggle', () => {
     const matchMedia = vi.spyOn(window, 'matchMedia')
       .mockReturnValue(modernMediaQuery as unknown as MediaQueryList);
 
-    const modern = render(<ThemeToggle />);
-    expect(modernMediaQuery.addEventListener).toHaveBeenCalledWith('change', expect.any(Function));
-    modern.unmount();
-    expect(modernMediaQuery.removeEventListener).toHaveBeenCalledWith(
-      'change',
-      modernMediaQuery.addEventListener.mock.calls[0][1]
-    );
+    try {
+      const modern = render(<ThemeToggle />);
+      expect(modernMediaQuery.addEventListener).toHaveBeenCalledWith('change', expect.any(Function));
+      modern.unmount();
+      expect(modernMediaQuery.removeEventListener).toHaveBeenCalledWith(
+        'change',
+        modernMediaQuery.addEventListener.mock.calls[0][1]
+      );
 
-    window.localStorage.removeItem('gravity_theme');
-    matchMedia.mockReturnValue(legacyMediaQuery as unknown as MediaQueryList);
-    const legacy = render(<ThemeToggle />);
-    expect(legacyMediaQuery.addListener).toHaveBeenCalledWith(expect.any(Function));
-    legacy.unmount();
-    expect(legacyMediaQuery.removeListener).toHaveBeenCalledWith(
-      legacyMediaQuery.addListener.mock.calls[0][0]
-    );
-
-    matchMedia.mockRestore();
+      window.localStorage.removeItem('gravity_theme');
+      matchMedia.mockReturnValue(legacyMediaQuery as unknown as MediaQueryList);
+      const legacy = render(<ThemeToggle />);
+      expect(legacyMediaQuery.addListener).toHaveBeenCalledWith(expect.any(Function));
+      legacy.unmount();
+      expect(legacyMediaQuery.removeListener).toHaveBeenCalledWith(
+        legacyMediaQuery.addListener.mock.calls[0][0]
+      );
+    } finally {
+      matchMedia.mockRestore();
+    }
   });
 
   it('cycles and persists theme selection', async () => {
