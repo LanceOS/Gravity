@@ -4,7 +4,7 @@ type RefForwardingChild = React.ReactElement<React.RefAttributes<Element>>;
 
 export interface ClickAwayListenerProps {
   children: React.ReactElement;
-  onClickAway: (event: MouseEvent | TouchEvent) => void;
+  onClickAway: (event: PointerEvent | MouseEvent | TouchEvent) => void;
   active?: boolean;
 }
 
@@ -31,32 +31,62 @@ export const ClickAwayListener = React.forwardRef<Element, ClickAwayListenerProp
   React.useEffect(() => {
     if (!active) return;
 
-    const handleInteraction = (event: MouseEvent | TouchEvent) => {
+    const handleInteraction = (event: PointerEvent | MouseEvent | TouchEvent) => {
       const { target } = event;
 
       if (!(target instanceof Node)) {
-        return;
+        return false;
       }
 
       if (target instanceof Element) {
         // Keep clicks inside the dropdown surface itself from dismissing it.
         // Dialogs elsewhere on the page should still count as outside clicks.
         if (target.closest('[role="listbox"], [role="menu"], [role="tooltip"], .select-menu, .autocomplete-menu, .popover-content')) {
-          return;
+          return false;
         }
       }
 
       if (childRef.current && !childRef.current.contains(target)) {
         onClickAway(event);
+        return true;
       }
+
+      return false;
     };
 
-    document.addEventListener('mousedown', handleInteraction);
-    document.addEventListener('touchstart', handleInteraction);
+    if (typeof window.PointerEvent === 'function') {
+      document.addEventListener('pointerdown', handleInteraction);
+
+      return () => {
+        document.removeEventListener('pointerdown', handleInteraction);
+      };
+    }
+
+    // Older browsers can dispatch a compatibility mousedown after touchstart.
+    // Keep both fallbacks but avoid dismissing twice for that one touch.
+    let lastTouchStartTime: number | undefined;
+    const handleTouchStart = (event: TouchEvent) => {
+      if (handleInteraction(event)) {
+        lastTouchStartTime = event.timeStamp;
+      }
+    };
+    const handleMouseDown = (event: MouseEvent) => {
+      if (lastTouchStartTime !== undefined) {
+        const elapsed = event.timeStamp - lastTouchStartTime;
+        if (elapsed >= 0 && elapsed < 800) {
+          return;
+        }
+      }
+
+      handleInteraction(event);
+    };
+
+    document.addEventListener('mousedown', handleMouseDown);
+    document.addEventListener('touchstart', handleTouchStart);
 
     return () => {
-      document.removeEventListener('mousedown', handleInteraction);
-      document.removeEventListener('touchstart', handleInteraction);
+      document.removeEventListener('mousedown', handleMouseDown);
+      document.removeEventListener('touchstart', handleTouchStart);
     };
   }, [onClickAway, active]);
 

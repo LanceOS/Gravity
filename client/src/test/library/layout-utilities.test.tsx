@@ -257,6 +257,84 @@ describe('library layout and utilities', () => {
     expect(screen.getByRole('button', { name: 'Open trap' })).toHaveFocus();
   });
 
+  it('uses only pointerdown when Pointer Events are supported', () => {
+    const pointerEventDescriptor = Object.getOwnPropertyDescriptor(window, 'PointerEvent');
+    Object.defineProperty(window, 'PointerEvent', {
+      configurable: true,
+      value: class TestPointerEvent extends MouseEvent {
+        readonly pointerType: string;
+
+        constructor(type: string, eventInitDict: PointerEventInit = {}) {
+          super(type, eventInitDict);
+          this.pointerType = eventInitDict.pointerType ?? '';
+        }
+      },
+    });
+
+    try {
+      const onClickAway = vi.fn();
+      render(
+        <div>
+          <button type="button">Outside pointer target</button>
+          <ClickAwayListener onClickAway={onClickAway}>
+            <div>Inside pointer target</div>
+          </ClickAwayListener>
+        </div>,
+      );
+
+      const outside = screen.getByRole('button', { name: 'Outside pointer target' });
+      fireEvent.pointerDown(outside, { pointerType: 'touch' });
+      // Browsers normally follow pointerdown with mousedown for mouse input.
+      // The pointer-event path must not listen to both event families.
+      fireEvent.mouseDown(outside);
+      fireEvent.touchStart(outside);
+      fireEvent.pointerDown(outside, { pointerType: 'pen' });
+      fireEvent.pointerDown(outside, { pointerType: 'mouse' });
+
+      expect(onClickAway).toHaveBeenCalledTimes(3);
+      expect(onClickAway.mock.calls[0][0]).toHaveProperty('type', 'pointerdown');
+      expect(onClickAway.mock.calls[0][0]).toHaveProperty('pointerType', 'touch');
+      expect(onClickAway.mock.calls[1][0]).toHaveProperty('pointerType', 'pen');
+      expect(onClickAway.mock.calls[2][0]).toHaveProperty('pointerType', 'mouse');
+    } finally {
+      if (pointerEventDescriptor) {
+        Object.defineProperty(window, 'PointerEvent', pointerEventDescriptor);
+      } else {
+        Reflect.deleteProperty(window, 'PointerEvent');
+      }
+    }
+  });
+
+  it('deduplicates compatibility mouse events after touch in browsers without Pointer Events', () => {
+    const pointerEventDescriptor = Object.getOwnPropertyDescriptor(window, 'PointerEvent');
+    Object.defineProperty(window, 'PointerEvent', { configurable: true, value: undefined });
+
+    try {
+      const onClickAway = vi.fn();
+      render(
+        <div>
+          <button type="button">Outside touch target</button>
+          <ClickAwayListener onClickAway={onClickAway}>
+            <div>Inside touch target</div>
+          </ClickAwayListener>
+        </div>,
+      );
+
+      const outside = screen.getByRole('button', { name: 'Outside touch target' });
+      fireEvent.touchStart(outside);
+      fireEvent.mouseDown(outside);
+
+      expect(onClickAway).toHaveBeenCalledTimes(1);
+      expect(onClickAway.mock.calls[0][0]).toHaveProperty('type', 'touchstart');
+    } finally {
+      if (pointerEventDescriptor) {
+        Object.defineProperty(window, 'PointerEvent', pointerEventDescriptor);
+      } else {
+        Reflect.deleteProperty(window, 'PointerEvent');
+      }
+    }
+  });
+
   it('closes a select dropdown when clicking elsewhere in the page, even inside another dialog', async () => {
     const user = userEvent.setup();
 
