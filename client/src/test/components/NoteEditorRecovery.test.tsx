@@ -7,6 +7,7 @@ import { notesService } from '../../modules/notes/services/notesService';
 import { readDraft, writeDraft } from '../../modules/notes/components/noteDrafts';
 import { ApiError } from '../../utils/apiClient';
 import type { Note } from '../../modules/notes/types';
+import { getNoteDraftStorageKey } from '../../constants/storage';
 
 vi.mock('@library', () => ({
   toast: { show: vi.fn() },
@@ -22,7 +23,7 @@ vi.mock('@library', () => ({
 const note = (id: string, version = 1): Note => ({
   id, projectId: 'project', userId: 'owner', title: id, body: `body ${id}`, version, createdAt: '', updatedAt: '',
 });
-const draftKey = (id: string) => `gravity:note-draft:["owner","project","${id}"]`;
+const draftKey = (id: string) => getNoteDraftStorageKey('owner', 'project', id);
 const deferred = <T,>() => {
   let resolve!: (value: T) => void;
   const promise = new Promise<T>(yes => { resolve = yes; });

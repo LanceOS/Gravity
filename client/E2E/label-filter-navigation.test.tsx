@@ -4,6 +4,7 @@ import { describe, it, expect } from 'vitest';
 import { renderMockApp } from './renderMockApp';
 import { dbState } from './setup';
 import { router } from '../src/router';
+import { THEME_STORAGE_KEY } from '../src/constants/storage';
 
 describe('Label filter navigation E2E', () => {
   it('navigates to label-filtered view when clicking a label from ticket detail', async () => {
@@ -64,7 +65,7 @@ describe('Label filter navigation E2E', () => {
       },
     ];
 
-    window.localStorage.setItem('gravity_theme', 'dark');
+    window.localStorage.setItem(THEME_STORAGE_KEY, 'dark');
 
     await router.navigate('/workspaces/wsp-1/projects/prj-1/tickets');
     await renderMockApp();
@@ -134,7 +135,7 @@ describe('Label filter navigation E2E', () => {
       },
     ];
 
-    window.localStorage.setItem('gravity_theme', 'dark');
+    window.localStorage.setItem(THEME_STORAGE_KEY, 'dark');
 
     await router.navigate('/workspaces/wsp-2/projects/prj-2/tickets');
     await renderMockApp();
@@ -220,7 +221,7 @@ describe('Label filter navigation E2E', () => {
       },
     ];
 
-    window.localStorage.setItem('gravity_theme', 'dark');
+    window.localStorage.setItem(THEME_STORAGE_KEY, 'dark');
 
     await router.navigate('/workspaces/wsp-3/projects/prj-3/tickets');
     await renderMockApp();

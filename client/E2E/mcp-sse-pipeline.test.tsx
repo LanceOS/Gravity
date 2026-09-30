@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { renderMockApp } from './renderMockApp';
 import { router } from '../src/router';
 import { queryClient } from '../src/utils/queryClient';
+import { THEME_STORAGE_KEY } from '../src/constants/storage';
 import {
   addWorkspaceMember,
   dbState,
@@ -212,7 +213,7 @@ function seedRealtimeWorkspace(): SeededWorkspace {
   dbState.labels = [bugLabel];
   dbState.tickets = [mainTicket, dependencyTicket];
   dbState.comments = [];
-  window.localStorage.setItem('gravity_theme', 'dark');
+  window.localStorage.setItem(THEME_STORAGE_KEY, 'dark');
 
   return {
     memberUser,

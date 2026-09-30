@@ -12,6 +12,7 @@ import { useNote } from '../hooks/useNote';
 import './NoteEditor.css';
 import { readDraft, writeDraft, subscribeDraft } from './noteDrafts';
 import { NOTE_IMAGE_ACCEPT, validateNoteImage } from '../utils/noteMedia';
+import { getNoteDraftStorageKey } from '../../../constants/storage';
 
 interface NoteEditorProps {
   projectId: string;
@@ -53,7 +54,7 @@ function NoteEditorSession({ projectId, noteId, onTitleChange }: NoteEditorProps
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const draftKey = note ? `gravity:note-draft:${JSON.stringify([note.userId, projectId, noteId])}` : null;
+  const draftKey = note ? getNoteDraftStorageKey(note.userId, projectId, noteId) : null;
   const versionRef = useRef<number>(0);
   const draft = useSyncExternalStore(
     useCallback(listener => subscribeDraft(draftKey, listener), [draftKey]),
