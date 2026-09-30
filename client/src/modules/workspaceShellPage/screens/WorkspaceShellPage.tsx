@@ -1116,6 +1116,11 @@ export function WorkspaceShellPage() {
               settings={accountSettings}
               workspaceId={activeWorkspaceId}
               projectId={aiChatProjectId}
+              navigationScope={{
+                workspaceId: activeWorkspaceId,
+                projectIds: projectIdParam ? [projectIdParam] : [],
+                teamIds: teamIdParam ? [teamIdParam] : [],
+              }}
               isClosing={isAgentClosing}
               isMobile={isMobile}
               seedChatSessionId={currentSeedAiChatSessionId}

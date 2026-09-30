@@ -12,33 +12,32 @@ The system supports multiple providers including OpenAI, Anthropic, Gemini, and 
 
 ## Request Flow
 
-1. **User Input:** The user submits a chat message from the frontend client. Optional ticket attachments are serialized as supplemental context for that model turn.
+1. **User Input:** The user submits a chat message from the frontend client. The client sends the current workspace ID and route’s project/team IDs as `navigationScope` with each turn (including retries and regeneration). Workspace-wide routes send empty lists rather than treating the fallback chat storage project as the selected project. Optional ticket attachments are serialized as supplemental context for that model turn.
 2. **Session Selection:** Provider-backed project chats use a project-scoped chat session from `/api/v1/projects/:projectId/chats`. The frontend lazily creates a session when needed, or seeds `AgentChat` from a selected history item.
 3. **Authentication & Routing:** Provider-backed project messages stream through `/api/v1/projects/:projectId/chats/:chatId/stream`, where project membership is validated. Direct one-off provider requests use `/api/v1/ai/chat` when callers need non-persisted completions.
 4. **Credential Decryption:** The AI services use the configured credential path to securely decrypt provider API keys on the fly.
-5. **Prompt Injection:** The backend injects a strict `systemPrompt` containing rules, identity, and forbidden actions before sending the context to the LLM. Supplemental ticket context is appended to the current user message for the model request only.
+5. **Prompt Injection:** The backend injects a strict `systemPrompt` containing rules, identity, and forbidden actions before sending the context to the LLM. The prompt includes the workspace name/ID and current project names/IDs/keys and team names/IDs. The server resolves these from database records on every turn, verifies that the supplied workspace matches the chat workspace, checks selected project membership and team workspace membership, and rejects scopes outside the chat workspace. Project selections also include their owning teams. Clients without `navigationScope` default to the chat project and its team. Explicit empty lists indicate workspace-wide navigation; ambiguous operations require clarification. This navigation scope is model-only and distinct from the project that stores the chat session. Supplemental ticket context is appended to the current user message for the model request only.
 6. **Tool Execution Loop:**
    - The LLM decides if it needs to call an MCP tool to fulfill the request.
-   - If a tool is called, the request routes through the `McpRequestHandler`.
-   - The handler verifies authorization and proxies the request to the specific tool class (e.g., `TicketTools`).
-7. **State Sanitization:** Before the tool output is returned to the LLM, it passes through the `StateMap` sanitization layer (see Safeguards below).
+   - If a tool is called, project chat calls the shared `executeTool` dispatcher.
+   - The dispatcher validates tool arguments and authorization before invoking the registered handler.
+7. **Tool Results:** Project chat returns authorized tool results as tool messages. Scope IDs are available for tool arguments but must not appear in user-facing responses.
 8. **Persistence & Final Response:** Project chat sessions persist the visible user and assistant messages in `chat_sessions` and `chat_messages`. Model-only ticket context is not persisted in the visible message body. The LLM response is streamed back to the user and stored with the session.
 
 ## Limitations & Safeguards
 
 To prevent data leakage, cross-tenant access, and abuse, the agent chat implements multiple layers of defense-in-depth security.
 
-### 1. Zero-Exposure State Map
-The AI is completely blinded to actual internal database primary keys and UUIDs.
-- **Sanitization:** When MCP tools return data to the LLM, the `StateMap` strips out raw database IDs and replaces them with temporary aliases (e.g., mapping `p-eeebd7ff...` to `Temp-Project-A`).
-- **Desanitization:** When the LLM calls a tool using a temporary ID, the `McpRequestHandler` translates it back to the real database UUID before the tool executes.
-- **Current scope/retention:** The current implementation stores these mappings in process-wide in-memory maps. They are not scoped to an individual user session and are retained until explicitly overwritten, the process restarts, or the implementation performs cleanup.
-- **Why:** This prevents the LLM from seeing raw internal identifiers directly, reducing accidental leakage and making identifier guessing/enumeration harder, but it should not be relied on as a per-session isolation boundary by itself.
+### 1. Internal identifiers
+A legacy state-map utility supports temporary internal identifiers. Provider-backed project chat supplies resolved scope IDs to the model for tool arguments; the system prompt prohibits exposing those IDs in user-facing responses.
+- **Legacy aliases:** `McpStateMap` can replace IDs with temporary aliases within an explicitly established workspace/actor scope. Outside such a scope, authorized IDs remain unchanged.
+- **Retention:** Legacy maps are bounded to 1,000 scopes and 5,000 references per scope, with a one-hour inactivity expiry checked during access. They are not an authorization boundary.
+- **Project chat:** The model receives canonical authorized IDs. Backend tool authorization, rather than ID hiding or prompt instructions, enforces access control.
 
-### 2. Hard Rate Limiting
-Even with strict prompts, LLMs can be jailbroken into attempting bulk operations.
-- Tool handlers (like `createTicket` in `TicketTools`) enforce backend rate limits by requiring at least 3000ms between ticket creations per user; requests made sooner are rejected rather than delayed.
-- If the AI attempts to rapidly create or delete multiple tickets, the backend will reject subsequent requests with a `Rate limit exceeded` error, protecting database integrity.
+### 2. Bounded generation
+Prompt rules are backed by server-owned generation limits.
+- The stream route limits requests per user/project. `GenerationBudget` bounds provider calls, tool calls, input bytes, output tokens, and elapsed time.
+- Admission control limits concurrent generations per user and server process and prevents simultaneous generations for the same chat. These limits are separate from tool authorization.
 
 ### 3. Strict System Prompt Directives
 The injected system prompt establishes non-negotiable rules for the AI's behavior:
@@ -48,5 +47,9 @@ The injected system prompt establishes non-negotiable rules for the AI's behavio
 
 ### 4. Cross-Tenant Isolation
 The AI only operates within the bounds of the caller's active Workspace ID.
-- Every MCP tool call asserts that the requested resource (e.g., a `projectId` or `ticketKey`) belongs to the authenticated user's workspace.
-- Even if the AI guesses a valid ID belonging to another tenant, the `assertProjectInWorkspace` (and similar guards) will block the execution with an `Unauthorized` error.
+- Every project-chat tool call goes through `assertToolExecutionAllowed` with the server-resolved workspace and authenticated actor.
+- Resource authorization rejects IDs or ticket keys outside that scope. Navigation context supplies defaults for the model; it cannot expand backend permissions.
+
+## Navigation context regression checks
+
+Run the focused chat service/API suites with Vitest (the server test setup forces `pgmem://gravity` and disables Redis), and the client `ChatContext` and `AppShellPage` suites. On Node 26, use `NODE_OPTIONS=--no-experimental-webstorage` for the client tests (runtime compatibility is tracked in GRAV-246). They cover current scope serialization, renamed scopes across turns, invalid/inaccessible selections, and keeping injected context out of stored and visible user messages. Chat remains project-backed: a project is required to store the session, even on a team/workspace view. The stateless `/ai/chat` endpoint has no navigation/session binding and is not used by the assistant UI.

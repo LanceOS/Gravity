@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { asc, eq } from 'drizzle-orm';
 import { ChatService, isStreamingChatProvider, isSupportedChatProvider } from '../../src/modules/chats/services/chat-service.js';
 import { db } from '../../src/db/index.js';
-import { chatMessages, chatSessions, projects } from '../../src/db/schema.js';
+import { chatMessages, chatSessions, projects, teams, workspaces, projectMembers } from '../../src/db/schema.js';
 import { createId } from '../../src/lib/platform.js';
 import { seedUser, seedWorkspaceFixture } from '../helpers/test-helpers.js';
 import { mcpToolsList } from '../../src/modules/mcp/tools.js';
@@ -42,6 +42,7 @@ async function createChatFixture() {
     userId: owner.id,
     chatId,
     projectId: project.id,
+    teamId,
     workspace,
     project,
   };
@@ -60,6 +61,74 @@ describe('ChatService', () => {
   afterEach(() => {
     mcpToolsList.splice(0, mcpToolsList.length);
     vi.restoreAllMocks();
+  });
+
+  it('refreshes names and navigation scope each turn without persisting injected context', async () => {
+    const fixture = await createChatFixture();
+    const ai = { chat: vi.fn().mockResolvedValue({ content: 'Ready.' }) };
+    const service = new ChatService({ ai });
+    await service.generateResponse({ ...fixture, message: 'Where am I?', navigationScope: { workspaceId: fixture.workspace.id, projectIds: [fixture.projectId], teamIds: [] } });
+    const prompt = () => (ai.chat.mock.calls as any).at(-1)[2].messages[0].content;
+    expect(prompt()).toContain(JSON.stringify({ id: fixture.projectId, name: fixture.project.name, key: fixture.project.key }));
+    expect(prompt()).toContain(fixture.teamId);
+    await db.update(teams).set({ name: 'Renamed team' }).where(eq(teams.id, fixture.teamId));
+    await db.update(workspaces).set({ name: 'Renamed workspace' }).where(eq(workspaces.id, fixture.workspace.id));
+    await service.generateResponse({ ...fixture, message: 'And now?', navigationScope: { workspaceId: fixture.workspace.id, projectIds: [], teamIds: [fixture.teamId] } });
+    expect(prompt()).toContain('Renamed workspace');
+    expect(prompt()).toContain('"projects":[],"teams":[{"id":"' + fixture.teamId + '","name":"Renamed team"}]');
+    await service.generateResponse({ ...fixture, message: 'All work', navigationScope: { workspaceId: fixture.workspace.id, projectIds: [], teamIds: [] } });
+    expect(prompt()).toContain('"projects":[],"teams":[]');
+    const messages = await db.select().from(chatMessages).where(eq(chatMessages.sessionId, fixture.chatId));
+    expect(messages.filter((message) => message.role === 'user').map((message) => message.content)).toEqual(['Where am I?', 'And now?', 'All work']);
+    expect(messages.some((message) => message.content.includes('Current navigation scope'))).toBe(false);
+  });
+
+  it('resolves and deduplicates multiple selected projects and teams using current database names', async () => {
+    const fixture = await createChatFixture();
+    const [original] = await db.select().from(projects).where(eq(projects.id, fixture.projectId));
+    await db.insert(teams).values({ id: 'second-team', workspaceId: fixture.workspace.id, name: 'Second team' });
+    await db.insert(projects).values({ ...original, id: 'second-project', key: 'SECOND', name: 'Second project', teamId: 'second-team', inviteCode: 'SECOND-INVITE' });
+    await db.insert(projectMembers).values({ projectId: 'second-project', userId: fixture.userId, role: 'owner' });
+    await db.update(projects).set({ name: 'Renamed project' }).where(eq(projects.id, fixture.projectId));
+    const ai = { chat: vi.fn().mockResolvedValue({ content: 'Ready.' }) };
+    await new ChatService({ ai }).generateResponse({ ...fixture, message: 'Compare these projects', navigationScope: {
+      workspaceId: fixture.workspace.id,
+      projectIds: [fixture.projectId, 'second-project', fixture.projectId],
+      teamIds: ['second-team', fixture.teamId, 'second-team'],
+    } });
+    const prompt = (ai.chat.mock.calls as any)[0][2].messages[0].content as string;
+    const scopeLine = prompt.split('\n').find((line) => line.startsWith('Current navigation scope'))!;
+    const scope = JSON.parse(scopeLine.slice(scopeLine.indexOf('{')));
+    expect(scope.projects).toEqual([
+      { id: fixture.projectId, name: 'Renamed project', key: fixture.project.key },
+      { id: 'second-project', name: 'Second project', key: 'SECOND' },
+    ]);
+    expect(scope.teams).toHaveLength(2);
+    expect(scope.teams).toContainEqual({ id: 'second-team', name: 'Second team' });
+  });
+
+  it('rejects missing, cross-workspace, and non-member project scopes before calling the provider', async () => {
+    const fixture = await createChatFixture();
+    const other = await seedWorkspaceFixture({
+      owner: { id: fixture.userId, name: 'Chat Service User', email: 'chat-service-user@example.com' },
+      workspace: { id: 'other-workspace', key: 'OTHER', workspaceKey: 'WS-OTHER' },
+      project: { id: 'other-project', key: 'OTHER', inviteCode: 'OTHER-INVITE' },
+    });
+    const [otherProject] = await db.select().from(projects).where(eq(projects.id, other.project.id));
+    await db.insert(projects).values({ id: 'private-project', name: 'Private', key: 'PRIV', inviteCode: 'PRIVATE-INVITE', createdBy: fixture.userId, workspaceId: fixture.workspace.id, teamId: fixture.teamId });
+    const ai = { chat: vi.fn() };
+    for (const navigationScope of [
+      { projectIds: ['missing'], teamIds: [] },
+      { projectIds: [other.project.id], teamIds: [] },
+      { projectIds: ['private-project'], teamIds: [] },
+      { projectIds: [], teamIds: ['missing'] },
+      { projectIds: [], teamIds: [otherProject.teamId] },
+    ]) {
+      await expect(new ChatService({ ai }).generateResponse({ ...fixture, message: 'Use this scope', navigationScope: { workspaceId: fixture.workspace.id, ...navigationScope } }))
+        .rejects.toThrow('Invalid navigation scope.');
+    }
+    await expect(new ChatService({ ai }).generateResponse({ ...fixture, message: 'Wrong workspace', navigationScope: { workspaceId: other.workspace.id, projectIds: [], teamIds: [] } })).rejects.toThrow('Invalid navigation scope.');
+    expect(ai.chat).not.toHaveBeenCalled();
   });
 
   it('includes project context, prior messages, and available tools in the model prompt', async () => {
@@ -131,7 +200,7 @@ describe('ChatService', () => {
 
     expect(options.messages[0].role).toBe('system');
     expect(options.messages[0].content).toContain(`Workspace: ${workspace.name} (${workspace.id})`);
-    expect(options.messages[0].content).toContain(`Project: ${project.name} (${project.key})`);
+    expect(options.messages[0].content).toContain(JSON.stringify({ id: project.id, name: project.name, key: project.key }));
     expect(options.messages[0].content).toContain('- list_tickets: List tickets with optional status filtering.');
     expect(options.messages[1]).toMatchObject({ role: 'user', content: 'Current sprint is healthy.' });
     expect(options.messages[2]).toMatchObject({ role: 'assistant', content: 'Great, I noted it.' });

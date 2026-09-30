@@ -4,6 +4,7 @@ import type { SidebarTeam } from '../../../types/domain';
 import type { WorkspaceSettings } from '../../../utils/settings';
 
 export interface AiChatDockProps {
+  navigationScope?: AgentChatProps['navigationScope'];
   onClose: () => void;
   initialModel: string;
   settings: WorkspaceSettings;
@@ -21,6 +22,7 @@ export interface AiChatDockProps {
 }
 
 export function AiChatDock({
+  navigationScope,
   onClose,
   initialModel,
   settings,
@@ -36,6 +38,7 @@ export function AiChatDock({
   ticketAttachmentDefaultScopeId,
 }: AiChatDockProps) {
   const chatProps: AgentChatProps = {
+    navigationScope,
     onClose,
     initialModel,
     settings,

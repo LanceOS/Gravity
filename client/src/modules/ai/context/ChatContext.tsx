@@ -1,6 +1,6 @@
 import { toast } from '@library';
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
-import type { Message, SendMessageOptions } from '../types/AgentChat';
+import type { Message, SendMessageOptions, NavigationScope } from '../types/AgentChat';
 import type { WorkspaceSettings } from '../../../utils/settings';
 import { apiClient } from '../../../utils/apiClient';
 import { queryClient, queryKeys, CACHE_CONFIGS } from '../../../utils/queryClient';
@@ -78,7 +78,7 @@ async function readErrorMessage(response: Response) {
 async function postChatCompletionSse(
   projectId: string,
   chatId: string,
-  payload: { message: string; provider: string; model?: string; context?: string },
+  payload: { message: string; provider: string; model?: string; context?: string; navigationScope?: NavigationScope },
   signal: AbortSignal,
 ) {
   const response = await apiClient.raw(`/projects/${encodeURIComponent(projectId)}/chats/${encodeURIComponent(chatId)}/stream`, {
@@ -110,6 +110,7 @@ async function postChatCompletionSse(
 }
 
 export interface ChatProviderProps {
+  navigationScope?: NavigationScope;
   children: React.ReactNode;
   initialModel: string;
   settings: WorkspaceSettings;
@@ -122,6 +123,7 @@ export interface ChatProviderProps {
 
 export const ChatContextProvider: React.FC<ChatProviderProps> = ({
   children,
+  navigationScope,
   initialModel,
   settings,
   workspaceId,
@@ -296,6 +298,7 @@ export const ChatContextProvider: React.FC<ChatProviderProps> = ({
       }
       const doneEvent = await postChatCompletionSse(activeProjectId, chatId, {
         message: textToSend,
+        ...(navigationScope ? { navigationScope } : {}),
         provider: settings.aiProvider,
         ...(model ? { model } : {}),
         ...(normalizedModelContext ? { context: normalizedModelContext } : {}),

@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter, useLocation, Route, Routes } from 'react-router-dom';
@@ -182,9 +182,10 @@ vi.mock('../../utils/webmcp', async importOriginal => ({
 
 vi.mock('../../modules/ai', () => ({
   AgentSimulator: () => <div>AgentSimulator</div>,
-  AgentChat: ({ seedChatSessionId, seedMessages }: any) => (
+  AgentChat: ({ seedChatSessionId, seedMessages, navigationScope, projectId }: any) => (
     <div>
       <div>AgentChat</div>
+      <div data-testid="chat-navigation" data-storage-project={projectId}>{JSON.stringify(navigationScope)}</div>
       <div data-testid="local-ai-chat-session">{seedChatSessionId || ''}</div>
       <div data-testid="local-ai-chat-messages">{JSON.stringify(seedMessages ?? [])}</div>
     </div>
@@ -904,6 +905,25 @@ describe('AppShellPage', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+  });
+
+  it.each([
+    ['/workspaces/workspace-1/projects/project-2/tickets', ['project-2'], []],
+    ['/workspaces/workspace-1/teams/team-1/projects/project-2/tickets', ['project-2'], ['team-1']],
+    ['/workspaces/workspace-1/teams/team-1/tasks', [], ['team-1']],
+    ['/workspaces/workspace-1/all', [], []],
+  ])('passes the visible route scope to chat on %s', async (path, projectIds, teamIds) => {
+    mockAggregateApiResponses();
+    renderAppShell({
+      tickets: buildUseTickets({ activeProjectId: 'project-1', projects: aggregateProjects, tickets: [] }),
+      initialEntries: [path as string],
+    });
+    await waitFor(() => expect(screen.getByText('WorkspaceLayout')).toBeInTheDocument());
+    fireEvent.keyDown(window, { key: 'c', ctrlKey: true, shiftKey: true });
+    await waitFor(() => expect(screen.getByTestId('chat-navigation')).toBeInTheDocument());
+    expect(JSON.parse(screen.getByTestId('chat-navigation').textContent!)).toEqual({
+      workspaceId: 'workspace-1', projectIds, teamIds,
+    });
   });
 
   it('renders the auth screen when no current user is available', () => {

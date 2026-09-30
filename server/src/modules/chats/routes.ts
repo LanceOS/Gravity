@@ -9,7 +9,7 @@ import { env } from '../../env.js';
 import { chatMessages, chatSessions, projects } from '../../db/schema.js';
 import { resolveRequestActorUserId } from '../auth/utils/request-auth.js';
 import { authorizeProjectMemberAccess } from '../workspaces/services/membership.js';
-import { ChatService, isSupportedChatProvider } from './services/chat-service.js';
+import { ChatService, isSupportedChatProvider, type NavigationScope } from './services/chat-service.js';
 
 const CHAT_ROLES = ['user', 'assistant', 'system'] as const;
 const DEFAULT_CHAT_LIMIT = 20;
@@ -563,6 +563,17 @@ export function createChatsRouter() {
       return;
     }
 
+    const navigationScope = req.body?.navigationScope;
+    if (navigationScope !== undefined && (
+      !isPlainObject(navigationScope) ||
+      typeof navigationScope.workspaceId !== 'string' || !navigationScope.workspaceId.trim() || navigationScope.workspaceId.length > 200 ||
+      !['projectIds', 'teamIds'].every((key) => Array.isArray(navigationScope[key]) &&
+        navigationScope[key].length <= 100 &&
+        navigationScope[key].every((id: unknown) => typeof id === 'string' && id.trim().length > 0 && id.length <= 200))
+    )) {
+      res.status(400).json({ error: 'Invalid navigation scope.' });
+      return;
+    }
     const messageContext = normalizeChatMessageContext(req.body?.context);
     const messageModel = normalizeChatModel(req.body?.model ?? req.query.model);
     const maxTokens = normalizeChatMaxTokens(req.body?.maxTokens ?? req.query.maxTokens);
@@ -591,6 +602,7 @@ export function createChatsRouter() {
         chatId,
         userId: auth.userId,
         message: userMessage,
+        navigationScope: navigationScope as NavigationScope | undefined,
         messageContext: messageContext || undefined,
         provider: requestedProvider || undefined,
         model: messageModel.length > 0 ? messageModel : undefined,

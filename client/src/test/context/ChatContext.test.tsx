@@ -115,6 +115,30 @@ describe('ChatContextProvider integration', () => {
     });
   });
 
+  it('sends the current navigation scope on each turn without adding it to visible messages', async () => {
+    const bodies: any[] = [];
+    mocks.fetch.mockImplementation((url: string, options: RequestInit) => {
+      if (url.endsWith('/stream')) bodies.push(JSON.parse(options.body as string));
+      return Promise.resolve(createSseResponse([{ type: 'done', message: 'Ready.' }]));
+    });
+    const view = (projectIds: string[], teamIds: string[]) => (
+      <Wrapper><ChatContextProvider initialModel="gpt-4o-mini" settings={mockSettings}
+        projectId="storage-project" seedChatSessionId="chat-1" navigationScope={{ workspaceId: 'w-1', projectIds, teamIds }}>
+        <TestComponent />
+      </ChatContextProvider></Wrapper>
+    );
+    const { rerender } = render(view(['visible-project'], []));
+    fireEvent.click(screen.getByTestId('send-btn'));
+    await waitFor(() => expect(screen.getByTestId('is-generating')).toHaveTextContent('no'));
+    expect(bodies[0]).toMatchObject({ message: 'Hello', navigationScope: { projectIds: ['visible-project'], teamIds: [] } });
+    rerender(view([], ['visible-team']));
+    fireEvent.click(screen.getByTestId('send-btn'));
+    await waitFor(() => expect(bodies).toHaveLength(2));
+    expect(bodies[1].navigationScope).toEqual({ workspaceId: 'w-1', projectIds: [], teamIds: ['visible-team'] });
+    expect(screen.getByTestId('msg-list')).not.toHaveTextContent('visible-project');
+    expect(screen.getByTestId('msg-list')).not.toHaveTextContent('visible-team');
+  });
+
   it('creates a chat session and appends the streamed assistant response', async () => {
     mocks.fetch.mockImplementation((url: string) => {
       if (url === '/api/v1/mcp/sse') {
