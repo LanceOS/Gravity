@@ -26,7 +26,7 @@ export function TimePicker({ value, onChange, label }: TimePickerProps) {
           style={{ minHeight: '36px' }}
         >
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', fontSize: '13px' }}>
-            <Clock size={14} className="select-trigger__icon" />
+            <Clock size={14} className="select-trigger__icon" aria-hidden="true" />
             {value || 'Pick time'}
           </span>
         </button>

@@ -149,7 +149,7 @@ export function AIChatWindow({
             onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-text-primary)'; e.currentTarget.style.backgroundColor = 'var(--color-base100)'; }}
             onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-disabled)'; e.currentTarget.style.backgroundColor = 'transparent'; }}
           >
-            <X size={15} />
+            <X size={15} aria-hidden="true" />
           </button>
         )}
       </div>
@@ -225,6 +225,7 @@ export function AIChatWindow({
                   animation: generatingIconAnimation,
                   transformOrigin: 'center',
                 }}
+                aria-hidden="true"
               />
               <Sparkles
                 size={9}
@@ -236,6 +237,7 @@ export function AIChatWindow({
                   animation: generatingSparkleAnimation,
                   transformOrigin: 'center',
                 }}
+                aria-hidden="true"
               />
             </div>
             <span style={{ fontWeight: 500 }}>Generating answer...</span>
@@ -345,7 +347,7 @@ export function AIChatWindow({
               transition: 'background-color var(--transition-fast), color var(--transition-fast)',
             }}
           >
-            {isGenerating && onCancel ? <Square size={12} /> : <Send size={12} />}
+            {isGenerating && onCancel ? <Square size={12} aria-hidden="true" /> : <Send size={12} aria-hidden="true" />}
           </button>
         </form>
         {inputAccessory && (

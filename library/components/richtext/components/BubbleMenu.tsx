@@ -122,28 +122,28 @@ export function BubbleMenu() {
         transform: bubbleMenuStyle.placeBelow ? 'translate(-50%, 0)' : 'translate(-50%, -100%)',
       }}
     >
-      <FormattingButton label="bubble-bold" title="Bold" icon={<Bold size={14} />} active={boldActive} disabled={readOnly} onClick={() => {
+      <FormattingButton label="bubble-bold" title="Bold" icon={<Bold size={14} aria-hidden="true" />} active={boldActive} disabled={readOnly} onClick={() => {
         runEditorCommand(view, toggleMark(richTextSchema.marks.strong));
       }} />
-      <FormattingButton label="bubble-italic" title="Italic" icon={<Italic size={14} />} active={italicActive} disabled={readOnly} onClick={() => {
+      <FormattingButton label="bubble-italic" title="Italic" icon={<Italic size={14} aria-hidden="true" />} active={italicActive} disabled={readOnly} onClick={() => {
         runEditorCommand(view, toggleMark(richTextSchema.marks.em));
       }} />
-      <FormattingButton label="bubble-link" title="Link" icon={<Link2 size={14} />} active={linkActive} disabled={readOnly} onClick={() => {
+      <FormattingButton label="bubble-link" title="Link" icon={<Link2 size={14} aria-hidden="true" />} active={linkActive} disabled={readOnly} onClick={() => {
         runEditorCommand(view, toggleLink());
       }} />
-      <FormattingButton label="bubble-code" title="Inline code" icon={<Code2 size={14} />} active={codeActive} disabled={readOnly} onClick={() => {
+      <FormattingButton label="bubble-code" title="Inline code" icon={<Code2 size={14} aria-hidden="true" />} active={codeActive} disabled={readOnly} onClick={() => {
         runEditorCommand(view, toggleMark(richTextSchema.marks.code));
       }} />
-      <FormattingButton label="bubble-h1" title="Heading 1" icon={<Heading1 size={14} />} active={h1Active} disabled={readOnly} onClick={() => {
+      <FormattingButton label="bubble-h1" title="Heading 1" icon={<Heading1 size={14} aria-hidden="true" />} active={h1Active} disabled={readOnly} onClick={() => {
         runEditorCommand(view, toggleHeading(1));
       }} />
-      <FormattingButton label="bubble-h2" title="Heading 2" icon={<Heading2 size={14} />} active={h2Active} disabled={readOnly} onClick={() => {
+      <FormattingButton label="bubble-h2" title="Heading 2" icon={<Heading2 size={14} aria-hidden="true" />} active={h2Active} disabled={readOnly} onClick={() => {
         runEditorCommand(view, toggleHeading(2));
       }} />
-      <FormattingButton label="bubble-bullet-list" title="Bullet list" icon={<List size={14} />} active={bulletActive} disabled={readOnly} onClick={() => {
+      <FormattingButton label="bubble-bullet-list" title="Bullet list" icon={<List size={14} aria-hidden="true" />} active={bulletActive} disabled={readOnly} onClick={() => {
         runEditorCommand(view, toggleList('bullet_list'));
       }} />
-      <FormattingButton label="bubble-ordered-list" title="Numbered list" icon={<ListOrdered size={14} />} active={orderedActive} disabled={readOnly} onClick={() => {
+      <FormattingButton label="bubble-ordered-list" title="Numbered list" icon={<ListOrdered size={14} aria-hidden="true" />} active={orderedActive} disabled={readOnly} onClick={() => {
         runEditorCommand(view, toggleList('ordered_list'));
       }} />
     </div>

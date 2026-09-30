@@ -78,7 +78,7 @@ export function TreeSelect({ nodes, value, onChange, placeholder = 'Select node'
         {label && <label className="label">{label}</label>}
         <button type="button" onClick={() => setIsOpen(!isOpen)} className="select-trigger clickable">
           <span style={{ fontSize: '13px' }}>{value || placeholder}</span>
-          <ChevronDown size={14} className="select-trigger__icon" />
+          <ChevronDown size={14} className="select-trigger__icon" aria-hidden="true" />
         </button>
         {isOpen && (
           <div

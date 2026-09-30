@@ -154,6 +154,8 @@ export function ChatInterface({
               {/* Avatar */}
               {!isSystem && (
                 <div
+                  role="img"
+                  aria-label={isUser ? 'You' : 'Assistant'}
                   style={{
                     width: '32px',
                     height: '32px',
@@ -170,7 +172,7 @@ export function ChatInterface({
                     boxShadow: 'var(--shadow-sm)',
                   }}
                 >
-                  {isUser ? <User size={14} /> : <Sparkles size={14} />}
+                  {isUser ? <User size={14} aria-hidden="true" /> : <Sparkles size={14} aria-hidden="true" />}
                 </div>
               )}
 
@@ -250,12 +252,12 @@ export function ChatInterface({
                     >
                       {copiedKey === String(idx) ? (
                         <>
-                          <Check size={11} style={{ color: 'var(--color-success)' }} />
+                          <Check size={11} style={{ color: 'var(--color-success)' }} aria-hidden="true" />
                           <span style={{ color: 'var(--color-success)' }}>Copied!</span>
                         </>
                       ) : (
                         <>
-                          <Copy size={11} />
+                          <Copy size={11} aria-hidden="true" />
                           <span>Copy</span>
                         </>
                       )}
@@ -282,7 +284,7 @@ export function ChatInterface({
                         onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-text-secondary)'; e.currentTarget.style.background = 'var(--color-base100)'; }}
                         onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-disabled)'; e.currentTarget.style.background = 'transparent'; }}
                       >
-                        <RefreshCw size={11} />
+                        <RefreshCw size={11} aria-hidden="true" />
                         <span>Regenerate</span>
                       </button>
                     )}
@@ -319,7 +321,7 @@ export function ChatInterface({
                 boxShadow: 'var(--shadow-sm)',
               }}
             >
-              <Sparkles size={14} />
+              <Sparkles size={14} aria-hidden="true" />
             </div>
             <div
               style={{
@@ -371,7 +373,7 @@ export function ChatInterface({
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--color-text-error)', fontSize: '12px' }}>
-              <AlertCircle size={14} style={{ flexShrink: 0 }} />
+              <AlertCircle size={14} style={{ flexShrink: 0 }} aria-hidden="true" />
               <span>{error}</span>
             </div>
             {onRetry && (
@@ -449,9 +451,9 @@ export function ChatInterface({
             }}
           >
             {isGenerating ? (
-              <Loader2 size={12} className="animate-spin" style={{ animation: 'spin 1s linear infinite' }} />
+              <Loader2 size={12} className="animate-spin" style={{ animation: 'spin 1s linear infinite' }} aria-hidden="true" />
             ) : (
-              <Send size={12} />
+              <Send size={12} aria-hidden="true" />
             )}
           </button>
         </form>

@@ -47,14 +47,20 @@ export function TreeView({ nodes, onNodeClick, style }: TreeViewProps) {
               <button
                 type="button"
                 onClick={(e) => toggleExpand(node.id, e)}
+                aria-label={`${isExpanded ? 'Collapse' : 'Expand'} ${node.label}`}
+                aria-expanded={isExpanded}
                 style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: 'var(--color-text-disabled)', display: 'flex', alignItems: 'center' }}
               >
-                <ChevronDown size={14} style={{ transform: isExpanded ? 'none' : 'rotate(-90deg)', transition: 'transform var(--transition-fast)' }} />
+                <ChevronDown size={14} style={{ transform: isExpanded ? 'none' : 'rotate(-90deg)', transition: 'transform var(--transition-fast)' }} aria-hidden="true" />
               </button>
-              <Folder size={14} style={{ color: 'var(--color-primary)' }} />
+              <span role="img" aria-label="Folder" style={{ display: 'inline-flex' }}>
+                <Folder size={14} style={{ color: 'var(--color-primary)' }} aria-hidden="true" />
+              </span>
             </div>
           ) : (
-            <File size={14} style={{ color: 'var(--color-text-disabled)' }} />
+            <span role="img" aria-label="File" style={{ display: 'inline-flex' }}>
+              <File size={14} style={{ color: 'var(--color-text-disabled)' }} aria-hidden="true" />
+            </span>
           )}
           <span>{node.label}</span>
         </div>

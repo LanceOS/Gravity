@@ -177,7 +177,7 @@ export function Drawer({ isOpen, onClose, title, children, style }: DrawerProps)
                   className="btn btn-ghost clickable"
                   style={{ padding: '6px', minHeight: 'auto', borderRadius: 'var(--radius-sm)' }}
                 >
-                  <X size={16} />
+                  <X size={16} aria-hidden="true" />
                 </button>
               </div>
               <div style={{ padding: '24px', overflowY: 'auto', flexGrow: 1, fontSize: '13px' }}>{children}</div>

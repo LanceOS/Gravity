@@ -182,7 +182,7 @@ export function Modal({ isOpen, onClose, title, children, footer, style }: Modal
                   className="btn btn-ghost clickable"
                   style={{ padding: '6px', minHeight: 'auto', borderRadius: 'var(--radius-sm)' }}
                 >
-                  <X size={16} />
+                  <X size={16} aria-hidden="true" />
                 </button>
               </div>
               <div style={{ padding: '24px', overflowY: 'auto', flexGrow: 1, fontSize: '13px' }}>{children}</div>

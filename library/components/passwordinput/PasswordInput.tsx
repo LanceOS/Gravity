@@ -33,7 +33,7 @@ export function PasswordInput({ className = '', ...props }: PasswordInputProps) 
           justifyContent: 'center',
         }}
       >
-        {show ? <EyeOff size={16} /> : <Eye size={16} />}
+        {show ? <EyeOff size={16} aria-hidden="true" /> : <Eye size={16} aria-hidden="true" />}
       </button>
     </div>
   );
