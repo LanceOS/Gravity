@@ -19,8 +19,14 @@ export function ThemeToggle() {
     if (theme === 'system') {
       const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
       const handleSystemChange = () => applyTheme('system');
-      mediaQuery.addEventListener('change', handleSystemChange);
-      return () => mediaQuery.removeEventListener('change', handleSystemChange);
+
+      if (typeof mediaQuery.addEventListener === 'function') {
+        mediaQuery.addEventListener('change', handleSystemChange);
+        return () => mediaQuery.removeEventListener('change', handleSystemChange);
+      }
+
+      mediaQuery.addListener(handleSystemChange);
+      return () => mediaQuery.removeListener(handleSystemChange);
     }
   }, [theme]);
 
