@@ -181,7 +181,7 @@ function ToastItemComponent({ item, onExited }: ToastItemComponentProps) {
         }}
         style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: 'var(--color-text-disabled)' }}
       >
-        <X size={14} />
+        <X size={14} aria-hidden="true" />
       </button>
     </div>
   );

@@ -9,6 +9,8 @@ export function CircularSpinner({ size = 20, style }: CircularSpinnerProps) {
   return (
     <svg
       className="lib-spinner"
+      role="status"
+      aria-label="Loading"
       viewBox="0 0 50 50"
       style={{
         width: `${size}px`,

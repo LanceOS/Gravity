@@ -205,12 +205,12 @@ export function CodeBlock({ code, language, toneStyles }: CodeBlockProps) {
         >
           {copied ? (
             <>
-              <Check size={12} style={{ color: 'var(--color-success)' }} />
+              <Check size={12} style={{ color: 'var(--color-success)' }} aria-hidden="true" />
               <span style={{ color: 'var(--color-success)' }}>Copied!</span>
             </>
           ) : (
             <>
-              <Clipboard size={12} />
+              <Clipboard size={12} aria-hidden="true" />
               <span>{error ? 'Copy failed' : 'Copy'}</span>
             </>
           )}
@@ -486,11 +486,11 @@ export const FormattedMarkdown = React.memo(function FormattedMarkdown({ text, c
                           marginLeft: '-24px',
                         }}
                       >
-                        <div style={{ marginTop: '2px' }}>
+                        <div role="img" aria-label={item.checked ? 'Checked' : 'Not checked'} style={{ marginTop: '2px' }}>
                           {item.checked ? (
-                            <CheckSquare size={14} color={toneStyles.accent} />
+                            <CheckSquare size={14} color={toneStyles.accent} aria-hidden="true" />
                           ) : (
-                            <Square size={14} color={toneStyles.iconMuted} />
+                            <Square size={14} color={toneStyles.iconMuted} aria-hidden="true" />
                           )}
                         </div>
                         <span style={{ textDecoration: item.checked ? 'line-through' : 'none', opacity: item.checked ? 0.7 : 1 }}>

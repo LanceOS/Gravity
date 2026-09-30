@@ -26,6 +26,7 @@ export function Rating({ max = 5, value, onChange, label }: RatingProps) {
               onMouseLeave={() => setHoverVal(null)}
               onClick={() => onChange(starVal)}
               aria-label={`Rate ${starVal} out of ${max}`}
+              aria-pressed={value === starVal}
               style={{
                 background: 'none',
                 border: 'none',
@@ -35,7 +36,7 @@ export function Rating({ max = 5, value, onChange, label }: RatingProps) {
                 transition: 'color var(--transition-fast)',
               }}
             >
-              <Star size={18} fill={isActive ? 'var(--color-text-secondary)' : 'none'} />
+              <Star size={18} fill={isActive ? 'var(--color-text-secondary)' : 'none'} aria-hidden="true" />
             </button>
           );
         })}

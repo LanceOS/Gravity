@@ -52,11 +52,11 @@ export function ThemeToggle() {
         cursor: 'pointer',
       }}
     >
-      {theme === 'marble-blue' && <Sun size={15} style={{ color: 'var(--color-text-secondary)' }} />}
+      {theme === 'marble-blue' && <Sun size={15} style={{ color: 'var(--color-text-secondary)' }} aria-hidden="true" />}
       {(theme === 'dark' || theme === 'coal-black' || theme === 'coffee' || theme === 'midnight-azure') && (
-        <Moon size={15} style={{ color: 'var(--color-primary)' }} />
+        <Moon size={15} style={{ color: 'var(--color-primary)' }} aria-hidden="true" />
       )}
-      {theme === 'system' && <Laptop size={15} style={{ color: 'var(--color-text-disabled)' }} />}
+      {theme === 'system' && <Laptop size={15} style={{ color: 'var(--color-text-disabled)' }} aria-hidden="true" />}
     </button>
   );
 }

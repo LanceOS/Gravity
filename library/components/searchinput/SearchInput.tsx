@@ -18,7 +18,7 @@ export function SearchInput({ className = '', ...props }: SearchInputProps) {
           alignItems: 'center',
         }}
       >
-        <Search size={15} />
+        <Search size={15} aria-hidden="true" />
       </div>
       <TextInput
         type="search"

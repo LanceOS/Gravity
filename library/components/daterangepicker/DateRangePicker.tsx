@@ -58,7 +58,7 @@ export function DateRangePicker({ value, onChange, label }: DateRangePickerProps
           style={{ minHeight: '36px' }}
         >
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', fontSize: '13px' }}>
-            <Calendar size={14} className="select-trigger__icon" />
+            <Calendar size={14} className="select-trigger__icon" aria-hidden="true" />
             {getRangeText()}
           </span>
         </button>

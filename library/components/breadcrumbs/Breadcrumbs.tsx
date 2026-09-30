@@ -33,7 +33,7 @@ export function Breadcrumbs({ items, style }: BreadcrumbsProps) {
                 {item.label}
               </span>
             )}
-            {!isLast && <ChevronRight size={13} style={{ color: 'var(--color-text-disabled)' }} />}
+            {!isLast && <ChevronRight size={13} style={{ color: 'var(--color-text-disabled)' }} aria-hidden="true" />}
           </React.Fragment>
         );
       })}

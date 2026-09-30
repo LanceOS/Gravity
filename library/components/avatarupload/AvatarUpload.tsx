@@ -19,12 +19,17 @@ export function AvatarUpload({ src, onChange, label }: AvatarUploadProps) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
       {label && <label className="label">{label}</label>}
-      <div
+      <input ref={fileRef} type="file" accept="image/*" onChange={handleFileChange} style={{ display: 'none' }} />
+      <button
+        type="button"
         className="clickable"
+        aria-label={label ? `Upload ${label.toLowerCase()}` : 'Upload avatar'}
         onClick={() => fileRef.current?.click()}
         style={{
           width: '80px',
           height: '80px',
+          boxSizing: 'content-box',
+          padding: 0,
           borderRadius: 'var(--radius-full)',
           border: '1px solid var(--color-border-default)',
           position: 'relative',
@@ -34,15 +39,15 @@ export function AvatarUpload({ src, onChange, label }: AvatarUploadProps) {
           alignItems: 'center',
           justifyContent: 'center',
           cursor: 'pointer',
+          font: 'inherit',
         }}
       >
-        <input ref={fileRef} type="file" accept="image/*" onChange={handleFileChange} style={{ display: 'none' }} />
         {src ? (
           <img src={src} alt="Avatar Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
         ) : (
-          <User size={32} style={{ color: 'var(--color-text-disabled)' }} />
+          <User size={32} style={{ color: 'var(--color-text-disabled)' }} aria-hidden="true" />
         )}
-      </div>
+      </button>
     </div>
   );
 }
