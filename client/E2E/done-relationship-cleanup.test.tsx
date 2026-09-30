@@ -2,7 +2,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { renderMockApp } from './renderMockApp';
-import { dbState, resetMockDb } from './setup';
+import { dbState } from './setup';
 import { router } from '../src/router';
 
 describe('Relationship cleanup on status transition to done E2E', () => {
