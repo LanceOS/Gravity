@@ -1,7 +1,7 @@
 import dotenv from 'dotenv';
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
-import { z } from 'zod';
+import { parseDeploymentConfig } from './config.js';
 
 const rootEnvPath = join(process.cwd(), '..', '.env');
 const serverEnvPath = join(process.cwd(), '.env');
@@ -27,64 +27,7 @@ for (const [key, value] of Object.entries(mergedEnv)) {
   }
 }
 
-const envSchema = z.object({
-  PORT: z.coerce.number().int().positive().default(8080),
-  FEDERATION_SYNC_INTERVAL_MS: z.coerce.number().int().nonnegative().default(5000),
-  FEDERATION_SYNC_FAILURE_BASE_MS: z.coerce.number().int().positive().default(5000),
-  FEDERATION_SYNC_FAILURE_MAX_MS: z.coerce.number().int().positive().default(60000),
-  FEDERATION_SYNC_FAILURE_MAX_RETRIES: z.coerce.number().int().positive().default(5),
-  DATABASE_URL: z.string().min(1),
-  BETTER_AUTH_SECRET: z.string().min(1),
-  NODE_IDENTITY_MASTER_KEY: z.string().min(1),
-  NODE_DISPLAY_NAME: z.string().optional(),
-  BETTER_AUTH_BASE_URL: z.string().url().optional(),
-  CORS_ORIGINS: z.string().optional(),
-  TRUSTED_ORIGINS: z.string().optional(),
-  TRUSTED_SERVICE_TOKENS: z.string().optional(),
-  TRUSTED_SERVICE_TOKENS_FILE: z.string().optional(),
-  TRUSTED_SERVICE_TOKENS_REFRESH_INTERVAL_MS: z.coerce.number().int().nonnegative().default(60000),
-  BETTER_AUTH_OLD_SECRETS: z.string().optional(),
-  TRUSTED_PROXIES: z.string().optional(),
-    CSRF_ALLOW_HOST_FALLBACK: z.preprocess((v) => {
-      if (typeof v !== 'string') return v;
-      const s = v.trim().toLowerCase();
-      if (s === 'true' || s === '1') return true;
-      if (s === 'false' || s === '0' || s === '') return false;
-      return v;
-    }, z.boolean()).default(false),
-  AI_PROVIDER: z.string().optional(),
-  AI_MODEL: z.string().optional(),
-  AI_STREAM_CHUNK_SIZE: z.coerce.number().int().positive().default(48),
-  MCP_STDIO_WORKSPACE_ID: z.string().optional(),
-  MCP_STDIO_ACTOR_USER_ID: z.string().optional(),
-  MCP_AGENT_COMMAND: z.string().optional(),
-  MCP_EVENT_NAMESPACE: z.string().trim().max(128).optional(),
-  NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
-  ALLOW_ENV_AI_KEYS: z.preprocess((v) => {
-    if (typeof v !== 'string') return v;
-    const s = v.trim().toLowerCase();
-    if (s === 'true' || s === '1') return true;
-    if (s === 'false' || s === '0' || s === '') return false;
-    return v;
-  }, z.boolean()).default(false),
-  REDIS_REQUIRED: z.enum(['true', 'false']).default('false'),
-  OBJECT_STORAGE_REQUIRED: z.enum(['true', 'false']).default('true'),
-  REDIS_URL: z.string().default('redis://localhost:6379'),
-  REDIS_ENABLED: z.preprocess((v) => {
-    if (typeof v !== 'string') return v;
-    const s = v.trim().toLowerCase();
-    if (s === 'true' || s === '1') return true;
-    if (s === 'false' || s === '0' || s === '') return false;
-    return v;
-  }, z.boolean()).default(false),
-  RUSTFS_ENDPOINT: z.string().default('http://localhost:9000'),
-  RUSTFS_ACCESS_KEY: z.string().default('admin'),
-  RUSTFS_SECRET_KEY: z.string().default('password'),
-  RUSTFS_BUCKET: z.string().default('notes'),
-  GITHUB_WEBHOOK_SECRET: z.string().optional(),
-});
-
-const parsed = envSchema.parse(process.env);
+const parsed = parseDeploymentConfig(process.env);
 
 const splitList = (value?: string) =>
   value
@@ -146,5 +89,6 @@ export const env = {
   rustfsAccessKey: parsed.RUSTFS_ACCESS_KEY,
   rustfsSecretKey: parsed.RUSTFS_SECRET_KEY,
   rustfsBucket: parsed.RUSTFS_BUCKET,
+  allowUnsignedLocalWebhooks: parsed.ALLOW_UNSIGNED_LOCAL_WEBHOOKS,
   githubWebhookSecret: parsed.GITHUB_WEBHOOK_SECRET?.trim() || undefined,
 };

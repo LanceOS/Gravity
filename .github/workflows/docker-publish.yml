@@ -73,8 +73,13 @@ jobs:
         run: |
           docker run -d --name gravity-server-smoke --platform "linux/$ARCH" --network host \
             -e DATABASE_URL=postgres://gravity:smoke-only@127.0.0.1:5432/gravity \
-            -e BETTER_AUTH_SECRET=ci-smoke-only-secret-with-at-least-32-characters \
-            -e NODE_IDENTITY_MASTER_KEY=ci-smoke-only-identity-key-with-at-least-32-characters \
+            -e BETTER_AUTH_SECRET="$(openssl rand -hex 32)" \
+            -e NODE_IDENTITY_MASTER_KEY="$(openssl rand -hex 32)" \
+            -e GITHUB_WEBHOOK_SECRET="$(openssl rand -hex 32)" \
+            -e BETTER_AUTH_BASE_URL=https://gravity.example.org \
+            -e CORS_ORIGINS=https://gravity.example.org \
+            -e TRUSTED_ORIGINS=https://gravity.example.org \
+            -e RUSTFS_SECRET_KEY="$(openssl rand -hex 32)" \
             -e REDIS_ENABLED=true -e REDIS_URL=redis://127.0.0.1:6379 \
             "gravity-smoke:server-$ARCH"
           docker run -d --name gravity-client-smoke --platform "linux/$ARCH" --network host \

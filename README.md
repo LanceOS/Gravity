@@ -106,3 +106,7 @@ Run the repo's local CI flow from the project root with:
 ```
 
 This delegates to the maintained CI driver in `scripts/local-ci.sh`, which installs dependencies, runs the client and server test suites, builds both apps, and performs a compose-based smoke check.
+
+Before deployment, run `npm --workspace=server run check-env` and follow
+[deployment configuration](docs/deployment-configuration.md) for required secrets,
+production OAuth/origin settings, signed webhooks, and dependency readiness.

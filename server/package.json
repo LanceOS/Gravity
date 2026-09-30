@@ -4,6 +4,7 @@
   "version": "0.8.1",
   "type": "module",
   "scripts": {
+    "check-env": "tsx src/check-env.ts",
     "dev": "tsx watch src/index.ts",
     "build": "tsc -p tsconfig.json",
     "test": "vitest run && npm run test:health",
