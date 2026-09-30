@@ -7,6 +7,7 @@ import type { Project, Ticket } from '../../../types/domain';
 import { queryKeys } from '../../../utils/queryClient';
 import { TicketMutationProvider, useTicketMutations } from '../TicketMutationContext';
 import type { TicketMutationContextType } from '../TicketMutationContext.types';
+import { removeSseTicketSubtree } from '../../realtime/sseEventUtils';
 import { TICKET_UPDATE_DEBOUNCE_MS } from '../ticketMutationUtils';
 
 const mocks = vi.hoisted(() => {
@@ -289,6 +290,22 @@ describe('TicketMutationProvider', () => {
     expect(invalidateQueriesSpy).toHaveBeenCalledWith({ queryKey: ['teamTickets', 'team-1'] });
   });
 
+  it('reconciles deleted descendants from the response without a realtime connection', async () => {
+    const client = createQueryClient();
+    const child = { ...baseTicket, id: 'child', key: 'ABC-2', parentId: baseTicket.id };
+    client.setQueryData(queryKeys.tickets('project-1'), [baseTicket, child]);
+    client.setQueryData(queryKeys.ticketDetail(child.id), child);
+    client.setQueryData(queryKeys.comments(child.id), [{ id: 'comment' }]);
+    const { setActiveTicket } = configureContext({ activeTicket: child });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ success: true, deletedTickets: [baseTicket, child] })));
+    renderWithProvider(client);
+    await act(async () => { await currentActions.deleteTicket(baseTicket.id); });
+    expect(client.getQueryData(queryKeys.tickets('project-1'))).toEqual([]);
+    expect(client.getQueryData(queryKeys.ticketDetail(child.id))).toBeUndefined();
+    expect(client.getQueryData(queryKeys.comments(child.id))).toBeUndefined();
+    expect(setActiveTicket).toHaveBeenCalledWith(null);
+  });
+
   it('rolls back failed updates and clears the active ticket on delete', async () => {
     const queryClient = createQueryClient();
     queryClient.setQueryData(queryKeys.tickets('project-1'), [baseTicket]);
@@ -494,6 +511,74 @@ describe('TicketMutationProvider', () => {
     expect(client.getQueryData<Ticket[]>(queryKeys.tickets(baseTicket.projectId))).toMatchObject([
       { title: baseTicket.title }, { title: 'Saved other ticket' },
     ]);
+  });
+
+  it.each(['local', 'remote'])('does not send queued descendant edits after %s subtree deletion', async (source) => {
+    vi.useFakeTimers();
+    configureContext();
+    const root = { ...baseTicket, id: 'root', key: 'GRA-0' };
+    const child = { ...baseTicket, parentId: root.id };
+    const client = createQueryClient();
+    client.setQueryData(queryKeys.tickets(baseTicket.projectId), [root, child]);
+    client.setQueryData(queryKeys.ticketDetail(child.id), child);
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ deletedTickets: [root, child] }));
+    vi.stubGlobal('fetch', fetchMock);
+    renderWithProvider(client);
+    await act(async () => {
+      await currentActions.updateTicket(child.id, { title: 'Queued' }, { immediate: false });
+      if (source === 'local') await currentActions.deleteTicket(root.id);
+      else removeSseTicketSubtree(client, [root, child]);
+      await vi.advanceTimersByTimeAsync(TICKET_UPDATE_DEBOUNCE_MS);
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(source === 'local' ? 1 : 0);
+    expect(client.getQueryData(queryKeys.tickets(baseTicket.projectId))).toEqual([]);
+    expect(client.getQueryData(queryKeys.ticketDetail(child.id))).toBeUndefined();
+  });
+
+  it.each([
+    ['debounced', 200], ['debounced', 404], ['immediate', 200], ['immediate', 404],
+  ] as const)('ignores an in-flight %s response (%s) after remote subtree deletion', async (mode, status) => {
+    vi.useFakeTimers();
+    configureContext();
+    const root = { ...baseTicket, id: 'root', key: 'GRA-0' };
+    const child = { ...baseTicket, parentId: root.id };
+    const client = createQueryClient();
+    client.setQueryData(queryKeys.tickets(baseTicket.projectId), [root, child]);
+    client.setQueryData(queryKeys.ticketDetail(child.id), child);
+    let finish!: (response: Response) => void;
+    vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>(resolve => { finish = resolve; })));
+    renderWithProvider(client);
+    let saving!: Promise<boolean | void>;
+    await act(async () => {
+      saving = currentActions.updateTicket(child.id, { title: 'In flight' }, { immediate: mode === 'immediate' });
+      if (mode === 'debounced') await vi.advanceTimersByTimeAsync(TICKET_UPDATE_DEBOUNCE_MS);
+    });
+    await act(async () => {
+      removeSseTicketSubtree(client, [root, child]);
+      finish(jsonResponse(status === 200 ? { ...child, title: 'Late save' } : { error: 'Deleted' }, status));
+      await saving;
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(client.getQueryData(queryKeys.tickets(baseTicket.projectId))).toEqual([]);
+    expect(client.getQueryData(queryKeys.ticketDetail(child.id))).toBeUndefined();
+  });
+
+  it('does not restore deleted siblings from an unrelated immediate-save rollback', async () => {
+    configureContext();
+    const sibling = { ...baseTicket, id: 'sibling', key: 'GRA-2' };
+    const client = createQueryClient();
+    client.setQueryData(queryKeys.tickets(baseTicket.projectId), [baseTicket, sibling]);
+    let finish!: (response: Response) => void;
+    vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>(resolve => { finish = resolve; })));
+    renderWithProvider(client);
+    let saving!: Promise<boolean | void>;
+    await act(async () => { saving = currentActions.updateTicket(sibling.id, { title: 'Fail' }); });
+    await act(async () => {
+      removeSseTicketSubtree(client, [baseTicket]);
+      finish(jsonResponse({ error: 'Offline' }, 500));
+      await saving;
+    });
+    expect(client.getQueryData(queryKeys.tickets(baseTicket.projectId))).toEqual([sibling]);
   });
 
   it('delegates moveTicket to the injected move hook', async () => {

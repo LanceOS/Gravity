@@ -1,4 +1,4 @@
-import { bigint, index, pgTable, primaryKey, jsonb, text, timestamp, check } from 'drizzle-orm/pg-core';
+import { bigint, index, pgTable, primaryKey, jsonb, text, timestamp, check, type AnyPgColumn } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 
 // No foreign key: deleting a project must not release its external identities.
@@ -17,7 +17,7 @@ export const tickets = pgTable('tickets', {
   assigneeId: text('assignee_id'),
   projectId: text('project_id').notNull(),
   cycleId: text('cycle_id'),
-  parentId: text('parent_id'),
+  parentId: text('parent_id').references((): AnyPgColumn => tickets.id),
   prStatus: text('pr_status').notNull().default('none'),
   prUrl: text('pr_url'),
   branchName: text('branch_name').notNull().default(''),
@@ -62,7 +62,7 @@ export interface CommentAutomation {
 
 export const comments = pgTable('comments', {
   id: text('id').primaryKey(),
-  ticketId: text('ticket_id').notNull(),
+  ticketId: text('ticket_id').notNull().references(() => tickets.id, { onDelete: 'cascade' }),
   userId: text('user_id').notNull(),
   body: text('body').notNull(),
   automation: jsonb('automation').$type<CommentAutomation>(),

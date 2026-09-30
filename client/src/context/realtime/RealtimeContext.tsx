@@ -16,6 +16,7 @@ import {
   invalidateCommentCacheFromSse,
   removeSseComment,
   removeSseTicketEntries,
+  removeSseTicketSubtree,
   upsertSseComment,
   upsertTicketFromSse,
 } from './sseEventUtils';
@@ -37,7 +38,7 @@ export function useRealtimeContextValue({
   currentUserId,
 }: RealtimeContextValueArgs): RealtimeContextType {
   const { activeProjectId } = useActiveProject();
-  const { activeTicket } = useActiveTicket();
+  const { activeTicket, setActiveTicket } = useActiveTicket();
   const projectContext = React.useContext(ProjectContext);
   const projects = projectContext?.projects || [];
   const projectLookup = projectContext?.projectLookup || new Map();
@@ -109,6 +110,12 @@ export function useRealtimeContextValue({
               break;
 
             case 'ticket.deleted':
+              if (removeSseTicketSubtree(queryClient, messageData.deletedTickets)) {
+                if (Array.isArray(messageData.deletedTickets) && messageData.deletedTickets.some(
+                  ticket => ticket?.id === activeTicketRef.current?.id,
+                )) setActiveTicket(null);
+                break;
+              }
               if (payloadTicket) {
                 removeSseTicketEntries(queryClient, payloadTicket.key, payloadTicket.id, event.projectId || payloadTicket?.projectId);
                 break;
@@ -271,7 +278,7 @@ export function useRealtimeContextValue({
       sseCoalescerRef.current?.destroy();
       sseCoalescerRef.current = null;
     };
-  }, [queryClient, workspaceId]);
+  }, [queryClient, workspaceId, setActiveTicket]);
 
   return useMemo(() => ({
     workspaceId: workspaceId || null,

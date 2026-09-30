@@ -1272,6 +1272,8 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
         data: { dependencyTicketKey: parentTicket3.key },
       });
 
+      const deletedChild = await seedTicket(project.id, { id: 'deleted-child', key: 'GRV-901', parentId: createResult.ticket.id });
+      const deletedGrandchild = await seedTicket(project.id, { id: 'deleted-grandchild', key: 'GRV-902', parentId: deletedChild.id });
       const deleteTicketResponse = await ownerMcpRequest({
         jsonrpc: '2.0',
         id: 34,
@@ -1288,7 +1290,7 @@ describe('auth, AI, MCP, webhooks, and realtime routes', () => {
         ...mutationBase,
         type: 'ticket.deleted',
         ticketKey: createResult.ticket.key,
-        data: { ticketId: expect.any(String) },
+        data: { ticketId: createResult.ticket.id, deletedTickets: [createResult.ticket, deletedChild, deletedGrandchild].map(({ id, key }) => ({ id, key, projectId: project.id })) },
       });
     } finally {
       unsubscribe();

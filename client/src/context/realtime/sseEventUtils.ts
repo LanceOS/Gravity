@@ -3,6 +3,7 @@ import type { Comment, Ticket } from '../../types/domain';
 import type { TicketWithRelations } from '../../modules/tickets/utils/ticketRelations';
 import {
   combineTicketDetails,
+  invalidateAggregateTicketQueries,
   findCachedTicketByKeyOrId,
   getListQueryProjectId,
   normalizeCommentPayload,
@@ -132,6 +133,35 @@ export function removeSseTicketEntries(
   }
 }
 
+// A late save response/rollback must not resurrect a physically deleted ticket.
+// QueryClient lifetime scopes this marker to the current client session.
+const deletedTicketIds = new WeakMap<QueryClient, Set<string>>();
+export function isTicketDeletedInSession(queryClient: QueryClient, ticketId: string): boolean {
+  return deletedTicketIds.get(queryClient)?.has(ticketId) ?? false;
+}
+
+/** Apply the committed deletion batch, including descendants absent from list caches. */
+export function removeSseTicketSubtree(queryClient: QueryClient, deletedTickets: unknown): boolean {
+  if (!Array.isArray(deletedTickets) || deletedTickets.length === 0) return false;
+  const entries = deletedTickets.filter((entry): entry is { id: string; key: string; projectId: string } =>
+    isRecord(entry) && typeof entry.id === 'string' && typeof entry.key === 'string' && typeof entry.projectId === 'string');
+  if (entries.length === 0) return false;
+  const deleted = deletedTicketIds.get(queryClient) ?? new Set<string>();
+  deletedTicketIds.set(queryClient, deleted);
+  for (const ticket of entries) {
+    deleted.add(ticket.id);
+    removeSseTicketEntries(queryClient, ticket.key, ticket.id, ticket.projectId);
+  }
+  // Survivors can have changed parent/subtask and dependency snapshots, including
+  // references from other projects. Mark inactive detail caches stale as well.
+  void queryClient.invalidateQueries({ queryKey: ['tickets'] });
+  void queryClient.invalidateQueries({ queryKey: queryKeys.ticketDetails() });
+  for (const projectId of new Set(entries.map(ticket => ticket.projectId))) {
+    invalidateAggregateTicketQueries(queryClient, projectId);
+  }
+  return true;
+}
+
 export function upsertTicketInListCachesFromSse(
   queryClient: QueryClient,
   normalizedTicket: Ticket,
@@ -199,7 +229,7 @@ export function upsertTicketFromSse(
   ticket: Ticket | TicketWithRelations | null,
 ): void {
   const normalizedTicket = normalizeTicketPayload(ticket);
-  if (!normalizedTicket) return;
+  if (!normalizedTicket || isTicketDeletedInSession(queryClient, normalizedTicket.id)) return;
 
   const ticketKey = normalizedTicket.key;
   const ticketId = normalizedTicket.id;
@@ -256,7 +286,7 @@ export function upsertSseComment(
   comment: Comment | null,
 ): void {
   const normalizedComment = normalizeCommentPayload(comment);
-  if (!normalizedComment) return;
+  if (!normalizedComment || isTicketDeletedInSession(queryClient, normalizedComment.ticketId)) return;
 
   queryClient.setQueryData<Comment[]>(queryKeys.comments(normalizedComment.ticketId), (old) => {
     const existing = old || [];

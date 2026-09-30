@@ -1321,19 +1321,57 @@ export async function updateTicketRecord(
   return result?.ticket ?? null;
 }
 
-export async function deleteTicketRecord(ticketId: string, projectId?: string) {
-  const ticket = await getTicketById(ticketId, projectId);
-  if (!ticket) {
-    return false;
-  }
+/** Permanently delete one authorized subtree; see docs/server/ticket-deletion.md. */
+export async function deleteTicketRecordWithEffects(ticketId: string, projectId?: string) {
+  return db.transaction(async (tx) => {
+    const [candidate] = await tx.select({ projectId: tickets.projectId }).from(tickets)
+      .where(projectId === undefined ? eq(tickets.id, ticketId)
+        : and(eq(tickets.id, ticketId), eq(tickets.projectId, projectId)));
+    if (!candidate) return null;
+    // Match create/update/move lock order: project before ticket rows. Recheck
+    // the root after waiting, since a concurrent project move can win first.
+    await tx.select({ id: projects.id }).from(projects)
+      .where(eq(projects.id, candidate.projectId)).for('update');
+    // Lock before resolving descendants. The parent FK makes concurrent inserts
+    // wait on these locks, then fail if their parent was deleted.
+    const [root] = await tx.select().from(tickets)
+      .where(and(eq(tickets.id, ticketId), eq(tickets.projectId, candidate.projectId)))
+      .for('update');
+    if (!root) return null;
 
-  await db.transaction(async (tx) => {
-    await tx.delete(comments).where(eq(comments.ticketId, ticketId));
-    await tx.delete(tickets).where(and(eq(tickets.parentId, ticketId), eq(tickets.projectId, ticket.projectId)));
-    await tx.delete(tickets).where(eq(tickets.id, ticketId));
+    const deletedTickets = [{ id: root.id, key: root.key, projectId: root.projectId }];
+    const ids = new Set([root.id]);
+    let frontier = [root.id];
+    while (frontier.length > 0) {
+      const children = await tx.select({ id: tickets.id, key: tickets.key, projectId: tickets.projectId })
+        .from(tickets).where(inArray(tickets.parentId, frontier)).for('update');
+      // A legacy cross-project edge must not expand the caller's authority or
+      // leave an orphan. Reject the whole operation without changing any rows.
+      if (children.some(child => child.projectId !== root.projectId)) {
+        throw new Error(TICKET_PARENT_SCOPE_VIOLATION);
+      }
+      const unseen = children.filter(child => !ids.has(child.id));
+      deletedTickets.push(...unseen);
+      frontier = unseen.map(child => child.id);
+      for (const id of frontier) ids.add(id);
+    }
+
+    const subtreeIds = [...ids];
+    await tx.delete(comments).where(inArray(comments.ticketId, subtreeIds));
+    await tx.delete(ticketLabels).where(inArray(ticketLabels.ticketId, subtreeIds));
+    await tx.delete(ticketRelationships).where(or(
+      inArray(ticketRelationships.ticketId, subtreeIds),
+      inArray(ticketRelationships.blockedTicketId, subtreeIds),
+    ));
+    // One statement permits NO ACTION parent references within the subtree,
+    // including legacy cycles. A parent outside this set is preserved.
+    await tx.delete(tickets).where(inArray(tickets.id, subtreeIds));
+    return { deletedTickets };
   });
-  
-  return true;
+}
+
+export async function deleteTicketRecord(ticketId: string, projectId?: string) {
+  return (await deleteTicketRecordWithEffects(ticketId, projectId)) !== null;
 }
 
 export async function addCommentRecord(ticketId: string, userId: string, body: string, createdAt?: Date) {
