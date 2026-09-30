@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   Autocomplete,
   AvatarUpload,
@@ -380,6 +380,42 @@ describe('library forms and theme toggle', () => {
     const avatarInput = avatarUploadHost.querySelector('input[type="file"]') as HTMLInputElement;
     await user.upload(avatarInput, avatar);
     expect(screen.getByText('Avatar value: avatar.png')).toBeInTheDocument();
+  });
+
+  it('uses and cleans up modern and legacy system theme change listeners', () => {
+    window.localStorage.removeItem('gravity_theme');
+
+    const modernMediaQuery = {
+      matches: false,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    };
+    const legacyMediaQuery = {
+      matches: false,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+    };
+    const matchMedia = vi.spyOn(window, 'matchMedia')
+      .mockReturnValue(modernMediaQuery as unknown as MediaQueryList);
+
+    const modern = render(<ThemeToggle />);
+    expect(modernMediaQuery.addEventListener).toHaveBeenCalledWith('change', expect.any(Function));
+    modern.unmount();
+    expect(modernMediaQuery.removeEventListener).toHaveBeenCalledWith(
+      'change',
+      modernMediaQuery.addEventListener.mock.calls[0][1]
+    );
+
+    window.localStorage.removeItem('gravity_theme');
+    matchMedia.mockReturnValue(legacyMediaQuery as unknown as MediaQueryList);
+    const legacy = render(<ThemeToggle />);
+    expect(legacyMediaQuery.addListener).toHaveBeenCalledWith(expect.any(Function));
+    legacy.unmount();
+    expect(legacyMediaQuery.removeListener).toHaveBeenCalledWith(
+      legacyMediaQuery.addListener.mock.calls[0][0]
+    );
+
+    matchMedia.mockRestore();
   });
 
   it('cycles and persists theme selection', async () => {
