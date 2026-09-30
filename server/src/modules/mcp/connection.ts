@@ -4,7 +4,7 @@ import { db } from '../../db/index.js';
 import { mcpConnectionTokens } from '../../db/schema.js';
 import { createId } from '../../lib/platform.js';
 import { env } from '../../env.js';
-import { audit, securityAlert } from '../../lib/logger.js';
+import { audit, securityAlert, warn } from '../../lib/logger.js';
 import { isMcpWorkspaceMember } from './access.js';
 
 const DEFAULT_MCP_SCOPES = ['tools/list'];
@@ -14,7 +14,7 @@ function configuredSecrets() {
   const current = process.env.BETTER_AUTH_SECRET ?? env.betterAuthSecret;
   const configured = process.env.BETTER_AUTH_OLD_SECRETS;
   const entries = configured === undefined ? env.betterAuthOldSecrets : configured.split(',');
-  const keyed: Record<string, string> = {};
+  const keyed = Object.create(null) as Record<string, string>;
   const legacy: string[] = [];
   for (const entry of entries) {
     const item = entry.trim();
@@ -66,14 +66,40 @@ function auditConnectionTokenEvent(event: string, data: Record<string, unknown>)
   }
 }
 
+function warnConnectionTokenSigningKeyRejected(workspaceId: string, hmacKeyId: string): void {
+  const data = {
+    failureReason: 'unknown_signing_key_id',
+    workspaceId,
+    hmacKeyId,
+    remediation: "Add the key ID to BETTER_AUTH_OLD_SECRETS as key-id=secret, or omit hmacKeyId to use BETTER_AUTH_SECRET.",
+  };
+
+  try {
+    warn('mcp.token.signing_key_rejected', data);
+  } catch {
+    // Keep rejection behavior stable if the warning sink is unavailable.
+    try {
+      securityAlert('security.mcp_token_signing_key_rejected', data);
+    } catch {
+      // Logging failure must not replace the actionable signing-key error.
+    }
+  }
+}
+
 export async function createConnectionToken(opts: CreateOptions): Promise<ConnectionTokenPayload> {
+  const hmacKeyId = opts.hmacKeyId ?? 'env';
+  // Current tokens use the env key; old keys are available only by an explicit mapping.
+  const secrets = configuredSecrets();
+  const secretForKey = hmacKeyId === 'env'
+    ? secrets.current
+    : Object.hasOwn(secrets.keyed, hmacKeyId) ? secrets.keyed[hmacKeyId] : undefined;
+  if (!secretForKey) {
+    warnConnectionTokenSigningKeyRejected(opts.workspaceId, hmacKeyId);
+    throw new Error('Unknown MCP signing key.');
+  }
+
   const id = createId('mct');
   const raw = randomBytes(32).toString('hex');
-  const hmacKeyId = opts.hmacKeyId ?? 'env';
-  // Determine secret for the given key id. Prefer mapped keyed secrets, fall back to current env secret.
-  const secrets = configuredSecrets();
-  const secretForKey = hmacKeyId === 'env' ? secrets.current : secrets.keyed[hmacKeyId];
-  if (!secretForKey) throw new Error('Unknown MCP signing key.');
   const tokenHash = createHmac('sha256', secretForKey).update(raw).digest('hex');
 
   const expiresAt = opts.ttlSeconds ? new Date(Date.now() + opts.ttlSeconds * 1000) : new Date(Date.now() + DEFAULT_TOKEN_TTL_SECONDS * 1000);
