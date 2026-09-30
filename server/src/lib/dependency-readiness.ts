@@ -2,6 +2,7 @@ import { Pool } from 'pg';
 import { CreateBucketCommand, HeadBucketCommand, S3Client } from '@aws-sdk/client-s3';
 import { env } from '../env.js';
 import { REQUIRED_SCHEMA_VERSION } from '../db/schema-version.js';
+import { isRedisRateLimitingHealthy } from './rateLimitRedis.js';
 import { client } from './redis.js';
 import { createReadinessCheck } from './readiness.js';
 import { isServerInitialized, isServerShuttingDown } from './server-lifecycle.js';
@@ -26,6 +27,7 @@ export const checkDependencies = createReadinessCheck({
     await storage.send(new HeadBucketCommand({ Bucket: env.rustfsBucket }), { abortSignal: signal });
     return true;
   } },
+  rateLimiting: { required: false, check: async () => isRedisRateLimitingHealthy() },
   redis: { required: env.redisRequired, check: async () => {
     if (!env.redisEnabled || !client?.isReady) return false;
     return await client.ping() === 'PONG';

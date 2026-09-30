@@ -64,7 +64,7 @@ describe('rate limiter policy isolation and retry timing', () => {
   it('names Redis buckets independently of client identity and shares matching policies', async () => {
     const evaluate = vi.fn(async () => [1, 1, 0]);
     const client = { isReady: true, isOpen: true, eval: evaluate } as unknown as RedisClientType;
-    const options = { namespace: 'credential:create', windowMs: 5000, max: 2, client };
+    const options = { failurePolicy: 'closed' as const, namespace: 'credential:create', windowMs: 5000, max: 2, client };
     await invoke(createRedisRateLimiter(options));
     await invoke(createRedisRateLimiter(options));
     await invoke(createRedisRateLimiter({ ...options, namespace: 'credential:revoke' }));
@@ -79,7 +79,7 @@ describe('rate limiter policy isolation and retry timing', () => {
   it('converts Redis window timing into matching Retry-After headers and JSON', async () => {
     const evaluate = vi.fn().mockResolvedValueOnce([0, 2, 2999]).mockResolvedValueOnce([0, 2, 1]).mockResolvedValueOnce([1, 2, 0]);
     const client = { isReady: true, isOpen: true, eval: evaluate } as unknown as RedisClientType;
-    const limiter = createRedisRateLimiter({ namespace: 'retry-timing', windowMs: 5000, max: 2, client });
+    const limiter = createRedisRateLimiter({ failurePolicy: 'closed', namespace: 'retry-timing', windowMs: 5000, max: 2, client });
     const blocked = await invoke(limiter);
     expect(blocked.statusCode).toBe(429);
     expect(blocked.headers['Retry-After']).toBe('3');
@@ -89,11 +89,11 @@ describe('rate limiter policy isolation and retry timing', () => {
     expect((await invoke(limiter)).next).toHaveBeenCalledOnce();
   });
 
-  it('preserves fail-open behavior while Redis is unavailable', async () => {
+  it('fails closed while Redis is unavailable', async () => {
     const evaluate = vi.fn();
     const client = { isReady: false, isOpen: true, eval: evaluate } as unknown as RedisClientType;
-    const limiter = createRedisRateLimiter({ namespace: 'offline', windowMs: 5000, max: 2, client });
-    expect((await invoke(limiter)).next).toHaveBeenCalledOnce();
+    const limiter = createRedisRateLimiter({ failurePolicy: 'closed', namespace: 'offline', windowMs: 5000, max: 2, client });
+    expect((await invoke(limiter)).statusCode).toBe(503);
     expect(evaluate).not.toHaveBeenCalled();
   });
 });

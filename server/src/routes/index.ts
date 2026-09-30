@@ -26,7 +26,7 @@ export function createApiRouter() {
   const router = Router();
   const createLimiter = env.redisEnabled ? createRedisRateLimiter : createRateLimiter;
   const eventsIpLimiter = createLimiter({
-    namespace: 'events.subscribe.ip',
+    namespace: 'events.subscribe.ip', failurePolicy: 'local',
     windowMs: SSE_EVENTS_IP_RATE_LIMIT_WINDOW_MS,
     max: SSE_EVENTS_IP_RATE_LIMIT_MAX,
     keyFn: (req) => `ip:${getRequestSourceIp(req) ?? 'unknown'}`,

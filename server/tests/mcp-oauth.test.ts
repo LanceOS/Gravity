@@ -1,5 +1,8 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { eq } from 'drizzle-orm';
+import express from 'express';
+import supertest from 'supertest';
+import { createOAuthAuthorizationRouter } from '../src/modules/mcp/oauth.js';
 import { describe, expect, it } from 'vitest';
 import { db } from '../src/db/index.js';
 import { mcpConnectionTokens, mcpOAuthRequests, mcpOAuthRefreshTokens, mcpOAuthGrants, workspaceMembers, workspaces } from '../src/db/schema.js';
@@ -224,4 +227,28 @@ describe('workspace OAuth MCP authorization', () => {
     expect((await account.post(path).set('Origin', origin).send({ approved: true, scopes: writeScopes })).status).toBe(403);
   });
 
+});
+
+it('fails closed for OAuth issuance during a Redis outage while retaining bounded revocation', async () => {
+  const previous = env.redisEnabled;
+  env.redisEnabled = true; // Redis client remains null: no external connections.
+  try {
+    const app = express();
+    app.use(express.urlencoded({ extended: false }));
+    app.use(createOAuthAuthorizationRouter());
+    const requests = supertest(app);
+    for (const path of ['/register', '/token']) {
+      const response = await requests.post(path).type('form').send({});
+      expect(response.status).toBe(503);
+      expect(response.headers['retry-after']).toBe('1');
+    }
+    expect((await requests.get('/authorize')).status).toBe(503);
+    // Missing token/client fields reach SDK validation, with no credential writes.
+    for (let i = 0; i < 50; i++) {
+      expect((await requests.post('/revoke').type('form').send({})).status).toBe(400);
+    }
+    expect((await requests.post('/revoke').type('form').send({})).status).toBe(429);
+  } finally {
+    env.redisEnabled = previous;
+  }
 });

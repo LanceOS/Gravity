@@ -738,16 +738,16 @@ export function createWorkspacesRouter() {
   };
   const connectionIpKey = (req: Request) => `ip:${getRequestSourceIp(req) ?? 'unknown'}`;
   const issuanceUserLimiter = createLimiter({
-    namespace: 'mcp.connection.issue.user',
+    namespace: 'mcp.connection.issue.user', failurePolicy: 'closed',
     windowMs: 60_000,
     max: 10,
     keyFn: connectionUserKey,
   });
-  const issuanceIpLimiter = createLimiter({ namespace: 'mcp.connection.issue.ip', windowMs: 60_000, max: 60, keyFn: connectionIpKey });
+  const issuanceIpLimiter = createLimiter({ namespace: 'mcp.connection.issue.ip', failurePolicy: 'closed', windowMs: 60_000, max: 60, keyFn: connectionIpKey });
   // Removing old credentials must neither consume issuance capacity nor be
   // blocked by generation attempts. Keep each operation's existing limits.
-  const revocationUserLimiter = createLimiter({ namespace: 'mcp.connection.revoke.user', windowMs: 60_000, max: 10, keyFn: connectionUserKey });
-  const revocationIpLimiter = createLimiter({ namespace: 'mcp.connection.revoke.ip', windowMs: 60_000, max: 60, keyFn: connectionIpKey });
+  const revocationUserLimiter = createLimiter({ namespace: 'mcp.connection.revoke.user', failurePolicy: 'local', windowMs: 60_000, max: 10, keyFn: connectionUserKey });
+  const revocationIpLimiter = createLimiter({ namespace: 'mcp.connection.revoke.ip', failurePolicy: 'local', windowMs: 60_000, max: 60, keyFn: connectionIpKey });
   // Enforce CSRF Origin/Referer checks for state-changing requests by default.
   // `csrfProtect` allows Authorization header or service tokens to bypass when appropriate.
   router.use(csrfProtect());
