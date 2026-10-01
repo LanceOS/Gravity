@@ -40,6 +40,31 @@ describe('MCP connection endpoints', () => {
     expect(row.tokenHash).toBeTruthy();
   });
 
+  it('accepts a 30-day connection lifetime and rejects anything longer', async () => {
+    const ownerApi = await createAuthenticatedApi({
+      name: 'MCP Long-Lived Owner',
+      email: 'mcp-long-lived-owner@example.com',
+      role: 'owner',
+      avatarUrl: 'https://example.com/owner.png',
+    });
+    const owner = ownerApi.user;
+    const { workspace } = await seedWorkspaceFixture({
+      owner: { id: owner.id, name: owner.name, email: owner.email, role: owner.role, avatarUrl: owner.avatar },
+    });
+
+    const thirtyDaysSeconds = 30 * 24 * 60 * 60;
+    const requestStartedAt = Date.now();
+    const accepted = await ownerApi.post(`/api/v1/workspaces/${workspace.id}/mcp/connection`).send({ ttlSeconds: thirtyDaysSeconds });
+    expect(accepted.status).toBe(201);
+    const ttlMilliseconds = new Date(accepted.body.expires_at).getTime() - requestStartedAt;
+    const elapsedMilliseconds = Date.now() - requestStartedAt;
+    expect(ttlMilliseconds).toBeGreaterThanOrEqual(thirtyDaysSeconds * 1000);
+    expect(ttlMilliseconds).toBeLessThanOrEqual(thirtyDaysSeconds * 1000 + elapsedMilliseconds);
+
+    const tooLong = await ownerApi.post(`/api/v1/workspaces/${workspace.id}/mcp/connection`).send({ ttlSeconds: thirtyDaysSeconds + 1 });
+    expect(tooLong.status).toBe(400);
+  });
+
   it('refreshes a connection token and invalidates the previous raw token', async () => {
     const ownerApi = await createAuthenticatedApi({
       name: 'MCP Refresh Owner',
@@ -57,7 +82,13 @@ describe('MCP connection endpoints', () => {
     const oldToken = createRes.body.auth.token;
     const oldExpiresAt = new Date(createRes.body.expires_at);
 
-    const refreshRes = await ownerApi.post(`/api/v1/workspaces/${workspace.id}/mcp/connection/${createRes.body.id}/refresh`).send({ ttlSeconds: 600 });
+    const thirtyDaysSeconds = 30 * 24 * 60 * 60;
+    const refreshUrl = `/api/v1/workspaces/${workspace.id}/mcp/connection/${createRes.body.id}/refresh`;
+    const tooLongRefresh = await ownerApi.post(refreshUrl).send({ ttlSeconds: thirtyDaysSeconds + 1 });
+    expect(tooLongRefresh.status).toBe(400);
+
+    const refreshStartedAt = Date.now();
+    const refreshRes = await ownerApi.post(refreshUrl).send({ ttlSeconds: thirtyDaysSeconds });
     expect(refreshRes.status).toBe(200);
     expect(refreshRes.body).toMatchObject({
       id: createRes.body.id,
@@ -71,7 +102,11 @@ describe('MCP connection endpoints', () => {
 
     const newToken = refreshRes.body.auth.token;
     expect(newToken).not.toBe(oldToken);
-    expect(new Date(refreshRes.body.expires_at).getTime()).toBeGreaterThan(oldExpiresAt.getTime());
+    const refreshedExpiresAt = new Date(refreshRes.body.expires_at).getTime();
+    expect(refreshedExpiresAt).toBeGreaterThan(oldExpiresAt.getTime());
+    const refreshElapsedMilliseconds = Date.now() - refreshStartedAt;
+    expect(refreshedExpiresAt - refreshStartedAt).toBeGreaterThanOrEqual(thirtyDaysSeconds * 1000);
+    expect(refreshedExpiresAt - refreshStartedAt).toBeLessThanOrEqual(thirtyDaysSeconds * 1000 + refreshElapsedMilliseconds);
 
     const oldUse = await api()
       .post('/api/v1/mcp/sse')
