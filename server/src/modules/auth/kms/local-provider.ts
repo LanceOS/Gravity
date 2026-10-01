@@ -82,19 +82,23 @@ export class LocalEnvKmsProvider implements IKMSProvider {
     const tag = encryptedDEK.subarray(12, 28);
     const ciphertext = encryptedDEK.subarray(28);
 
+    let plaintextUpdateBuffer: Buffer | null = null;
+    let plaintextFinalBuffer: Buffer | null = null;
     try {
       const decipher = createDecipheriv('aes-256-gcm', this.kek, iv);
       decipher.setAuthTag(tag);
-      return Buffer.concat([
-        decipher.update(ciphertext),
-        decipher.final()
-      ]);
+      plaintextUpdateBuffer = decipher.update(ciphertext);
+      plaintextFinalBuffer = decipher.final();
+      return Buffer.concat([plaintextUpdateBuffer, plaintextFinalBuffer]);
     } catch (error) {
       throw new Error(
         `Security Exception: Failed to decrypt Data Encryption Key. Integrity check failed or KEK is invalid: ${
           error instanceof Error ? error.message : String(error)
         }`
       );
+    } finally {
+      plaintextUpdateBuffer?.fill(0);
+      plaintextFinalBuffer?.fill(0);
     }
   }
 }

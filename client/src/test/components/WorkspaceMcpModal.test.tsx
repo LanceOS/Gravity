@@ -30,6 +30,19 @@ beforeEach(() => {
 afterEach(() => vi.restoreAllMocks());
 
 describe('WorkspaceMcpModal', () => {
+  it('offers a 30-day lifetime for generated connections', async () => {
+    const user = userEvent.setup();
+    render(<WorkspaceMcpModal workspaceId="workspace-1" isOpen onClose={vi.fn()} />);
+    await waitFor(() => expect(screen.getByLabelText('List Tickets (read)')).toBeChecked());
+    await user.click(screen.getByRole('button', { name: 'Connection lifetime' }));
+    await user.click(screen.getByRole('option', { name: '30 days' }));
+    await user.click(screen.getByRole('button', { name: 'Generate connection' }));
+
+    await waitFor(() => expect(mocks.createConnection).toHaveBeenCalledWith({
+      scopes: ['tools/list', 'tools/call:list_tickets'], ttlSeconds: 2592000, singleUse: false, bindToIp: false,
+    }));
+  });
+
   it('defaults to exact read scopes and exports a reusable complete configuration', async () => {
     const user = userEvent.setup();
     const writeText = vi.fn().mockResolvedValue(undefined);

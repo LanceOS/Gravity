@@ -9,8 +9,17 @@ import { isMcpWorkspaceMember } from './access.js';
 
 const DEFAULT_MCP_SCOPES = ['tools/list'];
 const DEFAULT_TOKEN_TTL_SECONDS = 24 * 60 * 60;
+export const MCP_MAX_CONNECTION_TTL_SECONDS = 30 * 24 * 60 * 60;
 const SHA256_DIGEST_BYTES = 32;
 const SHA256_HEX_PATTERN = /^[0-9a-f]{64}$/;
+
+function connectionTokenExpiresAt(ttlSeconds?: number) {
+  const ttl = ttlSeconds ?? DEFAULT_TOKEN_TTL_SECONDS;
+  if (!Number.isSafeInteger(ttl) || ttl < 1 || ttl > MCP_MAX_CONNECTION_TTL_SECONDS) {
+    throw new RangeError(`MCP connection lifetime must be an integer from 1 through ${MCP_MAX_CONNECTION_TTL_SECONDS} seconds.`);
+  }
+  return new Date(Date.now() + ttl * 1000);
+}
 
 function readSha256Hex(value: unknown): { bytes: Buffer; valid: boolean } {
   const bytes = Buffer.alloc(SHA256_DIGEST_BYTES);
@@ -118,7 +127,7 @@ export async function createConnectionToken(opts: CreateOptions): Promise<Connec
   const raw = randomBytes(32).toString('hex');
   const tokenHash = createHmac('sha256', secretForKey).update(raw).digest('hex');
 
-  const expiresAt = opts.ttlSeconds ? new Date(Date.now() + opts.ttlSeconds * 1000) : new Date(Date.now() + DEFAULT_TOKEN_TTL_SECONDS * 1000);
+  const expiresAt = connectionTokenExpiresAt(opts.ttlSeconds);
   const normalizedScopes = opts.scopes ?? DEFAULT_MCP_SCOPES;
 
   await db.insert(mcpConnectionTokens).values({
@@ -204,7 +213,7 @@ export async function refreshConnectionToken(
   const hmacKeyId = 'env';
   const secretForKey = configuredSecrets().current;
   const tokenHash = createHmac('sha256', secretForKey).update(raw).digest('hex');
-  const expiresAt = opts.ttlSeconds ? new Date(Date.now() + opts.ttlSeconds * 1000) : new Date(Date.now() + DEFAULT_TOKEN_TTL_SECONDS * 1000);
+  const expiresAt = connectionTokenExpiresAt(opts.ttlSeconds);
 
   await db.update(mcpConnectionTokens).set({
     tokenHash,

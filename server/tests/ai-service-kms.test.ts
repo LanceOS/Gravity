@@ -318,8 +318,9 @@ describe('CredentialManager with a mock IKMSProvider', () => {
 
     expect(callback).not.toHaveBeenCalled();
     expectBufferWiped(retainedDEK());
-    expect(updateSpy).toHaveBeenCalledTimes(1);
+    expect(updateSpy).toHaveBeenCalledTimes(2);
     expectBufferWiped(updateSpy.mock.results[0]?.value as Buffer | undefined);
+    expectBufferWiped(updateSpy.mock.results[1]?.value as Buffer | undefined);
   });
 
   it('wipes the retained DEK and decrypted buffers after callback success', async () => {
@@ -335,6 +336,7 @@ describe('CredentialManager with a mock IKMSProvider', () => {
     expect(result).toBe('callback-result');
     expectBufferWiped(retainedDEK());
     expectBufferWiped(updateSpy.mock.results[0]?.value as Buffer | undefined);
+    expectBufferWiped(updateSpy.mock.results[1]?.value as Buffer | undefined);
   });
 
   it('wipes the retained DEK and decrypted buffers without relabeling callback failures', async () => {
@@ -353,5 +355,6 @@ describe('CredentialManager with a mock IKMSProvider', () => {
 
     expectBufferWiped(retainedDEK());
     expectBufferWiped(updateSpy.mock.results[0]?.value as Buffer | undefined);
+    expectBufferWiped(updateSpy.mock.results[1]?.value as Buffer | undefined);
   });
 });

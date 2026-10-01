@@ -20,6 +20,7 @@ const connectionLifetimeOptions = [
   { value: '300', label: '5 minutes' },
   { value: '3600', label: '1 hour' },
   { value: '86400', label: '24 hours' },
+  { value: '2592000', label: '30 days' },
 ];
 
 function connectionRequestError(error: unknown, fallback: string): string {

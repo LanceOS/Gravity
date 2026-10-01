@@ -39,7 +39,7 @@ import {
   listWorkspaceSummaries,
   normalizeEntityKey,
 } from '../../lib/platform.js';
-import { createConnectionToken, refreshConnectionToken, revokeConnectionToken } from '../mcp/connection.js';
+import { createConnectionToken, MCP_MAX_CONNECTION_TTL_SECONDS, refreshConnectionToken, revokeConnectionToken } from '../mcp/connection.js';
 import { csrfProtect } from '../../lib/csrf.js';
 import { createRateLimiter } from '../../lib/rateLimit.js';
 import { createRedisRateLimiter } from '../../lib/rateLimitRedis.js';
@@ -73,8 +73,6 @@ const MCP_SCOPE_CALL = 'tools/call';
 const MCP_SCOPE_CALL_WILDCARD = 'tools/call:*';
 const MCP_SCOPE_CALL_PREFIX = 'tools/call:';
 const MCP_DEFAULT_CONNECTION_SCOPES = [MCP_SCOPE_LIST];
-const MCP_MAX_CONNECTION_TTL_SECONDS = 24 * 60 * 60;
-
 async function authorizeMcpManagementAccess(req: Request, workspaceId: string) {
   const actorUserId = await resolveRequestActorUserId(req);
   if (!actorUserId) return { allowed: false as const, status: 401, error: 'Authentication required.' };
