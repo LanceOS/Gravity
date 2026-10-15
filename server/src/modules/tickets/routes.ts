@@ -1131,8 +1131,8 @@ export function createTicketsRouter() {
         ? await authorizeTeamAccess(req, input.teamId)
         : await authorizeProjectAccess(req, projectId!);
       if (!auth.allowed) { res.status(auth.status).json({ error: auth.error }); return; }
-      if (auth.workspaceRole !== 'owner' && auth.workspaceRole !== 'admin') {
-        res.status(403).json({ error: 'Only workspace owners or admins can manage cycles.' }); return;
+      if (auth.workspaceRole !== 'owner') {
+        res.status(403).json({ error: 'Only workspace owners can manage cycles.' }); return;
       }
       const targetTeamId = input.teamId ?? await getProjectTeamId(projectId!);
       if (!targetTeamId) { res.status(404).json({ error: 'Project has no team.' }); return; }
@@ -1143,7 +1143,7 @@ export function createTicketsRouter() {
           res.status(400).json({ error: 'Team does not own this project.' }); return;
         }
       }
-      const cycle = await createCycleRecord(targetTeamId, input);
+      const cycle = await createCycleRecord(targetTeamId, input, projectId);
       await invalidateSidebarCacheFromTeam(targetTeamId);
       res.status(201).json(mapCycle(cycle));
     } catch (error) {
@@ -1174,8 +1174,8 @@ export function createTicketsRouter() {
       if (!current) { res.status(404).json({ error: 'Cycle not found.' }); return; }
       const auth = await authorizeTeamAccess(req, current.teamId);
       if (!auth.allowed) { res.status(auth.status).json({ error: auth.error }); return; }
-      if (auth.workspaceRole !== 'owner' && auth.workspaceRole !== 'admin') {
-        res.status(403).json({ error: 'Only workspace owners or admins can manage cycles.' }); return;
+      if (auth.workspaceRole !== 'owner') {
+        res.status(403).json({ error: 'Only workspace owners can manage cycles.' }); return;
       }
       if (req.query.teamId && req.query.teamId !== current.teamId) {
         res.status(404).json({ error: 'Cycle not found in this team.' }); return;
@@ -1194,8 +1194,8 @@ export function createTicketsRouter() {
       if (!current) { res.status(404).json({ error: 'Cycle not found.' }); return; }
       const auth = await authorizeTeamAccess(req, current.teamId);
       if (!auth.allowed) { res.status(auth.status).json({ error: auth.error }); return; }
-      if (auth.workspaceRole !== 'owner' && auth.workspaceRole !== 'admin') {
-        res.status(403).json({ error: 'Only workspace owners or admins can manage cycles.' }); return;
+      if (auth.workspaceRole !== 'owner') {
+        res.status(403).json({ error: 'Only workspace owners can manage cycles.' }); return;
       }
       if (req.query.teamId && req.query.teamId !== current.teamId) {
         res.status(404).json({ error: 'Cycle not found in this team.' }); return;
@@ -1217,8 +1217,8 @@ export function createTicketsRouter() {
       if (!current) { res.status(404).json({ error: 'Cycle not found.' }); return; }
       const auth = await authorizeTeamAccess(req, current.teamId);
       if (!auth.allowed) { res.status(auth.status).json({ error: auth.error }); return; }
-      if (auth.workspaceRole !== 'owner' && auth.workspaceRole !== 'admin') {
-        res.status(403).json({ error: 'Only workspace owners or admins can manage cycles.' }); return;
+      if (auth.workspaceRole !== 'owner') {
+        res.status(403).json({ error: 'Only workspace owners can manage cycles.' }); return;
       }
       if (req.query.teamId && req.query.teamId !== current.teamId) {
         res.status(404).json({ error: 'Cycle not found in this team.' }); return;

@@ -1,7 +1,7 @@
-import { and, eq, gt, lt, ne } from 'drizzle-orm';
+import { and, asc, eq, gt, inArray, lt, ne } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../../../db/index.js';
-import { cycles, teams, tickets } from '../../../db/schema.js';
+import { cycles, projects, teams, tickets } from '../../../db/schema.js';
 import { createId, normalizeIsoDate } from '../../../lib/platform.js';
 
 export class CycleError extends Error {
@@ -55,8 +55,10 @@ function dates(input: { startDate: string; endDate: string }) {
 type WriteTx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 async function lockTeam(tx: WriteTx, teamId: string) {
-  const [team] = await tx.select({ id: teams.id }).from(teams).where(eq(teams.id, teamId)).for('update');
+  const [team] = await tx.select({ id: teams.id, workspaceId: teams.workspaceId })
+    .from(teams).where(eq(teams.id, teamId)).for('update');
   if (!team) throw new CycleError('Team not found.', 404);
+  return team;
 }
 
 /**
@@ -73,15 +75,42 @@ async function assertNoActiveOverlap(tx: WriteTx, teamId: string, startDate: Dat
   if (overlap) throw new CycleError('Active cycle dates overlap another cycle in this team.', 409);
 }
 
+/** Call before moving a team's cycles into another team. Both locks use ID order. */
+export async function assertCycleTeamTransferAllowed(tx: WriteTx, sourceTeamId: string, targetTeamId: string) {
+  const teamIds = [sourceTeamId, targetTeamId].sort();
+  const lockedTeams = await tx.select({ id: teams.id }).from(teams)
+    .where(inArray(teams.id, teamIds)).orderBy(asc(teams.id)).for('update');
+  if (lockedTeams.length !== 2) throw new CycleError('Team not found.', 404);
+  const active = await tx.select({ startDate: cycles.startDate, endDate: cycles.endDate })
+    .from(cycles).where(and(inArray(cycles.teamId, teamIds), eq(cycles.completed, false)))
+    .orderBy(asc(cycles.startDate), asc(cycles.endDate));
+  let latestEnd = Number.NEGATIVE_INFINITY;
+  for (const cycle of active) {
+    if (cycle.startDate.getTime() < latestEnd) {
+      throw new CycleError('Moving cycles would overlap active dates in the target team.', 409);
+    }
+    latestEnd = cycle.endDate.getTime();
+  }
+}
+
 export async function getCycleRecord(cycleId: string) {
   const [cycle] = await db.select().from(cycles).where(eq(cycles.id, cycleId)).limit(1);
   return cycle ?? null;
 }
 
-export async function createCycleRecord(teamId: string, input: z.infer<typeof createCycleSchema>) {
+export async function createCycleRecord(teamId: string, input: z.infer<typeof createCycleSchema>, projectId?: string) {
   const range = dates(input);
   return db.transaction(async (tx) => {
-    await lockTeam(tx, teamId);
+    const team = await lockTeam(tx, teamId);
+    if (projectId) {
+      // This read is inside the transaction and holds a share lock. A project
+      // transfer cannot make a cached team lookup stale between validation and insert.
+      const [project] = await tx.select({ teamId: projects.teamId, workspaceId: projects.workspaceId })
+        .from(projects).where(eq(projects.id, projectId)).for('share');
+      if (!project || project.teamId !== teamId || project.workspaceId !== team.workspaceId) {
+        throw new CycleError('Team does not own this project.', 409);
+      }
+    }
     if (!input.completed) await assertNoActiveOverlap(tx, teamId, range.startDate, range.endDate);
     const [cycle] = await tx.insert(cycles).values({
       id: createId('c'), teamId, name: input.name, ...range,
@@ -111,15 +140,26 @@ export async function editCycleRecord(teamId: string, cycleId: string, input: z.
 }
 
 export async function deleteCycleRecord(teamId: string, cycleId: string) {
-  return db.transaction(async (tx) => {
-    await lockTeam(tx, teamId);
-    // Ticket assignment takes a cycle row lock before it writes. This lock
-    // makes the reference check and deletion atomic with API assignments.
-    const [cycle] = await tx.select({ id: cycles.id }).from(cycles)
-      .where(and(eq(cycles.id, cycleId), eq(cycles.teamId, teamId))).for('update');
-    if (!cycle) throw new CycleError('Cycle not found in this team.', 404);
-    const [assigned] = await tx.select({ id: tickets.id }).from(tickets).where(eq(tickets.cycleId, cycleId)).limit(1);
-    if (assigned) throw new CycleError('Cannot delete a cycle while tickets are assigned.', 409);
-    await tx.delete(cycles).where(and(eq(cycles.id, cycleId), eq(cycles.teamId, teamId)));
-  });
+  try {
+    return await db.transaction(async (tx) => {
+      await lockTeam(tx, teamId);
+      // Ticket assignment takes a cycle row lock before it writes. This lock
+      // makes the reference check and deletion atomic with API assignments.
+      const [cycle] = await tx.select({ id: cycles.id }).from(cycles)
+        .where(and(eq(cycles.id, cycleId), eq(cycles.teamId, teamId))).for('update');
+      if (!cycle) throw new CycleError('Cycle not found in this team.', 404);
+      const [assigned] = await tx.select({ id: tickets.id }).from(tickets).where(eq(tickets.cycleId, cycleId)).limit(1);
+      if (assigned) throw new CycleError('Cannot delete a cycle while tickets are assigned.', 409);
+      await tx.delete(cycles).where(and(eq(cycles.id, cycleId), eq(cycles.teamId, teamId)));
+    });
+  } catch (error) {
+    // A direct SQL assignment can race after the pre-delete check. The FK is
+    // authoritative; preserve the same conflict response when it catches one.
+    const cause = error && typeof error === 'object' && 'cause' in error ? error.cause : error;
+    if (cause && typeof cause === 'object' && 'code' in cause && cause.code === '23503'
+      && 'constraint' in cause && cause.constraint === 'tickets_cycle_id_cycles_id_fk') {
+      throw new CycleError('Cannot delete a cycle while tickets are assigned.', 409);
+    }
+    throw error;
+  }
 }

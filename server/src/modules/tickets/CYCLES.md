@@ -5,7 +5,7 @@ Cycles belong to a team. `GET /cycles?teamId=...` (or `?projectId=...`) and
 cycles remain readable in both endpoints. A request that supplies both team and
 project IDs must name a project in that team.
 
-Workspace owners and admins can `POST /cycles`, `PATCH /cycles/:cycleId`, and
+Workspace owners can `POST /cycles`, `PATCH /cycles/:cycleId`, and
 `DELETE /cycles/:cycleId`. Create accepts a team ID or a project ID. Edit accepts
 only `name`, `startDate`, `endDate`, and `completed`; it cannot move a cycle to
 another team. Names are trimmed and must be nonempty. Dates must be real ISO
@@ -19,10 +19,14 @@ overlapping half-open `[startDate, endDate)` intervals. Adjacent cycles may shar
 an endpoint. Completed cycles do not reserve dates; reopening one checks the
 rule again. Create, edit, and reopen return 409 on overlap. Lifecycle writes
 lock the team row before checking and writing, so concurrent API requests for
-one team are serialized. This rule applies to API lifecycle writes; legacy or
-direct database writes are outside the API contract.
+one team are serialized. Team reassignment locks both teams and rejects a move
+that would overlap their active cycles. Legacy or direct database writes are
+outside the API overlap contract.
 
 Deletion returns 409 while any ticket references the cycle. Ticket assignment
 locks its cycle row, and deletion locks the same row before checking references.
+The `tickets.cycle_id` foreign key also prevents direct writes from creating
+new dangling references or deleting a referenced cycle. It is installed as
+`NOT VALID` in PostgreSQL so existing orphaned IDs remain for a separate repair.
 After the last assignment is removed, deletion succeeds and invalidates the
 workspace sidebar cache. Create and edit also invalidate that cache.

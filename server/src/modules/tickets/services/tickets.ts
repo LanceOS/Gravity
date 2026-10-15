@@ -161,7 +161,7 @@ async function assertTicketRelationships(
 ) {
   if (cycleId) {
     const [cycle] = await tx.select({ id: cycles.id }).from(cycles)
-      .where(and(eq(cycles.id, cycleId), eq(cycles.teamId, project.teamId))).for('update');
+      .where(and(eq(cycles.id, cycleId), eq(cycles.teamId, project.teamId))).for('key share');
     if (!cycle) throw new Error(TICKET_CYCLE_SCOPE_VIOLATION);
   }
   const visited = new Set([ticketId]);
