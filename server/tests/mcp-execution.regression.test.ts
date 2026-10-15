@@ -1,11 +1,12 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import { AjvJsonSchemaValidator } from '@modelcontextprotocol/sdk/validation/ajv';
 import { eq } from 'drizzle-orm';
 import { db } from '../src/db/index.js';
 import { workspaceSettings, tickets, workspaceMembers } from '../src/db/schema.js';
 import { bootstrapMcpRegistries } from '../src/modules/mcp/bootstrap.js';
 import { executeTool } from '../src/modules/mcp/tool-executor.js';
 import { handleMcpRequest } from '../src/modules/mcp/request-handler.js';
-import { listCanonicalTools } from '../src/modules/mcp/tools.js';
+import { getToolDefinition, listCanonicalTools, mcpToolsList, registerMcpTools } from '../src/modules/mcp/tools.js';
 import { seedWorkspaceFixture, seedTicket, seedUser } from './helpers/test-helpers.js';
 
 beforeEach(() => bootstrapMcpRegistries());
@@ -77,6 +78,91 @@ describe('MCP execution boundary', () => {
     expect(canonical.find((tool) => tool.name === 'get_ticket')?.aliases).toContain('read_ticket_details');
   });
 
+  it('advertises SDK-valid, exclusive success and error output shapes for every tool', () => {
+    const sdkValidator = new AjvJsonSchemaValidator();
+    for (const tool of listCanonicalTools()) {
+      const validate = sdkValidator.getValidator(tool.outputSchema!);
+      expect(validate({ data: null }).valid, tool.name).toBe(true);
+      expect(validate({ error: { code: 'INVALID_ARGUMENTS', message: 'Invalid input.' } }).valid, tool.name).toBe(true);
+      expect(validate({}).valid, tool.name).toBe(false);
+      expect(validate({ data: null, error: { code: 'FAILURE', message: 'Failed.' } }).valid, tool.name).toBe(false);
+      expect(validate({ error: { message: 'Missing code.' } }).valid, tool.name).toBe(false);
+    }
+  });
+
+  it('wraps a custom data output schema without weakening its validation', () => {
+    const name = 'custom_schema_probe';
+    registerMcpTools([{
+      name,
+      description: 'Schema registration probe',
+      inputSchema: { type: 'object', properties: {} },
+      outputSchema: { type: 'object', properties: { count: { type: 'number' } }, required: ['count'], additionalProperties: false },
+    }]);
+    try {
+      const schema = getToolDefinition(name)?.outputSchema;
+      expect(schema).toBeDefined();
+      const validate = new AjvJsonSchemaValidator().getValidator(schema!);
+      expect(validate({ data: { count: 1 } }).valid).toBe(true);
+      expect(validate({ data: { count: 'wrong' } }).valid).toBe(false);
+      expect(validate({ error: { code: 'FAILED', message: 'Could not count.' } }).valid).toBe(true);
+    } finally {
+      mcpToolsList.splice(mcpToolsList.findIndex((tool) => tool.name === name), 1);
+    }
+  });
+
+  it('returns SDK-valid structured successes, execution failures, and validation failures', async () => {
+    const { workspace, owner, ticket } = await fixture();
+    const listed: any = await handleMcpRequest({ jsonrpc: '2.0', id: 1, method: 'tools/list' }, workspace.id, owner.id);
+    const sdkValidator = new AjvJsonSchemaValidator();
+    const validateFor = (name: string, response: any) => {
+      const schema = listed.result.tools.find((tool: { name: string }) => tool.name === name).outputSchema;
+      expect(sdkValidator.getValidator(schema)(response.result.structuredContent).valid).toBe(true);
+      expect(JSON.parse(response.result.content[0].text)).toEqual(
+        response.result.isError ? response.result.structuredContent.error : response.result.structuredContent.data,
+      );
+    };
+
+    const success: any = await handleMcpRequest(request('get_ticket', { ticketKey: ticket.key }), workspace.id, owner.id);
+    expect(success.result.isError).toBe(false);
+    validateFor('get_ticket', success);
+
+    const missing: any = await handleMcpRequest(request('get_ticket', { ticketKey: 'NONE-999' }), workspace.id, owner.id);
+    expect(missing.result).toMatchObject({ isError: true, structuredContent: { error: {
+      code: 'NOT_FOUND', message: 'Ticket NONE-999 not found.',
+    } } });
+    validateFor('get_ticket', missing);
+
+    const unsafeBody = JSON.stringify({ type: 'doc', content: [{ type: 'paragraph', content: [
+      { type: 'image', attrs: { src: 'javascript:alert(1)' } },
+    ] }] });
+    const invalid: any = await handleMcpRequest(request('create_comment', { ticketKey: ticket.key, body: unsafeBody }), workspace.id, owner.id);
+    expect(invalid.result).toMatchObject({ isError: true, structuredContent: { error: {
+      code: 'INVALID_ARGUMENTS', message: 'Comment body must contain safe content.',
+    } } });
+    validateFor('create_comment', invalid);
+
+    const domain: any = await handleMcpRequest(request('preview_ticket_dependency', {
+      operation: 'add', blocker_ticket_key: ticket.key, dependent_ticket_key: ticket.key,
+    }), workspace.id, owner.id);
+    expect(domain.result).toMatchObject({ isError: true, structuredContent: { error: {
+      code: 'SELF_REFERENCE', status: 'self_reference', message: 'A ticket cannot block or depend on itself.',
+    } } });
+    validateFor('preview_ticket_dependency', domain);
+  });
+
+  it('keeps malformed arguments and authorization failures as actionable JSON-RPC errors', async () => {
+    const { workspace, owner, ticket } = await fixture();
+    const invalid = await handleMcpRequest(request('set_ticket_status', { ticketKey: ticket.key }), workspace.id, owner.id);
+    expect(invalid).toMatchObject({ error: { code: -32602, message: expect.stringContaining('Invalid arguments') } });
+    expect(invalid).not.toHaveProperty('result');
+
+    const unauthorized = await handleMcpRequest(request('set_ticket_status', {
+      ticketKey: ticket.key, status: 'done',
+    }), workspace.id, owner.id, { tokenScopes: ['tools/call:get_ticket'] });
+    expect(unauthorized).toMatchObject({ error: { code: -32001, message: 'Insufficient token scopes.' } });
+    expect(unauthorized).not.toHaveProperty('result');
+  });
+
   it('rechecks the token issuer role at write time while retaining read access', async () => {
     const { workspace, ticket } = await fixture();
     const member = await seedUser({ id: 'demoted-admin', email: 'demoted@example.com' });
@@ -98,6 +184,6 @@ describe('MCP execution boundary', () => {
     expect(await handleMcpRequest({ jsonrpc: '2.0', method: 'notifications/initialized' })).toBeNull();
     expect(await handleMcpRequest({ jsonrpc: '2.0', id: 1, method: 'ping' })).toMatchObject({ result: {} });
     const missing = await handleMcpRequest(request('get_ticket', { ticketKey: 'NONE-999' }), workspace.id, owner.id);
-    expect(missing).toMatchObject({ result: { isError: true, structuredContent: { error: { code: 'TOOL_EXECUTION_FAILED' } } } });
+    expect(missing).toMatchObject({ result: { isError: true, structuredContent: { error: { code: 'NOT_FOUND' } } } });
   });
 });

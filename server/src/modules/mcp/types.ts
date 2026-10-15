@@ -55,6 +55,7 @@ export type McpToolDefinition = {
   name: string;
   description: string;
   inputSchema: JsonSchema & { type: 'object'; properties: Record<string, JsonSchema> };
+  /** Before registration, describes handler data; registered tools advertise the wrapped MCP result. */
   outputSchema?: JsonSchema;
   annotations?: {
     readOnlyHint?: boolean;

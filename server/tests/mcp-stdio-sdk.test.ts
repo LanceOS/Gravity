@@ -33,6 +33,10 @@ describe('official MCP SDK stdio interoperability', () => {
       await client.ping();
       const catalog = await client.listTools();
       expect(catalog.tools.map((tool) => tool.name)).toEqual(expect.arrayContaining(['create_ticket', 'get_ticket', 'list_projects']));
+      const missing = await client.callTool({ name: 'get_ticket', arguments: { ticketKey: 'STD-999' } });
+      expect(missing).toMatchObject({ isError: true, structuredContent: { error: {
+        code: 'NOT_FOUND', message: 'Ticket STD-999 not found.',
+      } } });
       expect(data(await client.callTool({ name: 'list_tickets', arguments: { projectId: 'stdio-project' } }))).toEqual([]);
       const created = data(await client.callTool({ name: 'create_ticket', arguments: { projectId: 'stdio-project', title: 'Created through standard stdio' } }));
       const read = data(await client.callTool({ name: 'get_ticket', arguments: { ticketKey: created.ticket.key } }));

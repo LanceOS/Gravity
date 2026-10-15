@@ -9,7 +9,7 @@ import type { McpRequestPayload } from './types.js';
 import { getDisabledTools } from './workspace-tools.js';
 import { desanitize, sanitize, withMcpStateScope } from './state-map.js';
 import { getAvailableTools, hasToolCallScope } from './policy.js';
-import { validateToolArguments } from './validation.js';
+import { isValidToolOutput, validateToolArguments } from './validation.js';
 
 export const SUPPORTED_MCP_PROTOCOL_VERSIONS = ['2025-11-25', '2025-06-18', '2025-03-26', '2024-11-05'] as const;
 
@@ -23,12 +23,49 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
+type ToolFailure = { code: string; message: string; [key: string]: unknown };
+
+function toolResult(data: unknown): ReturnType<typeof createToolResult>;
+function toolResult(error: ToolFailure, isError: true): ReturnType<typeof createToolResult>;
 function toolResult(data: unknown, isError = false) {
+  return createToolResult(data, isError);
+}
+
+function createToolResult(data: unknown, isError: boolean) {
   return {
     content: [{ type: 'text' as const, text: JSON.stringify(data ?? null, null, 2) }],
     structuredContent: isError ? { error: data } : { data: data ?? null },
     isError,
   };
+}
+
+function toolExecutionFailure(error: unknown): ToolFailure {
+  if (error instanceof McpToolValidationError) {
+    return {
+      code: 'INVALID_ARGUMENTS',
+      message: error.message,
+      ...(error.data ? { details: error.data } : {}),
+    };
+  }
+  // These handler messages have a bounded, user-facing identifier. All other
+  // exceptions may contain database, network, or other internal diagnostics.
+  if (error instanceof Error && /^(Ticket|Project) [A-Za-z0-9_-]{1,128} not found\.$/.test(error.message)) {
+    return { code: 'NOT_FOUND', message: error.message };
+  }
+  if (error instanceof Error && error.message.startsWith('Rate limit exceeded:')) {
+    return { code: 'RATE_LIMITED', message: 'Rate limit exceeded. Please wait a moment and try again.' };
+  }
+  return { code: 'TOOL_EXECUTION_FAILED', message: 'Tool execution failed. Retry the call or contact support if it persists.' };
+}
+
+function requestFailure(id: string | number | null | undefined, error: unknown) {
+  if (error instanceof McpToolError) return createMcpErrorResponse(id, error.code, error.message, error.data);
+  if (error instanceof Error && [
+    'workspaceId is required.', 'Authenticated user is required.', 'Unauthorized workspace access.',
+  ].includes(error.message)) {
+    return createMcpErrorResponse(id, -32001, error.message);
+  }
+  return createMcpErrorResponse(id, -32603, 'Internal error handling MCP request.');
 }
 
 /** Transport-independent protocol handling. All actual dispatch policy lives in the executor. */
@@ -95,22 +132,33 @@ export class McpRequestHandler {
           const result = await executeTool(name, args, context.workspaceId, context.actorUserId, { tokenScopes: options.tokenScopes });
           const data = options.sanitize ? sanitize(result) : result;
           const domainFailure = isRecord(data) && data.ok === false;
-          return { jsonrpc: '2.0', id: payload.id, result: toolResult(data, domainFailure) };
+          if (domainFailure) {
+            // Keep the domain fields available to existing clients while giving
+            // every structured error a stable code and human-readable message.
+            const failure = {
+              ...data,
+              code: typeof data.status === 'string' ? data.status.toUpperCase() : 'DOMAIN_ERROR',
+              message: typeof data.message === 'string' ? data.message : 'Tool reported an error.',
+            };
+            return { jsonrpc: '2.0', id: payload.id, result: toolResult(failure, true) };
+          }
+          const success = toolResult(data);
+          // Custom schemas must match the JSON shape an SDK client will see.
+          if (!isValidToolOutput(definition, success.structuredContent)) {
+            return { jsonrpc: '2.0', id: payload.id, result: toolResult({
+              code: 'TOOL_OUTPUT_INVALID',
+              message: 'Tool returned invalid structured output. Contact support if it persists.',
+            }, true) };
+          }
+          return { jsonrpc: '2.0', id: payload.id, result: success };
         } catch (error) {
           // Authorization failures remain protocol errors. Domain errors are
           // visible to the model as tool failures so it can correct its input.
           if (error instanceof McpToolError && !(error instanceof McpToolValidationError)) throw error;
-          const failure = {
-            code: error instanceof McpToolValidationError ? 'INVALID_ARGUMENTS' : 'TOOL_EXECUTION_FAILED',
-            message: error instanceof Error ? error.message : 'Tool execution failed.',
-            ...(error instanceof McpToolError && error.data ? { details: error.data } : {}),
-          };
-          return { jsonrpc: '2.0', id: payload.id, result: toolResult(failure, true) };
+          return { jsonrpc: '2.0', id: payload.id, result: toolResult(toolExecutionFailure(error), true) };
         }
       } catch (error) {
-        return createMcpErrorResponse(payload.id, error instanceof McpToolError ? error.code : -32603,
-          error instanceof Error ? error.message : 'Internal error handling MCP request.',
-          error instanceof McpToolError ? error.data : undefined);
+        return requestFailure(payload.id, error);
       }
     });
   }
