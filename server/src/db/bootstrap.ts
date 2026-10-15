@@ -5,6 +5,7 @@ import { auth } from '../modules/auth/auth.js';
 import { env } from '../env.js';
 import { pool } from './index.js';
 import { mergeDuplicateTeamLabels } from './label-migration.js';
+import { removeCrossWorkspaceTicketRelationships } from './relationship-integrity.js';
 
 async function hasConstraint(constraintName: string) {
   try {
@@ -1060,4 +1061,10 @@ async function bootstrapDatabase() {
   await ensureConstraint('ticket_labels', 'ticket_labels_ticket_id_tickets_id_fk',
     'FOREIGN KEY (ticket_id) REFERENCES tickets(id) ON DELETE CASCADE' + ticketFkValidation);
   await migrateTicketKeyCounters(pool, env.databaseUrl.startsWith('pgmem://'));
+  // Legacy REST routes could create edges across workspaces. Run this after
+  // project backfills and before the server starts accepting requests.
+  const removedRelations = await removeCrossWorkspaceTicketRelationships();
+  if (removedRelations > 0) {
+    console.warn(`Removed ${removedRelations} cross-workspace ticket relationships during startup.`);
+  }
 }

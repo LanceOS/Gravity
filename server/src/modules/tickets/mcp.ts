@@ -57,6 +57,54 @@ function parseDateArg(value: unknown, fieldName: string): Date | undefined {
 }
 
 type WorkspaceTicket = NonNullable<Awaited<ReturnType<typeof getTicketByKey>>>;
+
+async function publishDependencyMutationEvent(
+  type: 'dependency.added' | 'dependency.removed',
+  context: ToolExecutionContext,
+  blocker: WorkspaceTicket,
+  dependent: WorkspaceTicket,
+) {
+  // MCP mutations also reach SSE clients. Hold ownership stable through the
+  // synchronous publish and suppress stale events after an out-of-band move.
+  try {
+    await db.transaction(async (tx) => {
+      const projectIds = [...new Set([blocker.projectId, dependent.projectId])];
+      const scopes = await tx.select({ id: projects.id, workspaceId: projects.workspaceId, teamId: projects.teamId })
+        .from(projects).where(inArray(projects.id, projectIds))
+        .orderBy(asc(projects.id)).for('share');
+      const currentTickets = await tx.select({ id: tickets.id, projectId: tickets.projectId })
+        .from(tickets).where(inArray(tickets.id, [blocker.id, dependent.id]))
+        .orderBy(asc(tickets.id)).for('share');
+      const scopeByProjectId = new Map(scopes.map((scope) => [scope.id, scope]));
+      const projectByTicketId = new Map(currentTickets.map((ticket) => [ticket.id, ticket.projectId]));
+      const blockerScope = scopeByProjectId.get(blocker.projectId);
+      const dependentScope = scopeByProjectId.get(dependent.projectId);
+      if (blockerScope?.workspaceId !== context.workspaceId
+        || dependentScope?.workspaceId !== context.workspaceId
+        || projectByTicketId.get(blocker.id) !== blocker.projectId
+        || projectByTicketId.get(dependent.id) !== dependent.projectId) return;
+
+      mcpEventBus.publish({
+        type,
+        workspaceId: context.workspaceId,
+        projectId: blocker.projectId,
+        teamId: blockerScope.teamId,
+        ticketKey: blocker.key,
+        actorUserId: context.actorUserId,
+        timestamp: new Date().toISOString(),
+        data: {
+          dependencyTicketKey: dependent.key,
+          blockerTicketKey: blocker.key,
+          dependentTicketKey: dependent.key,
+        },
+      });
+    });
+  } catch {
+    // The relation write already committed. Preserve its successful result.
+    try { audit('tickets.dependency_realtime_failed', { workspaceId: context.workspaceId }); } catch { /* best effort */ }
+  }
+}
+
 type TicketRelationSummary = Awaited<ReturnType<typeof listTicketDependencies>>[number];
 type DependencyOperation = 'add' | 'remove';
 type DependencyStatus =
@@ -559,12 +607,7 @@ export class TicketTools {
       context.workspaceId,
       'Dependent ticket',
     );
-    const scope = await getProjectScope(blockerTicket.projectId);
-    if (!scope) {
-      throw new Error(`Project ${blockerTicket.projectId} not found.`);
-    }
-
-    await createTicketDependencyRelation(blockerTicket.id, dependentTicket.id, blockerTicket.projectId);
+    await createTicketDependencyRelation(blockerTicket.id, dependentTicket.id, blockerTicket.projectId, context.workspaceId);
 
     audit(auditAction, {
       workspaceId: context.workspaceId,
@@ -573,20 +616,7 @@ export class TicketTools {
       dependentTicketKey: dependentTicket.key,
     });
 
-    mcpEventBus.publish({
-      type: 'dependency.added',
-      workspaceId: scope.workspaceId,
-      projectId: blockerTicket.projectId,
-      teamId: scope.teamId,
-      ticketKey: blockerTicket.key,
-      actorUserId: context.actorUserId,
-      timestamp: new Date().toISOString(),
-      data: {
-        dependencyTicketKey: dependentTicket.key,
-        blockerTicketKey: blockerTicket.key,
-        dependentTicketKey: dependentTicket.key,
-      },
-    });
+    await publishDependencyMutationEvent('dependency.added', context, blockerTicket, dependentTicket);
 
     return {
       success: true,
@@ -624,12 +654,7 @@ export class TicketTools {
       context.workspaceId,
       'Dependent ticket',
     );
-    const scope = await getProjectScope(blockerTicket.projectId);
-    if (!scope) {
-      throw new Error(`Project ${blockerTicket.projectId} not found.`);
-    }
-
-    await removeTicketDependencyRelation(blockerTicket.id, dependentTicket.id);
+    await removeTicketDependencyRelation(blockerTicket.id, dependentTicket.id, context.workspaceId);
 
     audit(auditAction, {
       workspaceId: context.workspaceId,
@@ -638,20 +663,7 @@ export class TicketTools {
       dependentTicketKey: dependentTicket.key,
     });
 
-    mcpEventBus.publish({
-      type: 'dependency.removed',
-      workspaceId: scope.workspaceId,
-      projectId: blockerTicket.projectId,
-      teamId: scope.teamId,
-      ticketKey: blockerTicket.key,
-      actorUserId: context.actorUserId,
-      timestamp: new Date().toISOString(),
-      data: {
-        dependencyTicketKey: dependentTicket.key,
-        blockerTicketKey: blockerTicket.key,
-        dependentTicketKey: dependentTicket.key,
-      },
-    });
+    await publishDependencyMutationEvent('dependency.removed', context, blockerTicket, dependentTicket);
 
     return {
       success: true,

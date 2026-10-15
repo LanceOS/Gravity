@@ -1,4 +1,4 @@
-import { and, asc, eq, isNull } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull } from 'drizzle-orm';
 import { type Request, type Response, Router } from 'express';
 import { db } from '../../db/index.js';
 import { cycles, labels, projects, teams, ticketLabels, tickets, workspaceSettings } from '../../db/schema.js';
@@ -34,6 +34,7 @@ import {
   getProjectScope,
   COMMENT_BODY_EMPTY_AFTER_SANITIZATION,
   TICKET_ASSIGNEE_SCOPE_VIOLATION,
+  TICKET_DEPENDENCY_WORKSPACE_CONFLICT,
   type TicketRelationshipCleanupEffect,
 } from './services/tickets.js';
 import {
@@ -188,6 +189,71 @@ export function createTicketsRouter() {
       ? { ...payload, actorUserId }
       : payload;
     broadcastToWorkspace(workspaceId, type, data);
+  }
+
+  function sendDependencyError(res: Response, error: unknown, fallback: string) {
+    if (error instanceof Error && error.message === TICKET_DEPENDENCY_WORKSPACE_CONFLICT) {
+      res.status(409).json({ error: 'Tickets must belong to the same workspace.' });
+      return;
+    }
+    res.status(500).json({ error: error instanceof Error ? error.message : fallback });
+  }
+
+  async function emitDependencyEvents(
+    authorizedWorkspaceId: string,
+    source: { id: string; projectId: string } | null,
+    sourceProjectId: string,
+    other: { id: string; projectId: string } | null,
+    otherProjectId: string,
+    userId: string,
+  ) {
+    // Keep ownership stable through the synchronous broadcast. A ticket that
+    // moved after hydration gets an invalidation, never its stale snapshot.
+    await db.transaction(async (tx) => {
+      const projectIds = [...new Set([sourceProjectId, otherProjectId])];
+      const scopes = await tx.select({ id: projects.id, workspaceId: projects.workspaceId })
+        .from(projects).where(inArray(projects.id, projectIds))
+        .orderBy(asc(projects.id)).for('share');
+      const ticketIds = [source?.id, other?.id].filter((id): id is string => Boolean(id));
+      const currentTickets = ticketIds.length > 0
+        ? await tx.select({ id: tickets.id, projectId: tickets.projectId })
+          .from(tickets).where(inArray(tickets.id, ticketIds))
+          .orderBy(asc(tickets.id)).for('share')
+        : [];
+      const workspaceByProjectId = new Map(scopes.map((scope) => [scope.id, scope.workspaceId]));
+      const currentProjectByTicketId = new Map(currentTickets.map((ticket) => [ticket.id, ticket.projectId]));
+      const emitForProject = (snapshot: { id: string; projectId: string } | null, projectId: string) => {
+        const workspaceId = workspaceByProjectId.get(projectId);
+        if (!workspaceId || workspaceId !== authorizedWorkspaceId) return;
+        const currentSnapshot = snapshot && currentProjectByTicketId.get(snapshot.id) === projectId ? snapshot : null;
+        emitWorkspaceEvent(workspaceId, 'tickets-updated', currentSnapshot
+          ? { projectId, ticketId: currentSnapshot.id, ticket: currentSnapshot }
+          : { projectId }, userId);
+      };
+      emitForProject(source, sourceProjectId);
+      if (otherProjectId !== sourceProjectId) emitForProject(other, otherProjectId);
+    });
+  }
+
+  async function notifyDependencyChange(
+    workspaceId: string,
+    ticketId: string,
+    ticketProjectId: string,
+    otherId: string,
+    otherProjectId: string,
+    userId: string,
+  ) {
+    try {
+      const [ticket, other] = await Promise.all([
+        getTicketById(ticketId, ticketProjectId),
+        getTicketById(otherId, otherProjectId),
+      ]);
+      await emitDependencyEvents(workspaceId, ticket, ticketProjectId, other, otherProjectId, userId);
+    } catch {
+      // The relation already committed. An unavailable realtime path must not
+      // turn a successful mutation into an HTTP 500 that clients might retry.
+      try { audit('tickets.dependency_realtime_failed', { workspaceId }); } catch { /* best effort */ }
+    }
   }
 
   async function emitRelationshipCleanupEvents(
@@ -1008,7 +1074,7 @@ export function createTicketsRouter() {
   });
 
   router.post('/tickets/:ticketId/dependencies', async (req, res) => {
-    await withTicketAccess(req, res, normalizeRouteParam(req.params.ticketId), async (ticket, userId) => {
+    await withTicketAccess(req, res, normalizeRouteParam(req.params.ticketId), async (ticket, userId, workspaceId) => {
       const dependencyId = req.body?.dependencyId;
       if (!dependencyId) {
         res.status(400).json({ error: 'Dependency ID is required.' });
@@ -1032,6 +1098,11 @@ export function createTicketsRouter() {
         return;
       }
 
+      if (workspaceId !== depAuth.workspaceId) {
+        res.status(409).json({ error: 'Tickets must belong to the same workspace.' });
+        return;
+      }
+
       if (await hasTicketDependencyRelation(ticket.id, dependencyId)) {
         res.status(400).json({ error: 'This ticket already blocks the selected ticket.' });
         return;
@@ -1048,41 +1119,19 @@ export function createTicketsRouter() {
       }
 
       try {
-        await createTicketDependencyRelation(ticket.id, dependencyId, ticket.projectId);
+        await createTicketDependencyRelation(ticket.id, dependencyId, ticket.projectId, workspaceId);
 
-        const updatedTicket = await getTicketById(ticket.id, ticket.projectId);
-        const updatedDependencyTicket = await getTicketById(dependencyId, dependencyTicket.projectId);
-
-        if (updatedTicket) {
-          emitWorkspaceEvent(depAuth.workspaceId, 'tickets-updated', {
-            projectId: ticket.projectId,
-            ticketId: updatedTicket.id,
-            ticket: updatedTicket,
-          }, userId);
-        } else {
-          emitWorkspaceEvent(depAuth.workspaceId, 'tickets-updated', { projectId: ticket.projectId }, userId);
-        }
-        if (dependencyTicket.projectId !== ticket.projectId) {
-          if (updatedDependencyTicket) {
-            emitWorkspaceEvent(depAuth.workspaceId, 'tickets-updated', {
-              projectId: dependencyTicket.projectId,
-              ticketId: updatedDependencyTicket.id,
-              ticket: updatedDependencyTicket,
-            }, userId);
-          } else {
-            emitWorkspaceEvent(depAuth.workspaceId, 'tickets-updated', { projectId: dependencyTicket.projectId }, userId);
-          }
-        }
+        await notifyDependencyChange(workspaceId, ticket.id, ticket.projectId, dependencyId, dependencyTicket.projectId, userId);
 
         res.status(201).json({ success: true });
       } catch (error) {
-        res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to add dependency.' });
+        sendDependencyError(res, error, 'Failed to add dependency.');
       }
     });
   });
 
   router.delete('/tickets/:ticketId/dependencies/:dependencyId', async (req, res) => {
-    await withTicketAccess(req, res, normalizeRouteParam(req.params.ticketId), async (ticket, userId) => {
+    await withTicketAccess(req, res, normalizeRouteParam(req.params.ticketId), async (ticket, userId, workspaceId) => {
       const dependencyId = normalizeRouteParam(req.params.dependencyId);
 
       const dependencyTicket = await getTicketById(dependencyId);
@@ -1097,41 +1146,24 @@ export function createTicketsRouter() {
         return;
       }
 
+      if (workspaceId !== depAuth.workspaceId) {
+        res.status(409).json({ error: 'Tickets must belong to the same workspace.' });
+        return;
+      }
+
       if (!(await hasTicketDependencyRelation(ticket.id, dependencyId))) {
         res.status(400).json({ error: 'Ticket is not a dependency of this ticket.' });
         return;
       }
 
       try {
-        await removeTicketDependencyRelation(ticket.id, dependencyId);
+        await removeTicketDependencyRelation(ticket.id, dependencyId, workspaceId);
 
-        const updatedTicket = await getTicketById(ticket.id, ticket.projectId);
-        const updatedDependencyTicket = await getTicketById(dependencyId, dependencyTicket.projectId);
-
-        if (updatedTicket) {
-          emitWorkspaceEvent(depAuth.workspaceId, 'tickets-updated', {
-            projectId: ticket.projectId,
-            ticketId: updatedTicket.id,
-            ticket: updatedTicket,
-          }, userId);
-        } else {
-          emitWorkspaceEvent(depAuth.workspaceId, 'tickets-updated', { projectId: ticket.projectId }, userId);
-        }
-        if (dependencyTicket.projectId !== ticket.projectId) {
-          if (updatedDependencyTicket) {
-            emitWorkspaceEvent(depAuth.workspaceId, 'tickets-updated', {
-              projectId: dependencyTicket.projectId,
-              ticketId: updatedDependencyTicket.id,
-              ticket: updatedDependencyTicket,
-            }, userId);
-          } else {
-            emitWorkspaceEvent(depAuth.workspaceId, 'tickets-updated', { projectId: dependencyTicket.projectId }, userId);
-          }
-        }
+        await notifyDependencyChange(workspaceId, ticket.id, ticket.projectId, dependencyId, dependencyTicket.projectId, userId);
 
         res.json({ success: true });
       } catch (error) {
-        res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to remove dependency.' });
+        sendDependencyError(res, error, 'Failed to remove dependency.');
       }
     });
   });
@@ -1148,7 +1180,7 @@ export function createTicketsRouter() {
   });
 
   router.post('/tickets/:ticketId/blockers', async (req, res) => {
-    await withTicketAccess(req, res, normalizeRouteParam(req.params.ticketId), async (ticket, userId) => {
+    await withTicketAccess(req, res, normalizeRouteParam(req.params.ticketId), async (ticket, userId, workspaceId) => {
       const blockerId = req.body?.blockerId;
       if (!blockerId) {
         res.status(400).json({ error: 'Blocker ID is required.' });
@@ -1172,6 +1204,11 @@ export function createTicketsRouter() {
         return;
       }
 
+      if (workspaceId !== blockerAuth.workspaceId) {
+        res.status(409).json({ error: 'Tickets must belong to the same workspace.' });
+        return;
+      }
+
       if (await hasTicketDependencyRelation(blockerId, ticket.id)) {
         res.status(400).json({ error: 'This ticket already has the selected blocker.' });
         return;
@@ -1188,41 +1225,19 @@ export function createTicketsRouter() {
       }
 
       try {
-        await createTicketDependencyRelation(blockerId, ticket.id, ticket.projectId);
+        await createTicketDependencyRelation(blockerId, ticket.id, blockerTicket.projectId, workspaceId);
 
-        const updatedTicket = await getTicketById(ticket.id, ticket.projectId);
-        const updatedBlockerTicket = await getTicketById(blockerId, blockerTicket.projectId);
-
-        if (updatedTicket) {
-          emitWorkspaceEvent(blockerAuth.workspaceId, 'tickets-updated', {
-            projectId: ticket.projectId,
-            ticketId: updatedTicket.id,
-            ticket: updatedTicket,
-          }, userId);
-        } else {
-          emitWorkspaceEvent(blockerAuth.workspaceId, 'tickets-updated', { projectId: ticket.projectId }, userId);
-        }
-        if (blockerTicket.projectId !== ticket.projectId) {
-          if (updatedBlockerTicket) {
-            emitWorkspaceEvent(blockerAuth.workspaceId, 'tickets-updated', {
-              projectId: blockerTicket.projectId,
-              ticketId: updatedBlockerTicket.id,
-              ticket: updatedBlockerTicket,
-            }, userId);
-          } else {
-            emitWorkspaceEvent(blockerAuth.workspaceId, 'tickets-updated', { projectId: blockerTicket.projectId }, userId);
-          }
-        }
+        await notifyDependencyChange(workspaceId, ticket.id, ticket.projectId, blockerId, blockerTicket.projectId, userId);
 
         res.status(201).json({ success: true });
       } catch (error) {
-        res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to add blocker.' });
+        sendDependencyError(res, error, 'Failed to add blocker.');
       }
     });
   });
 
   router.delete('/tickets/:ticketId/blockers/:blockerId', async (req, res) => {
-    await withTicketAccess(req, res, normalizeRouteParam(req.params.ticketId), async (ticket, userId) => {
+    await withTicketAccess(req, res, normalizeRouteParam(req.params.ticketId), async (ticket, userId, workspaceId) => {
       const blockerId = normalizeRouteParam(req.params.blockerId);
 
       const blockerTicket = await getTicketById(blockerId);
@@ -1237,41 +1252,24 @@ export function createTicketsRouter() {
         return;
       }
 
+      if (workspaceId !== blockerAuth.workspaceId) {
+        res.status(409).json({ error: 'Tickets must belong to the same workspace.' });
+        return;
+      }
+
       if (!(await hasTicketDependencyRelation(blockerId, ticket.id))) {
         res.status(400).json({ error: 'Ticket is not a blocker of this ticket.' });
         return;
       }
 
       try {
-        await removeTicketDependencyRelation(blockerId, ticket.id);
+        await removeTicketDependencyRelation(blockerId, ticket.id, workspaceId);
 
-        const updatedTicket = await getTicketById(ticket.id, ticket.projectId);
-        const updatedBlockerTicket = await getTicketById(blockerId, blockerTicket.projectId);
-
-        if (updatedTicket) {
-          emitWorkspaceEvent(blockerAuth.workspaceId, 'tickets-updated', {
-            projectId: ticket.projectId,
-            ticketId: updatedTicket.id,
-            ticket: updatedTicket,
-          }, userId);
-        } else {
-          emitWorkspaceEvent(blockerAuth.workspaceId, 'tickets-updated', { projectId: ticket.projectId }, userId);
-        }
-        if (blockerTicket.projectId !== ticket.projectId) {
-          if (updatedBlockerTicket) {
-            emitWorkspaceEvent(blockerAuth.workspaceId, 'tickets-updated', {
-              projectId: blockerTicket.projectId,
-              ticketId: updatedBlockerTicket.id,
-              ticket: updatedBlockerTicket,
-            }, userId);
-          } else {
-            emitWorkspaceEvent(blockerAuth.workspaceId, 'tickets-updated', { projectId: blockerTicket.projectId }, userId);
-          }
-        }
+        await notifyDependencyChange(workspaceId, ticket.id, ticket.projectId, blockerId, blockerTicket.projectId, userId);
 
         res.json({ success: true });
       } catch (error) {
-        res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to remove blocker.' });
+        sendDependencyError(res, error, 'Failed to remove blocker.');
       }
     });
   });

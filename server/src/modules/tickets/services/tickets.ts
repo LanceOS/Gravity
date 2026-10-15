@@ -1,4 +1,5 @@
 import { and, asc, desc, eq, gt, lt, gte, ilike, inArray, isNull, lte, or, sql } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 import { db } from '../../../db/index.js';
 import { authUsers, comments, tickets, ticketRelationships, userProfiles, projects, cycles, labels, ticketLabels, workspaceSettings, workspaceMembers, workspaces, projectMembers } from '../../../db/schema.js';
 import { createId, getProjectByKeyPrefix, nextTicketKey, normalizeIsoDate } from '../../../lib/platform.js';
@@ -20,6 +21,8 @@ type RelatedTicketRecord = {
   status: string;
   priority: string;
 };
+const relationAnchorTicket = alias(tickets, 'relation_anchor_ticket');
+const relationAnchorProject = alias(projects, 'relation_anchor_project');
 
 const labelSelectFields = {
   id: labels.id,
@@ -73,6 +76,7 @@ export const TICKET_CYCLE_SCOPE_VIOLATION = 'TICKET_CYCLE_SCOPE_VIOLATION';
 export const TICKET_PARENT_SCOPE_VIOLATION = 'TICKET_PARENT_SCOPE_VIOLATION';
 export const TICKET_PARENT_CYCLE = 'TICKET_PARENT_CYCLE';
 export const COMMENT_BODY_EMPTY_AFTER_SANITIZATION = 'COMMENT_BODY_EMPTY_AFTER_SANITIZATION';
+export const TICKET_DEPENDENCY_WORKSPACE_CONFLICT = 'TICKET_DEPENDENCY_WORKSPACE_CONFLICT';
 
 type EditorContentAuditContext = {
   operation: 'ticket_create' | 'ticket_update' | 'comment_create' | 'comment_update';
@@ -358,24 +362,33 @@ async function getTicketRelationshipFlags(ticketRows: Pick<TicketRecord, 'id' | 
     relatedTicketIds.add(row.blockedTicketId);
   }
 
-  // List queries already include statuses for most related tickets. Only load
-  // endpoints outside the result set (for example, on another page/project).
-  const missingTicketIds = Array.from(relatedTicketIds).filter((id) => !ticketStatusMap.has(id));
-  const missingTicketStatuses = await getTicketStatusMap(missingTicketIds);
-  for (const [id, status] of missingTicketStatuses) {
-    ticketStatusMap.set(id, status);
+  // Load endpoint workspaces and statuses together. List queries already
+  // supplied statuses for the current page; this covers off-page endpoints.
+  const workspaceRows = relatedTicketIds.size > 0
+    ? await db.select({ id: tickets.id, status: tickets.status, workspaceId: projects.workspaceId })
+      .from(tickets)
+      .innerJoin(projects, eq(projects.id, tickets.projectId))
+      .where(inArray(tickets.id, Array.from(new Set([...activeTicketIds, ...relatedTicketIds]))))
+    : [];
+  for (const row of workspaceRows) {
+    if (!ticketStatusMap.has(row.id)) ticketStatusMap.set(row.id, row.status);
   }
+  const workspaceByTicketId = new Map(workspaceRows.map((row) => [row.id, row.workspaceId]));
+  const isSameWorkspace = (sourceId: string, targetId: string) => {
+    const workspaceId = workspaceByTicketId.get(sourceId);
+    return workspaceId !== undefined && workspaceId === workspaceByTicketId.get(targetId);
+  };
   const filteredBlockedIds = new Set<string>();
   const filteredDependencyIds = new Set<string>();
 
   for (const row of blockedRows) {
-    if (!isTerminalTicketStatus(ticketStatusMap.get(row.ticketId))) {
+    if (isSameWorkspace(row.ticketId, row.blockedTicketId) && !isTerminalTicketStatus(ticketStatusMap.get(row.ticketId))) {
       filteredBlockedIds.add(row.blockedTicketId);
     }
   }
 
   for (const row of dependencyRows) {
-    if (!isTerminalTicketStatus(ticketStatusMap.get(row.blockedTicketId))) {
+    if (isSameWorkspace(row.ticketId, row.blockedTicketId) && !isTerminalTicketStatus(ticketStatusMap.get(row.blockedTicketId))) {
       filteredDependencyIds.add(row.ticketId);
     }
   }
@@ -631,9 +644,6 @@ export async function getTicketRelationsByKey(ticketKey: string) {
 }
 
 export async function listTicketDependencies(ticketId: string) {
-  const [anchor] = await db.select({ workspaceId: projects.workspaceId }).from(tickets)
-    .innerJoin(projects, eq(projects.id, tickets.projectId)).where(eq(tickets.id, ticketId)).limit(1);
-  if (!anchor) return [];
   const ticketStatusMap = await getTicketStatusMap([ticketId]);
   if (isTerminalTicketStatus(ticketStatusMap.get(ticketId))) {
     return [];
@@ -649,9 +659,11 @@ export async function listTicketDependencies(ticketId: string) {
       priority: tickets.priority,
     })
     .from(ticketRelationships)
+    .innerJoin(relationAnchorTicket, eq(relationAnchorTicket.id, ticketRelationships.ticketId))
+    .innerJoin(relationAnchorProject, eq(relationAnchorProject.id, relationAnchorTicket.projectId))
     .innerJoin(tickets, eq(tickets.id, ticketRelationships.blockedTicketId))
     .innerJoin(projects, eq(projects.id, tickets.projectId))
-    .where(and(eq(ticketRelationships.ticketId, ticketId), eq(projects.workspaceId, anchor.workspaceId)))
+    .where(and(eq(ticketRelationships.ticketId, ticketId), eq(projects.workspaceId, relationAnchorProject.workspaceId)))
     .orderBy(asc(tickets.createdAt), asc(tickets.key));
 
   return rows
@@ -660,9 +672,6 @@ export async function listTicketDependencies(ticketId: string) {
 }
 
 export async function listTicketBlockers(ticketId: string) {
-  const [anchor] = await db.select({ workspaceId: projects.workspaceId }).from(tickets)
-    .innerJoin(projects, eq(projects.id, tickets.projectId)).where(eq(tickets.id, ticketId)).limit(1);
-  if (!anchor) return [];
   const ticketStatusMap = await getTicketStatusMap([ticketId]);
   if (isTerminalTicketStatus(ticketStatusMap.get(ticketId))) {
     return [];
@@ -678,9 +687,11 @@ export async function listTicketBlockers(ticketId: string) {
       priority: tickets.priority,
     })
     .from(ticketRelationships)
+    .innerJoin(relationAnchorTicket, eq(relationAnchorTicket.id, ticketRelationships.blockedTicketId))
+    .innerJoin(relationAnchorProject, eq(relationAnchorProject.id, relationAnchorTicket.projectId))
     .innerJoin(tickets, eq(tickets.id, ticketRelationships.ticketId))
     .innerJoin(projects, eq(projects.id, tickets.projectId))
-    .where(and(eq(ticketRelationships.blockedTicketId, ticketId), eq(projects.workspaceId, anchor.workspaceId)))
+    .where(and(eq(ticketRelationships.blockedTicketId, ticketId), eq(projects.workspaceId, relationAnchorProject.workspaceId)))
     .orderBy(asc(tickets.createdAt), asc(tickets.key));
 
   return rows
@@ -708,7 +719,11 @@ export async function hasCircularDependency(targetBlockerId: string, startBlocke
     const rows = await db
       .select({ blockedTicketId: ticketRelationships.blockedTicketId })
       .from(ticketRelationships)
-      .where(inArray(ticketRelationships.ticketId, nextLayer));
+      .innerJoin(relationAnchorTicket, eq(relationAnchorTicket.id, ticketRelationships.ticketId))
+      .innerJoin(relationAnchorProject, eq(relationAnchorProject.id, relationAnchorTicket.projectId))
+      .innerJoin(tickets, eq(tickets.id, ticketRelationships.blockedTicketId))
+      .innerJoin(projects, eq(projects.id, tickets.projectId))
+      .where(and(inArray(ticketRelationships.ticketId, nextLayer), eq(projects.workspaceId, relationAnchorProject.workspaceId)));
 
     const nextQueue = rows.map((row) => String(row.blockedTicketId));
     if (nextQueue.includes(startBlockedId)) {
@@ -734,17 +749,62 @@ export async function hasTicketDependencyRelation(ticketId: string, blockedTicke
   return rows.length > 0;
 }
 
-export async function createTicketDependencyRelation(ticketId: string, blockedTicketId: string, projectId: string) {
-  await db
-    .insert(ticketRelationships)
-    .values({ ticketId, blockedTicketId, projectId })
-    .onConflictDoNothing();
+async function lockDependencyEndpoints(
+  tx: Pick<typeof db, 'select'>,
+  ticketId: string,
+  blockedTicketId: string,
+  expectedWorkspaceId: string,
+  expectedSourceProjectId?: string,
+) {
+  if (ticketId === blockedTicketId) throw new Error(TICKET_DEPENDENCY_WORKSPACE_CONFLICT);
+  // Ticket moves lock projects before updating ticket rows. Use that same lock
+  // order here, then reject if either ticket moved since the preliminary read.
+  const before = await tx.select({ id: tickets.id, projectId: tickets.projectId })
+    .from(tickets).where(inArray(tickets.id, [ticketId, blockedTicketId]));
+  if (before.length !== 2) throw new Error(TICKET_DEPENDENCY_WORKSPACE_CONFLICT);
+  const projectIds = [...new Set(before.map((row) => row.projectId))];
+  const lockedProjects = await tx.select({ id: projects.id, workspaceId: projects.workspaceId })
+    .from(projects).where(inArray(projects.id, projectIds))
+    .orderBy(asc(projects.id)).for('update');
+  const after = await tx.select({ id: tickets.id, projectId: tickets.projectId })
+    .from(tickets).where(inArray(tickets.id, [ticketId, blockedTicketId]))
+    .orderBy(asc(tickets.id)).for('update');
+  const projectById = new Map(lockedProjects.map((row) => [row.id, row.workspaceId]));
+  const source = after.find((row) => row.id === ticketId);
+  const target = after.find((row) => row.id === blockedTicketId);
+  if (lockedProjects.length !== projectIds.length || !source || !target
+    || before.some((row) => after.find((current) => current.id === row.id)?.projectId !== row.projectId)
+    || (expectedSourceProjectId !== undefined && source.projectId !== expectedSourceProjectId)
+    || projectById.get(source.projectId) !== expectedWorkspaceId
+    || projectById.get(target.projectId) !== expectedWorkspaceId) {
+    throw new Error(TICKET_DEPENDENCY_WORKSPACE_CONFLICT);
+  }
 }
 
-export async function removeTicketDependencyRelation(ticketId: string, blockedTicketId: string) {
-  await db
-    .delete(ticketRelationships)
-    .where(and(eq(ticketRelationships.ticketId, ticketId), eq(ticketRelationships.blockedTicketId, blockedTicketId)));
+export async function createTicketDependencyRelation(
+  ticketId: string,
+  blockedTicketId: string,
+  projectId: string,
+  expectedWorkspaceId: string,
+) {
+  await db.transaction(async (tx) => {
+    await lockDependencyEndpoints(tx, ticketId, blockedTicketId, expectedWorkspaceId, projectId);
+    await tx.insert(ticketRelationships)
+      .values({ ticketId, blockedTicketId, projectId })
+      .onConflictDoNothing();
+  });
+}
+
+export async function removeTicketDependencyRelation(
+  ticketId: string,
+  blockedTicketId: string,
+  expectedWorkspaceId: string,
+) {
+  await db.transaction(async (tx) => {
+    await lockDependencyEndpoints(tx, ticketId, blockedTicketId, expectedWorkspaceId);
+    await tx.delete(ticketRelationships)
+      .where(and(eq(ticketRelationships.ticketId, ticketId), eq(ticketRelationships.blockedTicketId, blockedTicketId)));
+  });
 }
 
 async function readComments(ticketId: string, commentId?: string) {
