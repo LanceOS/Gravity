@@ -191,7 +191,7 @@ export function Select({
     };
 
     window.addEventListener('resize', handleViewportChange);
-    window.addEventListener('scroll', handleViewportChange, true);
+    window.addEventListener('scroll', handleViewportChange, { capture: true, passive: true });
 
     return () => {
       window.removeEventListener('resize', handleViewportChange);

@@ -24,7 +24,7 @@ export function Scrollspy({ targets, children, style }: ScrollspyProps) {
       setActiveId(currentActive);
     };
 
-    window.addEventListener('scroll', handleScroll, true);
+    window.addEventListener('scroll', handleScroll, { capture: true, passive: true });
     return () => window.removeEventListener('scroll', handleScroll, true);
   }, [targets]);
 

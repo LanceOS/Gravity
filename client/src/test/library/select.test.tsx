@@ -1,12 +1,39 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useState } from 'react';
 import userEvent from '@testing-library/user-event';
 import { Select } from '@library';
 
 const options = [{ value: 'low', label: 'Low' }, { value: 'high', label: 'High' }];
 
+afterEach(() => vi.restoreAllMocks());
+
 describe('Select trigger props', () => {
+  it('uses a passive capture listener and repositions an open menu on nested scroll', () => {
+    const addListener = vi.spyOn(window, 'addEventListener');
+    const removeListener = vi.spyOn(window, 'removeEventListener');
+    const { unmount } = render(
+      <div data-testid="scroller"><Select options={options} value="low" aria-label="Priority" /></div>,
+    );
+    const trigger = screen.getByRole('button', { name: 'Priority' });
+    let rect = new DOMRect(200, 100, 80, 30);
+    vi.spyOn(trigger, 'getBoundingClientRect').mockImplementation(() => rect);
+
+    fireEvent.click(trigger);
+    const menu = screen.getByRole('listbox');
+    expect(menu).toHaveStyle({ left: '200px', top: '134px' });
+
+    const scrollCall = addListener.mock.calls.find(([type]) => type === 'scroll');
+    expect(scrollCall).toEqual(['scroll', expect.any(Function), { capture: true, passive: true }]);
+
+    rect = new DOMRect(300, 200, 80, 30);
+    fireEvent.scroll(screen.getByTestId('scroller'));
+    expect(menu).toHaveStyle({ left: '300px', top: '234px' });
+
+    unmount();
+    expect(removeListener).toHaveBeenCalledWith('scroll', scrollCall?.[1], true);
+  });
+
   it('forwards supported attributes without leaking native select props or overriding trigger behavior', () => {
     const nativeProps = { multiple: true, required: true, size: 4, defaultValue: 'high', autoComplete: 'off' };
     render(
