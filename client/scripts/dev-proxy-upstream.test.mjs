@@ -6,6 +6,7 @@ import { rm, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { loadConfigFromFile } from 'vite';
 import { resolveDevProxyUpstream } from '../dev-proxy-upstream.ts';
+import { validateViteEnvironment } from '../vite-env.ts';
 
 const clientRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const repoRoot = resolve(clientRoot, '..');
@@ -56,8 +57,19 @@ test('rejects invalid allowlist entries and the browser-exposed legacy setting',
   assert.throws(() => resolveDevProxyUpstream({ VITE_API_PROXY_TARGET: 'http://localhost:8080' }), /VITE_API_PROXY_TARGET/);
 });
 
+test('permits only reviewed VITE_ browser variables', () => {
+  assert.doesNotThrow(() => validateViteEnvironment({
+    VITE_ALLOWED_HOSTS: 'app.example.test',
+    VITE_ALLOWED_TICKET_HOSTS: 'tickets.example.test',
+    VITE_FRONTEND_PUBLIC_URL: 'https://app.example.test',
+    VITE_TICKET_URL_BASE: 'https://tickets.example.test',
+  }));
+  assert.throws(() => validateViteEnvironment({ VITE_PRIVATE_TOKEN: 'do-not-bundle' }), /VITE_PRIVATE_TOKEN is not an approved browser environment variable/);
+  assert.throws(() => validateViteEnvironment({ VITE_API_PROXY_TARGET: 'https://private.example.test' }), /VITE_API_PROXY_TARGET is no longer supported/);
+});
+
 async function withProxyEnv(values, run) {
-  const keys = ['BACKEND_UPSTREAM', 'GRAVITY_DEV_PROXY_ALLOWED_ORIGINS', 'VITE_API_PROXY_TARGET'];
+  const keys = ['BACKEND_UPSTREAM', 'GRAVITY_DEV_PROXY_ALLOWED_ORIGINS', 'VITE_API_PROXY_TARGET', 'VITE_PRIVATE_TOKEN'];
   const previous = Object.fromEntries(keys.map((key) => [key, process.env[key]]));
   for (const key of keys) {
     if (values[key] === undefined) delete process.env[key];
@@ -99,6 +111,7 @@ test('production build config does not apply the dev proxy allowlist', async () 
   await withProxyEnv({ BACKEND_UPSTREAM: 'https://production-api.example.test' }, async () => {
     const loaded = await loadConfigFromFile({ command: 'build', mode: 'production' }, resolve(clientRoot, 'vite.config.ts'), clientRoot);
     assert.ok(loaded?.config);
+    assert.equal(loaded.config.server?.proxy, undefined);
   });
 });
 
@@ -107,6 +120,15 @@ test('production build config rejects the browser-exposed legacy proxy target', 
     await assert.rejects(
       loadConfigFromFile({ command: 'build', mode: 'production' }, resolve(clientRoot, 'vite.config.ts'), clientRoot),
       /VITE_API_PROXY_TARGET is no longer supported/,
+    );
+  });
+});
+
+test('production build config rejects an unreviewed browser variable', async () => {
+  await withProxyEnv({ VITE_PRIVATE_TOKEN: 'do-not-bundle' }, async () => {
+    await assert.rejects(
+      loadConfigFromFile({ command: 'build', mode: 'production' }, resolve(clientRoot, 'vite.config.ts'), clientRoot),
+      /VITE_PRIVATE_TOKEN is not an approved browser environment variable/,
     );
   });
 });
@@ -122,7 +144,7 @@ test('Vite config reads client env files when loaded from the repository root', 
       const loaded = await loadConfigFromFile({ command: 'serve', mode }, resolve(clientRoot, 'vite.config.ts'), repoRoot);
       assert.equal(loaded?.config.root, clientRoot);
       assert.equal(loaded?.config.envDir, clientRoot);
-      assert.equal(loaded?.config.server?.proxy?.['/api']?.target, 'http://127.0.0.1:8080');
+      assert.equal(loaded?.config.server?.proxy?.['^/api(?:/|\\?|$)']?.target, 'http://127.0.0.1:8080');
     });
   } finally {
     process.chdir(previousCwd);

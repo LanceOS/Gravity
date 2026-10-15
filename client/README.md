@@ -2,7 +2,8 @@
 
 ## Development proxy and browser environment
 
-The Vite development server proxies `/api` and the OAuth endpoints to
+The Vite development server proxies `/api` (with an optional slash or query)
+and the OAuth discovery, authorize, token, register, and revoke endpoints to
 `http://localhost:8080` by default. Set the **server-only** `BACKEND_UPSTREAM`
 to change the target. Startup accepts `http://localhost:8080`,
 `http://127.0.0.1:8080`, and `http://[::1]:8080` without extra configuration.
@@ -25,13 +26,25 @@ The allowlist is comma-separated when several origins are needed. Proxy targets
 and allowlist entries must be origins only: no credentials, paths, query strings,
 or fragments. The Vite server fails at startup if the target is not allowed.
 Only approve backends you control; proxied browser requests may contain session
-data. `VITE_API_PROXY_TARGET` is rejected by both dev startup and client builds.
+cookies and authorization headers, which the app needs. The dev proxy removes
+browser-supplied `Forwarded`, `X-Forwarded-*`, and `X-Real-IP` headers before
+contacting the backend. Similar paths such as `/apiary` and `/authorize-extra`
+stay in the SPA. `VITE_API_PROXY_TARGET` is rejected by both dev startup and client builds.
 Use `BACKEND_UPSTREAM` instead.
+The backend sees the Vite server's connection IP. Its IP-based rate limits and
+IP-bound flows may therefore group multiple dev users together. Vite does not
+establish a trustworthy client IP chain; use a configured ingress outside this
+dev proxy when accurate client IPs matter.
 This check applies to the Vite development server; the production nginx proxy
 uses its own `BACKEND_UPSTREAM` setting.
+Vite's build configuration has no dev proxy entry, and the production image
+serves static assets with nginx rather than running Vite middleware.
 
+Copy [client/.env.example](.env.example) to `client/.env` for local settings.
 Every `VITE_` variable is available to browser code at build time. **Never put
 secrets, tokens, passwords, or private backend URLs in a `VITE_` variable.**
+Vite startup and builds reject `VITE_` names outside the four supported public
+settings below; adding a new browser setting requires explicitly reviewing it.
 The repository uses these variables. Storing a value in a CI secret does not
 make it private after it is passed to a `VITE_` variable:
 

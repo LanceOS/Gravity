@@ -19,6 +19,10 @@ before(async () => {
     const chunks = [];
     for await (const chunk of request) chunks.push(chunk);
     response.writeHead(200, { 'Content-Type': 'application/json' });
+    if (request.url === '/api/inspect-proxy-headers' || request.url === '/token?inspect-proxy-headers=1') {
+      response.end(JSON.stringify(request.headers));
+      return;
+    }
     response.end(JSON.stringify({
       service: 'oauth-backend',
       url: request.url,
@@ -79,9 +83,45 @@ test('proxies discovery and token endpoints, including optional query parameters
   }
 });
 
+test('proxies only the API path boundary, including a direct query', async () => {
+  for (const path of ['/api', '/api?probe=1', '/api/health']) {
+    const response = await fetch(`${frontendOrigin}${path}`);
+    assert.equal((await response.json()).url, path);
+  }
+});
+
 test('keeps consent and unrelated similarly named routes in the SPA', async () => {
-  for (const path of ['/oauth/consent?request=request-1', '/authorize-extra?client_id=test', '/tokenized']) {
+  for (const path of [
+    '/oauth/consent?request=request-1', '/authorize-extra?client_id=test', '/authorize/extra',
+    '/tokenized', '/register-extra', '/revoke-extra',
+    '/.well-known/oauth-authorization-server-extra', '/.well-known/oauth-protected-resource-extra',
+    '/apiary', '/api-extra', '/api%2Fv1',
+  ]) {
     const response = await fetch(`${frontendOrigin}${path}`, { headers: { Accept: 'text/html' } });
     assert.match(await response.text(), /Gravity SPA fallback/);
+  }
+});
+
+test('preserves app credentials but strips spoofed proxy identity headers', async () => {
+  for (const path of ['/api/inspect-proxy-headers', '/token?inspect-proxy-headers=1']) {
+    const response = await fetch(`${frontendOrigin}${path}`, {
+      headers: {
+        Authorization: 'Bearer test-token',
+        Cookie: 'session=test-cookie',
+        Forwarded: 'for=192.0.2.1',
+        'X-Forwarded-For': '192.0.2.1',
+        'X-Forwarded-Host': 'attacker.example',
+        'X-Forwarded-Proto': 'https',
+        'X-Forwarded-Custom': 'spoofed',
+        'X-Real-IP': '192.0.2.1',
+      },
+    });
+    const headers = await response.json();
+    assert.equal(headers.authorization, 'Bearer test-token');
+    assert.equal(headers.cookie, 'session=test-cookie');
+    assert.equal(headers.host, `127.0.0.1:${backend.address().port}`);
+    for (const name of ['forwarded', 'x-forwarded-for', 'x-forwarded-host', 'x-forwarded-proto', 'x-forwarded-custom', 'x-real-ip']) {
+      assert.equal(headers[name], undefined, `${path}: ${name}`);
+    }
   }
 });

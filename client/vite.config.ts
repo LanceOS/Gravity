@@ -1,17 +1,36 @@
 import { defineConfig, loadEnv } from 'vite'
+import type { ProxyOptions } from 'vite'
 import react from '@vitejs/plugin-react'
 import { resolve } from 'path'
-import { rejectBrowserProxyTarget, resolveDevProxyUpstream } from './dev-proxy-upstream'
-
-
+import { resolveDevProxyUpstream } from './dev-proxy-upstream'
+import { validateViteEnvironment } from './vite-env'
 
 // https://vite.dev/config/
 export default defineConfig(({ command, mode }) => {
   const env = loadEnv(mode, __dirname, '')
-  rejectBrowserProxyTarget(env)
-  const backendUpstream = command === 'serve'
-    ? resolveDevProxyUpstream(env)
-    : 'http://localhost:8080'
+  validateViteEnvironment(env)
+  const proxy = command === 'serve' ? (() => {
+    const target = resolveDevProxyUpstream(env)
+    const options: ProxyOptions = {
+      target,
+      changeOrigin: true,
+      configure(proxy) {
+        proxy.on('proxyReq', (request) => {
+          // Browser-supplied forwarding claims must not reach a trusted backend.
+          for (const name of request.getHeaderNames()) {
+            if (name === 'forwarded' || name === 'x-real-ip' || name.startsWith('x-forwarded-')) {
+              request.removeHeader(name)
+            }
+          }
+        })
+      },
+    }
+    return {
+      '^/api(?:/|\\?|$)': options,
+      // Vite matches req.url including its query string, which /authorize needs.
+      '^/(\\.well-known/oauth-(authorization-server|protected-resource)(/[^?]*)?|authorize|token|register|revoke)(?:\\?|$)': options,
+    }
+  })() : undefined
   const frontendPublicHost = (() => {
     const candidate = (env.GRAVITY_FRONTEND_PUBLIC_URL || env.VITE_FRONTEND_PUBLIC_URL || '').trim()
     if (!candidate) return ''
@@ -49,17 +68,7 @@ export default defineConfig(({ command, mode }) => {
     },
     server: {
       allowedHosts,
-      proxy: {
-        '/api': {
-          target: backendUpstream,
-          changeOrigin: true,
-        },
-        // Vite matches req.url including its query string, which /authorize needs.
-        '^/(\\.well-known/oauth-(authorization-server|protected-resource)(/[^?]*)?|authorize|token|register|revoke)(?:\\?|$)': {
-          target: backendUpstream,
-          changeOrigin: true,
-        }
-      }
+      ...(proxy ? { proxy } : {}),
     }
   }
 })
