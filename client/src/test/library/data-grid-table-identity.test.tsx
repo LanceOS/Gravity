@@ -81,7 +81,7 @@ it('keeps a visible DataGrid row identity when its virtual position changes', ()
   rerender(<DataGrid columns={columns} data={[{ code: 50, label: 'Inserted' }, ...data]} getRowKey={getRowKey} height={90} rowHeight={30} />);
   expect(screen.getByRole('textbox', { name: '20-name' })).toBe(input);
   expect(input).toHaveValue('Virtual draft');
-  expect(input.parentElement?.parentElement).toHaveStyle({ top: '660px' });
+  expect(input.parentElement?.parentElement).toHaveStyle({ top: '630px' });
   expect(screen.queryByRole('textbox', { name: '0-name' })).not.toBeInTheDocument();
 });
 
