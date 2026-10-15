@@ -7,7 +7,7 @@ import { rejectBrowserProxyTarget, resolveDevProxyUpstream } from './dev-proxy-u
 
 // https://vite.dev/config/
 export default defineConfig(({ command, mode }) => {
-  const env = loadEnv(mode, process.cwd(), '')
+  const env = loadEnv(mode, __dirname, '')
   rejectBrowserProxyTarget(env)
   const backendUpstream = command === 'serve'
     ? resolveDevProxyUpstream(env)
@@ -34,6 +34,8 @@ export default defineConfig(({ command, mode }) => {
   ].filter((host, index, arr) => arr.indexOf(host) === index)
 
   return {
+    root: __dirname,
+    envDir: __dirname,
     plugins: [react()],
     resolve: {
       // Shared server schema imports must use the editor's runtime, including

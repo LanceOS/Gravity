@@ -21,7 +21,7 @@ function parseOrigin(raw: string, variable: string): string {
     url.pathname !== '/' ||
     url.search ||
     url.hash ||
-    (raw !== url.origin && raw !== `${url.origin}/`)
+    !/^https?:\/\/[^\s/?#\\@]+\/?$/i.test(raw)
   ) {
     throw new Error(`${variable} must be an HTTP(S) origin without a path, query, fragment, or credentials`)
   }

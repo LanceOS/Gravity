@@ -1,11 +1,14 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { dirname, resolve } from 'node:path';
+import { randomUUID } from 'node:crypto';
+import { rm, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { loadConfigFromFile } from 'vite';
 import { resolveDevProxyUpstream } from '../dev-proxy-upstream.ts';
 
 const clientRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const repoRoot = resolve(clientRoot, '..');
 
 test('accepts the local default and loopback backend origins', () => {
   assert.equal(resolveDevProxyUpstream({}), 'http://localhost:8080');
@@ -19,6 +22,14 @@ test('accepts an explicitly approved exact origin', () => {
     BACKEND_UPSTREAM: 'https://dev-api.example.test:8443/',
     GRAVITY_DEV_PROXY_ALLOWED_ORIGINS: 'http://backend:8080, https://dev-api.example.test:8443',
   }), 'https://dev-api.example.test:8443');
+  assert.equal(resolveDevProxyUpstream({
+    BACKEND_UPSTREAM: 'http://backend:8080',
+    GRAVITY_DEV_PROXY_ALLOWED_ORIGINS: 'http://backend:8080',
+  }), 'http://backend:8080');
+  assert.equal(resolveDevProxyUpstream({
+    BACKEND_UPSTREAM: 'https://dev-api.example.test:443/',
+    GRAVITY_DEV_PROXY_ALLOWED_ORIGINS: 'https://dev-api.example.test',
+  }), 'https://dev-api.example.test');
 });
 
 test('rejects unapproved, malformed, or credential-bearing upstreams', () => {
@@ -98,4 +109,23 @@ test('production build config rejects the browser-exposed legacy proxy target', 
       /VITE_API_PROXY_TARGET is no longer supported/,
     );
   });
+});
+
+test('Vite config reads client env files when loaded from the repository root', async () => {
+  const mode = `grav-23-${randomUUID()}`;
+  const envFile = resolve(clientRoot, `.env.${mode}`);
+  const previousCwd = process.cwd();
+  await writeFile(envFile, 'BACKEND_UPSTREAM=http://127.0.0.1:8080\n', { flag: 'wx' });
+  try {
+    await withProxyEnv({}, async () => {
+      process.chdir(repoRoot);
+      const loaded = await loadConfigFromFile({ command: 'serve', mode }, resolve(clientRoot, 'vite.config.ts'), repoRoot);
+      assert.equal(loaded?.config.root, clientRoot);
+      assert.equal(loaded?.config.envDir, clientRoot);
+      assert.equal(loaded?.config.server?.proxy?.['/api']?.target, 'http://127.0.0.1:8080');
+    });
+  } finally {
+    process.chdir(previousCwd);
+    await rm(envFile);
+  }
 });
