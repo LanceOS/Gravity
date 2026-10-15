@@ -1,11 +1,12 @@
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter, useNavigate } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import OAuthConsentPage from '../../modules/mcpOAuth/OAuthConsentPage';
 import { type OAuthConsentRequest } from '../../modules/mcpOAuth/api';
 import { ProtectedRoute } from '../../router/ProtectedRoute';
 import { ApiError } from '../../utils/apiClient';
+import { settingsHistoryState } from '../../router/settingsNavigation';
 
 const mocks = vi.hoisted(() => ({
   get: vi.fn(), post: vi.fn(), redirect: vi.fn(),
@@ -45,6 +46,25 @@ beforeEach(() => {
 afterEach(() => vi.useRealTimers());
 
 describe('OAuth consent', () => {
+  it('marks the in-app account settings link as a returnable history entry', async () => {
+    const user = userEvent.setup();
+    function AccountState() {
+      const location = useLocation();
+      return <div data-testid="account-entry-state">{JSON.stringify(location.state)}</div>;
+    }
+
+    render(
+      <MemoryRouter initialEntries={['/oauth/consent?request=request-1']}>
+        <Routes>
+          <Route path="/oauth/consent" element={<OAuthConsentPage />} />
+          <Route path="/account" element={<AccountState />} />
+        </Routes>
+      </MemoryRouter>
+    );
+    await user.click(screen.getByRole('link', { name: 'Back to Account Preferences' }));
+    expect(screen.getByTestId('account-entry-state')).toHaveTextContent(JSON.stringify(settingsHistoryState));
+  });
+
   it('shows the client and fixed workspace, selects only requested reads, and approves exact selected scopes', async () => {
     const user = userEvent.setup();
     renderConsent();

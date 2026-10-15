@@ -106,8 +106,9 @@ export function usePendingWorkspaceInvite({
     }
 
     storePendingWorkspaceInvite(invite);
-    const newUrl = window.location.origin + window.location.pathname;
-    window.history.replaceState({}, document.title, newUrl);
+    const url = new URL(window.location.href);
+    url.searchParams.delete('invite');
+    window.history.replaceState(window.history.state, document.title, `${url.pathname}${url.search}${url.hash}`);
   }, []);
 
   useEffect(() => {

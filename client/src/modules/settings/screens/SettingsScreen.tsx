@@ -91,12 +91,12 @@ export function SettingsScreen(props: SettingsScreenProps) {
         headerLeftContent={
           isMobile ? (
             <Button variant="ghost" size="sm" onClick={onBackToWorkspace} leftIcon={<ArrowLeft size={14} />}>
-              Workspace
+              Back
             </Button>
           ) : (
             <Flex align="center" gap="var(--space-md)">
               <Button variant="ghost" size="sm" onClick={onBackToWorkspace} leftIcon={<ArrowLeft size={14} />}>
-                Workspace
+                Back
               </Button>
 
               <Button variant="ghost" size="sm" onClick={onOpenDirectory} leftIcon={<Globe size={14} />}>

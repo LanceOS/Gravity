@@ -90,8 +90,9 @@ export function WorkspaceTeamsPage({
     if (params.get('create') === 'true') {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- Consume the browser URL create intent once on mount and update history after opening the modal.
       setIsCreateModalOpen(true);
-      const newUrl = window.location.pathname;
-      window.history.replaceState({}, '', newUrl);
+      const url = new URL(window.location.href);
+      url.searchParams.delete('create');
+      window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
     }
   }, []);
 

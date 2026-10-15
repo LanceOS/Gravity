@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { SettingsScreen as SettingsPage, useTheme } from '../../settings';
 import { AuthScreen } from '../../auth';
 import { OnboardingModal } from '../../onboarding';
@@ -9,10 +9,12 @@ import { useWorkspaceSettings } from '../../../hooks/useWorkspaceSettings';
 import { useAuth } from '../../../context/auth/AuthContext';
 import { useActiveView } from '../../../context/ui/ActiveViewContext';
 import { LoadingPage } from '../../../pages/LoadingPage/LoadingPage';
+import { backFromSettings } from '../../../router/settingsNavigation';
 
 export function WorkspaceSettingsPageRoute() {
   const { workspaceId = '' } = useParams<{ workspaceId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const [localTutorialCompleted, setLocalTutorialCompleted] = useState(false);
 
   const { currentUser, loading } = useAuth();
@@ -143,7 +145,7 @@ export function WorkspaceSettingsPageRoute() {
         exportError={exportError}
         deleteLoading={deleteLoading}
         deleteError={deleteError}
-        onBackToWorkspace={() => navigate(`/workspaces/${workspaceId}`)}
+        onBackToWorkspace={() => backFromSettings(navigate, location, `/workspaces/${workspaceId}`)}
         onOpenDirectory={() => navigate('/workspaces')}
         onChangeSettings={updateSettings}
         onSaveSettings={saveSettings}

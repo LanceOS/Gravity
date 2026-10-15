@@ -1,6 +1,7 @@
 import { useCallback, useMemo } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import type { NavigateFunction } from 'react-router-dom';
+import { openSettings } from '../../../router/settingsNavigation';
 
 import { buildProjectScopedPath } from '../../../utils/workspace';
 import type { AppShellRouteState } from '../../../modules/workspaceShellPage/hooks/useAppShellRoute';
@@ -9,7 +10,7 @@ import { type SidebarNavigationState } from '../../../components/Sidebar';
 import type { Project, SidebarTree } from '../../../types/domain';
 
 interface UseWorkspaceShellNavigationArgs {
-  route: Pick<AppShellRouteState, 'teamIdParam' | 'projectIdParam'>;
+  route: Pick<AppShellRouteState, 'workspaceId' | 'teamIdParam' | 'projectIdParam'>;
   activeWorkspaceId: string;
   activeProjectId: string;
   projects: Project[];
@@ -170,11 +171,11 @@ export function useWorkspaceShellNavigation({
       navigate('/workspaces');
       return;
     }
-    navigate(`/workspaces/${activeWorkspaceId}/settings`);
-  }, [activeWorkspaceAvailable, activeWorkspaceId, navigate]);
+    openSettings(navigate, `/workspaces/${route.workspaceId || activeWorkspaceId}/settings`);
+  }, [activeWorkspaceAvailable, activeWorkspaceId, navigate, route.workspaceId]);
 
   const handleOpenAccountPreferences = useCallback(() => {
-    navigate('/account');
+    openSettings(navigate, '/account');
   }, [navigate]);
 
   const handleOpenProjectManager = useCallback(() => {

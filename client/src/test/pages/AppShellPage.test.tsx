@@ -2,12 +2,13 @@ import type { ReactNode } from 'react';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { MemoryRouter, useLocation, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, MemoryRouter, useLocation, Route, Routes } from 'react-router-dom';
 import { AppShellPage } from '../../pages/AppShellPage/AppShellPage.tsx';
 import { WorkspaceShellPage } from '../../pages/WorkspaceShellPage/WorkspaceShellPage.tsx';
 import WorkspaceAccessDeniedView from '../../pages/PlaceholderViews/WorkspaceAccessDeniedView.tsx';
 import WorkspaceAccessErrorView from '../../pages/PlaceholderViews/WorkspaceAccessErrorView.tsx';
 import { AccountPreferencesPageRoute } from '../../pages/AccountPreferencesPage/AccountPreferencesPage.tsx';
+import { WorkspaceSettingsPageRoute } from '../../pages/WorkspaceSettingsPage/WorkspaceSettingsPage.tsx';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { queryClient as sharedQueryClient, queryKeys } from '../../utils/queryClient';
 
@@ -170,7 +171,9 @@ vi.mock('../../modules/settings', () => ({
     setDensity: vi.fn(),
     setTheme: vi.fn(),
   }),
-  SettingsScreen: () => <div>SettingsPage</div>,
+  SettingsScreen: ({ onBackToWorkspace }: { onBackToWorkspace: () => void }) => (
+    <div><div>SettingsPage</div><button type="button" onClick={onBackToWorkspace}>Back from workspace settings</button></div>
+  ),
 }));
 
 vi.mock('../../utils/webmcp', async importOriginal => ({
@@ -903,6 +906,54 @@ describe('AppShellPage', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+  });
+
+  it('keeps the exact ticket URL in browser history through both real settings routes', async () => {
+    const from = '/workspaces/workspace-1/projects/project-1/tickets/GRA-1?status=todo&labels=urgent#details';
+    const fromWithoutHash = from.slice(0, from.indexOf('#'));
+    const user = userEvent.setup();
+    const setup = renderAppShell();
+    setup.unmount();
+    window.history.replaceState(null, '', from);
+
+    const view = render(
+      <QueryClientProvider client={sharedQueryClient}>
+        <BrowserRouter>
+          <LocationDisplay />
+          <Routes>
+            <Route path="/workspaces/:workspaceId/projects/:projectId/tickets/:ticketKey" element={<WorkspaceShellPage />} />
+            <Route path="/workspaces/:workspaceId/settings" element={<WorkspaceSettingsPageRoute />} />
+            <Route path="/account" element={<AccountPreferencesPageRoute />} />
+          </Routes>
+        </BrowserRouter>
+      </QueryClientProvider>
+    );
+
+    try {
+      await waitFor(() => expect(screen.getByText('WorkspaceLayout')).toBeInTheDocument());
+      await user.click(screen.getByRole('button', { name: 'Open account preferences' }));
+      await waitFor(() => expect(screen.getByTestId('location-display')).toHaveTextContent('/account'));
+
+      window.history.back();
+      await waitFor(() => expect(screen.getByTestId('location-display')).toHaveTextContent(fromWithoutHash));
+      expect(window.location.hash).toBe('#details');
+      window.history.forward();
+      await waitFor(() => expect(screen.getByTestId('location-display')).toHaveTextContent('/account'));
+
+      await user.click(screen.getByRole('button', { name: 'Back to Workspace' }));
+      await waitFor(() => expect(screen.getByTestId('location-display')).toHaveTextContent(fromWithoutHash));
+      expect(window.location.hash).toBe('#details');
+      await user.click(screen.getByRole('button', { name: 'Open settings' }));
+      await waitFor(() => expect(screen.getByText('SettingsPage')).toBeInTheDocument());
+      await user.click(screen.getByRole('button', { name: 'Back from workspace settings' }));
+      await waitFor(() => expect(screen.getByTestId('location-display')).toHaveTextContent(fromWithoutHash));
+      expect(window.location.hash).toBe('#details');
+      window.history.forward();
+      await waitFor(() => expect(screen.getByTestId('location-display')).toHaveTextContent('/workspaces/workspace-1/settings'));
+    } finally {
+      view.unmount();
+      window.history.replaceState(null, '', '/');
+    }
   });
 
   it.each([
