@@ -106,6 +106,9 @@ Run the repo's local CI flow from the project root with:
 ```
 
 This delegates to the maintained CI driver in `scripts/local-ci.sh`, which installs dependencies, runs the client and server test suites, builds both apps, and performs a compose-based smoke check.
+On a fresh checkout it creates a private, disposable `.env` with independent
+test secrets for the Compose smoke check and removes it on exit. An existing
+`.env` is left untouched.
 
 Before deployment, run `npm --workspace=server run check-env` and follow
 [deployment configuration](docs/deployment-configuration.md) for required secrets,

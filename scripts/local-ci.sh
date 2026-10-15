@@ -25,6 +25,8 @@ BACKEND_PORT="${GRAVITY_CI_BACKEND_PORT:-$(find_available_port 48080)}"
 FRONTEND_PORT="${GRAVITY_CI_FRONTEND_PORT:-$(find_available_port 43100)}"
 BACKEND_PUBLIC_URL="http://localhost:${FRONTEND_PORT}"
 FRONTEND_PUBLIC_URL="http://localhost:${FRONTEND_PORT}"
+CI_ENV_CREATED=0
+CI_ENV_TEMP=
 
 log() {
   printf '\n[gravity-ci] %s\n' "$1"
@@ -71,11 +73,52 @@ compose() {
   GRAVITY_POSTGRES_CONTAINER="$POSTGRES_CONTAINER_NAME" \
   GRAVITY_BACKEND_CONTAINER="$BACKEND_CONTAINER_NAME" \
   GRAVITY_FRONTEND_CONTAINER="$FRONTEND_CONTAINER_NAME" \
-    ${COMPOSE_BIN} -p "$PROJECT_NAME" -f "$ROOT_DIR/docker-compose.yml" "$@"
+    ${COMPOSE_BIN} --env-file "$ROOT_DIR/.env" -p "$PROJECT_NAME" -f "$ROOT_DIR/docker-compose.yml" "$@"
 }
 
 cleanup() {
   compose down -v --remove-orphans >/dev/null 2>&1 || true
+  if [[ -n "$CI_ENV_TEMP" ]]; then
+    rm -f "$CI_ENV_TEMP"
+  fi
+  if [[ "$CI_ENV_CREATED" == 1 ]]; then
+    rm -f "$ROOT_DIR/.env"
+  fi
+}
+
+prepare_compose_env() {
+  if [[ -f "$ROOT_DIR/.env" ]]; then
+    return
+  fi
+  if [[ -e "$ROOT_DIR/.env" ]]; then
+    printf 'Root .env must be a regular file.\n' >&2
+    return 1
+  fi
+
+  # The Compose manifests require an env file. A fresh CI checkout gets
+  # disposable, independent secrets without changing a developer's own .env.
+  local postgres_password redis_password auth_secret identity_key
+  postgres_password="$(openssl rand -hex 32)"
+  redis_password="$(openssl rand -hex 32)"
+  auth_secret="$(openssl rand -hex 32)"
+  identity_key="$(openssl rand -hex 32)"
+  CI_ENV_TEMP="$(mktemp "$ROOT_DIR/.env.ci.XXXXXX")"
+  cat > "$CI_ENV_TEMP" <<EOF
+GRAVITY_POSTGRES_PASSWORD=$postgres_password
+GRAVITY_REDIS_PASSWORD=$redis_password
+BETTER_AUTH_SECRET=$auth_secret
+NODE_IDENTITY_MASTER_KEY=$identity_key
+NODE_ENV=development
+ENCRYPTED_CREDENTIALS_MODE=disabled
+EOF
+  if ln "$CI_ENV_TEMP" "$ROOT_DIR/.env" 2>/dev/null; then
+    CI_ENV_CREATED=1
+  elif [[ ! -f "$ROOT_DIR/.env" ]]; then
+    printf 'Could not create root .env for the Compose smoke check.\n' >&2
+    return 1
+  fi
+  rm -f "$CI_ENV_TEMP"
+  CI_ENV_TEMP=
 }
 
 wait_for_url() {
@@ -167,6 +210,7 @@ assert_production_csp() {
 }
 
 trap cleanup EXIT
+prepare_compose_env
 
 log 'Installing workspace dependencies'
 npm ci --prefix "$ROOT_DIR" --workspaces

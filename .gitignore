@@ -27,3 +27,4 @@ dist-ssr
 .agents
 .vscode/
 .env
+.env.ci.*
