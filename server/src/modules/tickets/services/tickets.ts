@@ -565,7 +565,7 @@ export async function listWorkspaceTickets(projectIds: string[], filters: Ticket
 
   const direction = filters.order === 'desc' ? desc : asc;
   const priorityRank = sql<number>`case ${tickets.priority} when 'urgent' then 4 when 'high' then 3 when 'medium' then 2 when 'low' then 1 else 0 end`;
-  const firstLabelName = sql<string>`(select ${labels.name} from ${ticketLabels} inner join ${labels} on ${labels.id} = ${ticketLabels.labelId} where ${ticketLabels.ticketId} = ${tickets.id} order by ${ticketLabels.labelId} limit 1)`;
+  const firstLabelName = sql<string>`(select ${labels.name} from ${ticketLabels} inner join ${labels} on ${labels.id} = ${ticketLabels.labelId} where ${ticketLabels.ticketId} = ${tickets.id} order by ${labels.sortOrder}, ${labels.name}, ${labels.id} limit 1)`;
   const listOrder = (() => {
     switch (filters.listSort) {
       case 'created': case 'oldest': return [asc(tickets.createdAt), asc(tickets.id)];

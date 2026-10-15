@@ -166,6 +166,7 @@ describe('ticket hydration query regressions', () => {
     }
     expect(queries).toHaveLength(1);
     expect(queries[0]).toContain('order by case when (select');
+    expect(queries[0]).toMatch(/order by "labels"\."sort_order", "labels"\."name", "labels"\."id" limit 1/i);
     expect(queries[0]).toMatch(/limit\s+\$\d+/i);
   });
 

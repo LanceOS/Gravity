@@ -602,6 +602,8 @@ export function invalidateTicketCaches(
     return;
   }
 
+  queryClient.invalidateQueries({ queryKey: ['ticketByKey', resolvedTicketKey] });
+
   const invalidateUserScopedQueriesById = (queryPrefix: string[]) => {
     for (const [queryKey, cached] of queryClient.getQueriesData<unknown>({ queryKey: queryPrefix })) {
       const ticket = readTicketFromQueryPayload(cached);

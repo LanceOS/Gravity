@@ -332,7 +332,7 @@ export function WorkspaceShellPage() {
   });
 
   const { data: routeTicket, isLoading: routeTicketLoading } = useQuery<Ticket | null>({
-    queryKey: ['ticketByKey', route.ticketKey],
+    queryKey: ['ticketByKey', route.ticketKey?.toUpperCase(), currentUser?.id],
     queryFn: () => apiClient.get<Ticket | null>(`/tickets/key/${route.ticketKey}`),
     enabled: !!route.ticketKey && !!currentUser,
     staleTime: CACHE_CONFIGS.ticketDetail.staleTime,
