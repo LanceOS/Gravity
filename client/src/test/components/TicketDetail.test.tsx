@@ -399,7 +399,12 @@ describe('TicketDetail', () => {
     const detailBody = container.querySelector('.ticket-detail__body');
     expect(detailBody).toBeInstanceOf(HTMLElement);
     expect(getComputedStyle(detailBody as HTMLElement).flexDirection).toBe('row');
-    expect(getComputedStyle(screen.getByTestId('desktop-sidebar')).overflowY).toBe('auto');
+    const sidebar = screen.getByTestId('desktop-sidebar');
+    const scrollViewport = screen.getByTestId('desktop-sidebar-scroll');
+    expect(getComputedStyle(sidebar).overflow).toBe('hidden');
+    expect(getComputedStyle(scrollViewport).overflowY).toBe('auto');
+    expect(scrollViewport).toContainElement(within(sidebar).getByText('Properties'));
+    expect(scrollViewport).toContainElement(within(sidebar).getByLabelText('Select ticket status'));
   });
 
   it('updates title and description, selects related subtasks, and posts comments', async () => {
