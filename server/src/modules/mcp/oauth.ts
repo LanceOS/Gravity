@@ -26,7 +26,12 @@ export const OAUTH_ACCESS_TTL_SECONDS = 60 * 60;
 const REQUEST_TTL_MS = 10 * 60 * 1000;
 const CODE_TTL_MS = 2 * 60 * 1000;
 const opaqueToken = () => randomBytes(32).toString('base64url');
+// These credentials have 256 random bits. SQL comparison timing may vary with
+// digest prefixes or a hit/miss, but SHA-256 does not turn that into a token
+// prefix oracle. Keep indexed equality for lookup and atomic consume/rotation;
+// comparing a digest after an exact SQL match adds no timing protection.
 const tokenHash = (value: string) => createHash('sha256').update(value).digest('hex');
+const isOpaqueToken = (value: string) => /^[A-Za-z0-9_-]{43}$/.test(value);
 const scopeFor = (name: string) => `tools/call:${name}`;
 const publicBase = () => new URL(env.betterAuthBaseUrl).origin;
 export const OAUTH_DISABLED_MESSAGE = 'OAuth sign-in requires an HTTPS Gravity URL. HTTP is supported only on localhost or 127.0.0.1 for local testing. Manual connections remain available.';
@@ -121,7 +126,9 @@ export const gravityOAuthProvider: OAuthServerProvider = {
     res.redirect(`${publicBase()}/oauth/consent?request=${encodeURIComponent(requestId)}`);
   },
   async challengeForAuthorizationCode(client, code) {
-    const [request] = await db.select().from(mcpOAuthRequests).where(and(eq(mcpOAuthRequests.codeHash, tokenHash(code)),
+    if (!isOpaqueToken(code)) throw new InvalidGrantError('Invalid or expired authorization code.');
+    const hash = tokenHash(code);
+    const [request] = await db.select().from(mcpOAuthRequests).where(and(eq(mcpOAuthRequests.codeHash, hash),
       eq(mcpOAuthRequests.clientId, client.client_id), eq(mcpOAuthRequests.status, 'approved'),
       gt(mcpOAuthRequests.codeExpiresAt, new Date()))).limit(1);
     if (!request) throw new InvalidGrantError('Invalid or expired authorization code.');
@@ -129,16 +136,20 @@ export const gravityOAuthProvider: OAuthServerProvider = {
   },
   async exchangeAuthorizationCode(client, code, _verifier, redirectUri, resource) {
     resourceWorkspace(resource);
+    if (!isOpaqueToken(code)) throw new InvalidGrantError('Invalid, expired, or already used authorization code.');
     const now = new Date();
+    const hash = tokenHash(code);
     const accessToken = opaqueToken();
     const refreshToken = opaqueToken();
     return db.transaction(async (tx) => {
       const [request] = await tx.update(mcpOAuthRequests).set({ status: 'consumed' }).where(and(
-        eq(mcpOAuthRequests.codeHash, tokenHash(code)), eq(mcpOAuthRequests.clientId, client.client_id),
+        eq(mcpOAuthRequests.codeHash, hash), eq(mcpOAuthRequests.clientId, client.client_id),
         eq(mcpOAuthRequests.status, 'approved'), eq(mcpOAuthRequests.resource, resource!.href),
         eq(mcpOAuthRequests.redirectUri, redirectUri ?? ''), gt(mcpOAuthRequests.codeExpiresAt, now),
       )).returning();
-      if (!request?.actorUserId || !request.approvedScopes) throw new InvalidGrantError('Invalid, expired, or already used authorization code.');
+      if (!request?.actorUserId || !request.approvedScopes) {
+        throw new InvalidGrantError('Invalid, expired, or already used authorization code.');
+      }
       await assertCurrentGrantScopes(request.workspaceId, request.actorUserId, request.approvedScopes, tx);
       const connectionId = randomUUID();
       const grantExpiresAt = new Date(now.getTime() + OAUTH_GRANT_TTL_SECONDS * 1000);
@@ -154,10 +165,12 @@ export const gravityOAuthProvider: OAuthServerProvider = {
   },
   async exchangeRefreshToken(client, refreshToken, scopes, resource) {
     resourceWorkspace(resource);
+    if (!isOpaqueToken(refreshToken)) throw new InvalidGrantError('Invalid refresh token.');
+    const hash = tokenHash(refreshToken);
     const result = await db.transaction(async (tx): Promise<OAuthTokens | null> => {
       const [found] = await tx.select({ refresh: mcpOAuthRefreshTokens, grant: mcpOAuthGrants })
         .from(mcpOAuthRefreshTokens).innerJoin(mcpOAuthGrants, eq(mcpOAuthGrants.connectionId, mcpOAuthRefreshTokens.connectionId))
-        .where(and(eq(mcpOAuthRefreshTokens.tokenHash, tokenHash(refreshToken)), eq(mcpOAuthGrants.clientId, client.client_id),
+        .where(and(eq(mcpOAuthRefreshTokens.tokenHash, hash), eq(mcpOAuthGrants.clientId, client.client_id),
           eq(mcpOAuthGrants.resource, resource!.href))).limit(1);
       if (!found) throw new InvalidGrantError('Invalid refresh token.');
       // Serialize the entire family, including replay checks, with revocation.
@@ -169,7 +182,7 @@ export const gravityOAuthProvider: OAuthServerProvider = {
       if (nextScopes.some((scope) => !connection.scopes.includes(scope))) throw new InvalidScopeError('Refresh cannot add permissions.');
       await assertCurrentGrantScopes(connection.workspaceId, connection.generatedBy, nextScopes, tx);
       const [claimed] = await tx.update(mcpOAuthRefreshTokens).set({ usedAt: now }).where(and(
-        eq(mcpOAuthRefreshTokens.tokenHash, tokenHash(refreshToken)), isNull(mcpOAuthRefreshTokens.usedAt))).returning();
+        eq(mcpOAuthRefreshTokens.tokenHash, hash), isNull(mcpOAuthRefreshTokens.usedAt))).returning();
       if (!claimed) {
         await tx.update(mcpConnectionTokens).set({ status: 'revoked', revokedAt: now }).where(eq(mcpConnectionTokens.id, connection.id));
         return null; // Commit replay revocation before returning an OAuth error.
@@ -187,6 +200,7 @@ export const gravityOAuthProvider: OAuthServerProvider = {
     return result;
   },
   async verifyAccessToken(token) {
+    if (!isOpaqueToken(token)) throw new InvalidTokenError('Invalid or expired token.');
     const now = new Date();
     const hash = tokenHash(token);
     const [row] = await db.select({ connection: mcpConnectionTokens, grant: mcpOAuthGrants }).from(mcpConnectionTokens)
@@ -202,12 +216,19 @@ export const gravityOAuthProvider: OAuthServerProvider = {
       extra: { actorUserId: row.connection.generatedBy, workspaceId: row.connection.workspaceId } };
   },
   async revokeToken(client, { token }) {
+    if (!isOpaqueToken(token)) return;
     const hash = tokenHash(token);
-    const [row] = await db.select({ connectionId: mcpOAuthGrants.connectionId }).from(mcpOAuthGrants)
-      .innerJoin(mcpConnectionTokens, eq(mcpConnectionTokens.id, mcpOAuthGrants.connectionId))
-      .leftJoin(mcpOAuthRefreshTokens, eq(mcpOAuthRefreshTokens.connectionId, mcpOAuthGrants.connectionId))
-      .where(and(eq(mcpOAuthGrants.clientId, client.client_id), or(eq(mcpConnectionTokens.tokenHash, hash), eq(mcpOAuthRefreshTokens.tokenHash, hash)))).limit(1);
-    if (row) await db.update(mcpConnectionTokens).set({ status: 'revoked', revokedAt: new Date() }).where(eq(mcpConnectionTokens.id, row.connectionId));
+    // Each token type has its own hash index. Avoid joining every rotated
+    // refresh token into an OR lookup when checking an access token.
+    const [access] = await db.select({ connectionId: mcpConnectionTokens.id }).from(mcpConnectionTokens)
+      .innerJoin(mcpOAuthGrants, eq(mcpOAuthGrants.connectionId, mcpConnectionTokens.id))
+      .where(and(eq(mcpConnectionTokens.tokenHash, hash), eq(mcpConnectionTokens.connectionType, 'oauth'),
+        eq(mcpOAuthGrants.clientId, client.client_id))).limit(1);
+    const [refresh] = access ? [] : await db.select({ connectionId: mcpOAuthRefreshTokens.connectionId }).from(mcpOAuthRefreshTokens)
+      .innerJoin(mcpOAuthGrants, eq(mcpOAuthGrants.connectionId, mcpOAuthRefreshTokens.connectionId))
+      .where(and(eq(mcpOAuthRefreshTokens.tokenHash, hash), eq(mcpOAuthGrants.clientId, client.client_id))).limit(1);
+    const connectionId = access?.connectionId ?? refresh?.connectionId;
+    if (connectionId) await db.update(mcpConnectionTokens).set({ status: 'revoked', revokedAt: new Date() }).where(eq(mcpConnectionTokens.id, connectionId));
   },
 };
 
