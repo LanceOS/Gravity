@@ -208,7 +208,7 @@ describe('library display components', () => {
     expect(screen.getByText('Accordion details')).toBeInTheDocument();
 
     const treeViewHost = screen.getByTestId('tree-view-host');
-    await user.click(within(treeViewHost).getByRole('button'));
+    await user.click(within(treeViewHost).getByRole('button', { name: 'Expand Workspace' }));
     await user.click(screen.getByText('Notes.md'));
     expect(screen.getByText('Selected node: Notes.md')).toBeInTheDocument();
 
