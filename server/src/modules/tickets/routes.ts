@@ -9,7 +9,6 @@ import {
   getProjectIdFromRequest,
   WorkspaceCacheInvalidationReason,
   invalidateWorkspaceCache,
-  normalizeIsoDate,
 } from '../../lib/platform.js';
 import { audit } from '../../lib/logger.js';
 import { authorizeProjectAccess, authorizeTeamAccess, authorizeWorkspaceAccess, getProjectTeamId } from '../workspaces/services/membership.js';
@@ -43,6 +42,7 @@ import {
   TeamScopeStrategy,
   WorkspaceScopeStrategy,
 } from './services/scope-strategies.js';
+import { CycleError, createCycleRecord, createCycleSchema, deleteCycleRecord, editCycleRecord, editCycleSchema, getCycleRecord, mapCycle } from './services/cycles.js';
 
 function mapLabel(label: typeof labels.$inferSelect) {
   return {
@@ -80,16 +80,6 @@ const bulkTriageSchema = z.strictObject({
     z.strictObject({ type: z.enum(['add_label', 'remove_label']), value: z.string().min(1) }),
   ]),
 });
-
-function mapCycle(cycle: typeof cycles.$inferSelect) {
-  return {
-    id: cycle.id,
-    name: cycle.name,
-    startDate: normalizeIsoDate(cycle.startDate),
-    endDate: normalizeIsoDate(cycle.endDate),
-    completed: cycle.completed ? 1 : 0,
-  };
-}
 
 function normalizeLabelName(name: string) {
   return name.trim();
@@ -1100,6 +1090,13 @@ export function createTicketsRouter() {
           res.status(auth.status ?? 403).json({ error: auth.error });
           return;
         }
+        if (projectId) {
+          const projectAuth = await authorizeProjectAccess(req, projectId);
+          if (!projectAuth.allowed) { res.status(projectAuth.status).json({ error: projectAuth.error }); return; }
+          if (projectAuth.workspaceId !== auth.workspaceId || await getProjectTeamId(projectId) !== teamId) {
+            res.status(400).json({ error: 'Team does not own this project.' }); return;
+          }
+        }
         const rows = await db.select().from(cycles).where(eq(cycles.teamId, teamId)).orderBy(asc(cycles.startDate));
         res.json(rows.map(mapCycle));
       } else if (projectId) {
@@ -1124,52 +1121,113 @@ export function createTicketsRouter() {
   });
 
   router.post('/cycles', async (req, res) => {
-    const { name, startDate, endDate, completed, teamId } = req.body ?? {};
-    const projectId = req.body?.projectId || getProjectIdFromRequest(req);
-
-    if (!name || !startDate || !endDate) {
-      res.status(400).json({ error: 'Cycle name, startDate, and endDate are required.' });
-      return;
-    }
-
-    const targetTeamId = typeof teamId === 'string'
-      ? teamId
-      : projectId
-        ? (projectId ? (await getProjectTeamId(projectId)) ?? undefined : undefined)
-        : undefined;
-
-    if (!targetTeamId) {
-      res.status(400).json({ error: 'Either teamId or projectId is required.' });
-      return;
-    }
-
-    const auth = typeof teamId === 'string'
-      ? await authorizeTeamAccess(req, targetTeamId)
-      : await authorizeProjectAccess(req, projectId as string);
-
-    if (!auth.allowed) {
-      res.status(auth.status ?? 403).json({ error: auth.error });
-      return;
-    }
-
     try {
-      const rows = await db
-        .insert(cycles)
-        .values({
-          id: createId('c'),
-          teamId: targetTeamId,
-          name,
-          startDate: new Date(startDate),
-          endDate: new Date(endDate),
-          completed: Boolean(completed),
-          createdAt: new Date(),
-        })
-        .returning();
-
+      const parsed = createCycleSchema.safeParse(req.body);
+      if (!parsed.success) { res.status(400).json({ error: 'Invalid cycle data.', details: parsed.error.issues }); return; }
+      const input = parsed.data;
+      const projectId = input.projectId ?? getProjectIdFromRequest(req);
+      if (!input.teamId && !projectId) { res.status(400).json({ error: 'Either teamId or projectId is required.' }); return; }
+      const auth = input.teamId
+        ? await authorizeTeamAccess(req, input.teamId)
+        : await authorizeProjectAccess(req, projectId!);
+      if (!auth.allowed) { res.status(auth.status).json({ error: auth.error }); return; }
+      if (auth.workspaceRole !== 'owner') {
+        res.status(403).json({ error: 'Only workspace owners can manage cycles.' }); return;
+      }
+      const targetTeamId = input.teamId ?? await getProjectTeamId(projectId!);
+      if (!targetTeamId) { res.status(404).json({ error: 'Project has no team.' }); return; }
+      if (projectId) {
+        const projectAuth = await authorizeProjectAccess(req, projectId);
+        if (!projectAuth.allowed) { res.status(projectAuth.status).json({ error: projectAuth.error }); return; }
+        if (projectAuth.workspaceId !== auth.workspaceId || await getProjectTeamId(projectId) !== targetTeamId) {
+          res.status(400).json({ error: 'Team does not own this project.' }); return;
+        }
+      }
+      const cycle = await createCycleRecord(targetTeamId, input, projectId);
       await invalidateSidebarCacheFromTeam(targetTeamId);
-      res.status(201).json(mapCycle(rows[0]));
+      res.status(201).json(mapCycle(cycle));
     } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to create cycle.' });
+      res.status(error instanceof CycleError ? error.status : 500).json({ error: error instanceof Error ? error.message : 'Failed to create cycle.' });
+    }
+  });
+
+  router.get('/cycles/:cycleId', async (req, res) => {
+    try {
+      const cycle = await getCycleRecord(normalizeRouteParam(req.params.cycleId));
+      if (!cycle) { res.status(404).json({ error: 'Cycle not found.' }); return; }
+      const auth = await authorizeTeamAccess(req, cycle.teamId);
+      if (!auth.allowed) { res.status(auth.status).json({ error: auth.error }); return; }
+      if (req.query.teamId && req.query.teamId !== cycle.teamId) {
+        res.status(404).json({ error: 'Cycle not found in this team.' }); return;
+      }
+      res.json(mapCycle(cycle));
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load cycle.' });
+    }
+  });
+
+  router.patch('/cycles/:cycleId', async (req, res) => {
+    try {
+      const parsed = editCycleSchema.safeParse(req.body);
+      if (!parsed.success) { res.status(400).json({ error: 'Invalid cycle data.', details: parsed.error.issues }); return; }
+      const current = await getCycleRecord(normalizeRouteParam(req.params.cycleId));
+      if (!current) { res.status(404).json({ error: 'Cycle not found.' }); return; }
+      const auth = await authorizeTeamAccess(req, current.teamId);
+      if (!auth.allowed) { res.status(auth.status).json({ error: auth.error }); return; }
+      if (auth.workspaceRole !== 'owner') {
+        res.status(403).json({ error: 'Only workspace owners can manage cycles.' }); return;
+      }
+      if (req.query.teamId && req.query.teamId !== current.teamId) {
+        res.status(404).json({ error: 'Cycle not found in this team.' }); return;
+      }
+      const cycle = await editCycleRecord(current.teamId, current.id, parsed.data);
+      await invalidateSidebarCacheFromTeam(current.teamId);
+      res.json(mapCycle(cycle));
+    } catch (error) {
+      res.status(error instanceof CycleError ? error.status : 500).json({ error: error instanceof Error ? error.message : 'Failed to update cycle.' });
+    }
+  });
+
+  async function setCycleCompletion(req: Request, res: Response, completed: boolean) {
+    try {
+      const current = await getCycleRecord(normalizeRouteParam(req.params.cycleId));
+      if (!current) { res.status(404).json({ error: 'Cycle not found.' }); return; }
+      const auth = await authorizeTeamAccess(req, current.teamId);
+      if (!auth.allowed) { res.status(auth.status).json({ error: auth.error }); return; }
+      if (auth.workspaceRole !== 'owner') {
+        res.status(403).json({ error: 'Only workspace owners can manage cycles.' }); return;
+      }
+      if (req.query.teamId && req.query.teamId !== current.teamId) {
+        res.status(404).json({ error: 'Cycle not found in this team.' }); return;
+      }
+      const cycle = await editCycleRecord(current.teamId, current.id, { completed });
+      await invalidateSidebarCacheFromTeam(current.teamId);
+      res.json(mapCycle(cycle));
+    } catch (error) {
+      res.status(error instanceof CycleError ? error.status : 500).json({ error: error instanceof Error ? error.message : 'Failed to change cycle completion.' });
+    }
+  }
+
+  router.post('/cycles/:cycleId/complete', (req, res) => setCycleCompletion(req, res, true));
+  router.post('/cycles/:cycleId/reopen', (req, res) => setCycleCompletion(req, res, false));
+
+  router.delete('/cycles/:cycleId', async (req, res) => {
+    try {
+      const current = await getCycleRecord(normalizeRouteParam(req.params.cycleId));
+      if (!current) { res.status(404).json({ error: 'Cycle not found.' }); return; }
+      const auth = await authorizeTeamAccess(req, current.teamId);
+      if (!auth.allowed) { res.status(auth.status).json({ error: auth.error }); return; }
+      if (auth.workspaceRole !== 'owner') {
+        res.status(403).json({ error: 'Only workspace owners can manage cycles.' }); return;
+      }
+      if (req.query.teamId && req.query.teamId !== current.teamId) {
+        res.status(404).json({ error: 'Cycle not found in this team.' }); return;
+      }
+      await deleteCycleRecord(current.teamId, current.id);
+      await invalidateSidebarCacheFromTeam(current.teamId);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(error instanceof CycleError ? error.status : 500).json({ error: error instanceof Error ? error.message : 'Failed to delete cycle.' });
     }
   });
 

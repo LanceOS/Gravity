@@ -4,6 +4,7 @@ import { comments, cycles, labels, noteMetadata, projectMembers, projects, teams
 import { and, asc, eq, inArray, isNull } from 'drizzle-orm';
 import { createId, WorkspaceCacheInvalidationReason, invalidateWorkspaceCache } from '../../lib/platform.js';
 import { RustFS } from '../../lib/rustfs.js';
+import { assertCycleTeamTransferAllowed, CycleError } from '../tickets/services/cycles.js';
 import {
   authorizeWorkspaceAccess,
   authorizeWorkspaceOwnerAccess,
@@ -281,6 +282,7 @@ export function createTeamsRouter() {
           }
 
           await db.transaction(async (tx) => {
+            await assertCycleTeamTransferAllowed(tx, teamId, reassignTeamId);
             await tx.update(projects).set({ teamId: reassignTeamId }).where(eq(projects.teamId, teamId));
             await tx.update(cycles).set({ teamId: reassignTeamId }).where(eq(cycles.teamId, teamId));
             await mergeTeamLabels(tx, teamId, reassignTeamId);
@@ -311,7 +313,7 @@ export function createTeamsRouter() {
 
       res.json({ success: true });
     } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to delete team.' });
+      res.status(error instanceof CycleError ? error.status : 500).json({ error: error instanceof Error ? error.message : 'Failed to delete team.' });
     }
   });
 
