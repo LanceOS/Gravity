@@ -53,9 +53,10 @@ fi
 cmd=$1
 shift || true
 
-# Warn if .env not found
+# Compose uses the repository-root .env for required secrets.
 if [ ! -f "$ENV_FILE" ]; then
-  echo "Warning: $ENV_FILE not found. Compose will use the environment from the shell." >&2
+  echo "Error: copy .env.example to $ENV_FILE and set the required secrets first." >&2
+  exit 1
 fi
 
 case "$cmd" in

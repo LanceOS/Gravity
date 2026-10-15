@@ -1,11 +1,18 @@
 This Docker Compose setup attaches services to an internal network to avoid port conflicts.
 
+From the repository root, copy `.env.example` to `.env` and fill in the four
+required secrets and matching `DATABASE_URL`/`REDIS_URL` described in
+[deployment configuration](../docs/deployment-configuration.md). The `docker/`
+Compose file reads `../.env`; `docker/.env.example` is only a reference template.
+Run Compose from the repository root, or pass `--env-file ../.env` when running
+from `docker/`. A missing `.env` or empty required secret stops configuration.
+
 The `frontend` service is published to the host by default so you can access the UI in your browser at `http://localhost:${GRAVITY_FRONTEND_PORT:-5173}`.
 
 Start the stack:
 
 ```bash
-docker compose -f docker/docker-compose.yml up -d
+docker compose --env-file .env -f docker/docker-compose.yml up -d
 ```
 
 If you prefer to run fully internal-only (no host ports), remove or comment the `ports` entry under the `frontend` service in `docker/docker-compose.yml`.

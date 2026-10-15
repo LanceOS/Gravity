@@ -1,5 +1,31 @@
 # Deployment configuration
 
+## Compose secret setup
+
+From the repository root, run `cp .env.example .env` before using any Compose
+file. Keep `.env` private. Generate four independent values with
+`openssl rand -hex 32` and set `GRAVITY_POSTGRES_PASSWORD`,
+`GRAVITY_REDIS_PASSWORD`, `BETTER_AUTH_SECRET`, and
+`NODE_IDENTITY_MASTER_KEY`. The root and `docker/` manifests require these
+values during Compose configuration; `server/docker-compose.yml` requires the
+two service passwords. Their PostgreSQL and Redis container entrypoints also
+exit immediately if either password is empty. Do not use example placeholders
+or a shared secret. Use URL-safe password characters because the root manifest
+places these values in connection URLs.
+
+The root Compose file builds `DATABASE_URL` and `REDIS_URL` from those values.
+For `docker/docker-compose.yml`, replace the `<POSTGRES_PASSWORD>` and
+`<REDIS_PASSWORD>` placeholders in `.env` with the same values; percent-encode
+any URL special characters. Run it from the repository root with
+`docker compose --env-file .env -f docker/docker-compose.yml up -d`, or from
+`docker/` with `docker compose --env-file ../.env up -d`. Use the same `.env`
+for `server/docker-compose.yml` (`--env-file ../.env` from `server/`).
+The examples are templates only: copying one without setting the required
+values causes Compose to fail before it creates containers.
+
+For production, also set the browser origin, storage credentials, and webhook
+secret described below, then run the backend configuration check.
+
 Run `npm --workspace=server run check-env` before deployment. This reads the same
 configuration as startup, reports invalid fields without printing values, and
 exits nonzero on failure. In a built production installation without dev dependencies,
@@ -85,10 +111,11 @@ forwarded deliveries do not qualify. A configured signing secret always takes
 precedence, even when this opt-in is set. Production rejects the opt-in.
 
 The root Compose manifest forwards signing, proxy, origin, service-token, and
-security settings explicitly. The `docker/` manifest loads secrets from the root
-`.env` through `env_file`. Neither supplies application test keys by default.
-Set public URLs and keys before deployment; the examples intentionally contain
-empty placeholders and local URLs and are not production-ready configuration.
+security settings explicitly. The `docker/` manifest loads backend URLs and
+other settings from the root `.env` through `env_file`. Neither supplies
+application test keys by default. Set public URLs and keys before deployment;
+the examples intentionally contain empty placeholders and local URLs and are
+not production-ready configuration.
 
 Configuration validity is separate from availability. `/api/v1/health/ready`
 continues to require initialization, PostgreSQL connectivity, the expected schema,
