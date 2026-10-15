@@ -1,13 +1,17 @@
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import { resolve } from 'path'
+import { rejectBrowserProxyTarget, resolveDevProxyUpstream } from './dev-proxy-upstream'
 
 
 
 // https://vite.dev/config/
-export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, process.cwd(), '')
-  const backendUpstream = env.BACKEND_UPSTREAM || env.VITE_API_PROXY_TARGET || 'http://localhost:8080'
+export default defineConfig(({ command, mode }) => {
+  const env = loadEnv(mode, __dirname, '')
+  rejectBrowserProxyTarget(env)
+  const backendUpstream = command === 'serve'
+    ? resolveDevProxyUpstream(env)
+    : 'http://localhost:8080'
   const frontendPublicHost = (() => {
     const candidate = (env.GRAVITY_FRONTEND_PUBLIC_URL || env.VITE_FRONTEND_PUBLIC_URL || '').trim()
     if (!candidate) return ''
@@ -30,6 +34,8 @@ export default defineConfig(({ mode }) => {
   ].filter((host, index, arr) => arr.indexOf(host) === index)
 
   return {
+    root: __dirname,
+    envDir: __dirname,
     plugins: [react()],
     resolve: {
       // Shared server schema imports must use the editor's runtime, including

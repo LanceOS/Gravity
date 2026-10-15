@@ -1,5 +1,51 @@
 # Gravity client
 
+## Development proxy and browser environment
+
+The Vite development server proxies `/api` and the OAuth endpoints to
+`http://localhost:8080` by default. Set the **server-only** `BACKEND_UPSTREAM`
+to change the target. Startup accepts `http://localhost:8080`,
+`http://127.0.0.1:8080`, and `http://[::1]:8080` without extra configuration.
+For another backend origin, list its exact HTTP(S) origin in the server-only
+`GRAVITY_DEV_PROXY_ALLOWED_ORIGINS` variable:
+
+```bash
+BACKEND_UPSTREAM=http://backend:8080
+GRAVITY_DEV_PROXY_ALLOWED_ORIGINS=http://backend:8080
+npm run -w client dev
+```
+
+The root `docker-compose.dev.yml` override supplies the trusted
+`http://backend:8080` origin for the Compose development stack. Vite reads
+local `.env` files from `client/` regardless of the shell's current directory;
+Compose reads the root `.env` for its own interpolation and passes configured
+frontend environment values into the container.
+
+The allowlist is comma-separated when several origins are needed. Proxy targets
+and allowlist entries must be origins only: no credentials, paths, query strings,
+or fragments. The Vite server fails at startup if the target is not allowed.
+Only approve backends you control; proxied browser requests may contain session
+data. `VITE_API_PROXY_TARGET` is rejected by both dev startup and client builds.
+Use `BACKEND_UPSTREAM` instead.
+This check applies to the Vite development server; the production nginx proxy
+uses its own `BACKEND_UPSTREAM` setting.
+
+Every `VITE_` variable is available to browser code at build time. **Never put
+secrets, tokens, passwords, or private backend URLs in a `VITE_` variable.**
+The repository uses these variables. Storing a value in a CI secret does not
+make it private after it is passed to a `VITE_` variable:
+
+| Variable | Safe default or behavior when unset | Use |
+| --- | --- | --- |
+| `VITE_API_PROXY_TARGET` | Unset; a nonempty value fails Vite startup and builds | Legacy proxy target. Use server-only `BACKEND_UPSTREAM`. |
+| `VITE_FRONTEND_PUBLIC_URL` | Unset; `GRAVITY_FRONTEND_PUBLIC_URL` is preferred | Optional public frontend URL used to allow the dev server host. Only use a public, browser-safe URL. |
+| `VITE_ALLOWED_HOSTS` | Unset; Vite allows localhost and loopback, plus the configured public frontend host | Comma-separated additional dev server hostnames. List only hosts you control; do not use `*`. |
+| `VITE_TICKET_URL_BASE` | `https://tickets.placeholder.local` | Optional ticket link base. Use a same-origin path or an HTTPS origin approved by `VITE_ALLOWED_TICKET_HOSTS`. |
+| `VITE_ALLOWED_TICKET_HOSTS` | `tickets.placeholder.local` in the client; the main branch verification workflow requires a configured value | Comma-separated approved HTTPS ticket hosts; see [ticket URL guidance](../docs/client/TICKET_URL_BASE.md). |
+
+The ticket-host workflow checks that a value exists; deployment builds must
+also supply the intended public value to the client build environment.
+
 ## Local tests
 
 Client Vitest suites support **Node >=22.22.2 <23**. The checked-in `.nvmrc`

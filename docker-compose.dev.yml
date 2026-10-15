@@ -26,6 +26,8 @@ services:
     environment:
       # CHOKIDAR_USEPOLLING helps with file watching reliability on some OS/container setups
       - CHOKIDAR_USEPOLLING=true
+      # Match the backend service inherited from docker-compose.yml.
+      - GRAVITY_DEV_PROXY_ALLOWED_ORIGINS=http://backend:8080
 
 volumes:
   backend_node_modules:
