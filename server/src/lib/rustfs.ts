@@ -80,7 +80,8 @@ export class RustFS {
     bucketPath: string,
     filename: string,
     stream: NodeJS.ReadableStream,
-    contentLength?: number
+    contentLength?: number,
+    maxDurationMs = 60_000,
   ): Promise<void> {
     // An ended request has already been consumed. Sending it would silently
     // replace the object with an empty body when ContentLength is unavailable.
@@ -102,6 +103,10 @@ export class RustFS {
       stream.pause();
       limitStream.destroy(error);
     };
+    // The note upload endpoint holds a global metadata lock through this PUT.
+    // Abort a stalled source or storage request so it cannot hold that lock
+    // without a bound. A late PUT remains possible after cancellation.
+    const deadline = setTimeout(() => fail(new Error('UPLOAD_TIMEOUT')), maxDurationMs);
     const onAborted = () => fail(new Error('Upload source aborted'));
     stream.once('aborted', onAborted);
     let cleanupSource!: () => void;
@@ -151,6 +156,7 @@ export class RustFS {
       await bodyDone;
       throw error;
     } finally {
+      clearTimeout(deadline);
       stream.unpipe(limitStream);
       stream.removeListener('aborted', onAborted);
       cleanupSource();

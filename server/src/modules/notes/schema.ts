@@ -62,9 +62,11 @@ export const noteMediaDeletions = pgTable('note_media_deletions', {
   claimId: text('claim_id').notNull(),
   status: text('status').notNull().default('pending'),
   attempts: integer('attempts').notNull().default(0),
+  lastError: text('last_error'),
   nextAttemptAt: timestamp('next_attempt_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, table => ({
   pk: primaryKey({ columns: [table.bucketPath, table.filename] }),
-  recoveryIdx: index('note_media_deletions_recovery_idx').on(table.status, table.nextAttemptAt),
+  recoveryIdx: index('note_media_deletions_recovery_idx').on(table.nextAttemptAt, table.bucketPath, table.filename)
+    .where(sql`status <> 'confirmed'`),
 }));

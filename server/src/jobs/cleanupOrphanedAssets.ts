@@ -7,6 +7,9 @@ import { cleanupMedia, type CleanupOptions } from '../modules/notes/services/med
 import { recoverMediaDeletionClaims } from '../modules/notes/services/media-claims.js';
 
 async function runCleanup(dryRun = false, options: Omit<CleanupOptions, 'dryRun'> = {}) {
+  // Retry durable claims before another cleanup path or malformed inventory
+  // can abort the job.
+  const mediaDeletionClaims = await recoverMediaDeletionClaims({ dryRun });
   const deletedNoteBuckets = await recoverDeletedNoteBuckets({ dryRun });
   const media = await cleanupMedia({
     listNotes: MetadataRepository.listNotesForMediaCleanup,
@@ -15,7 +18,6 @@ async function runCleanup(dryRun = false, options: Omit<CleanupOptions, 'dryRun'
     statFile: (bucket, file) => RustFS.statFile(bucket, file),
     deleteFile: (bucket, file, etag) => RustFS.deleteFile(bucket, file, etag),
   }, { ...options, dryRun });
-  const mediaDeletionClaims = await recoverMediaDeletionClaims({ dryRun });
   const abandonedRevisions = await recoverAbandonedNoteRevisions(dryRun);
   return { ...media, mediaDeletionClaims, abandonedRevisions, deletedNoteBuckets };
 }

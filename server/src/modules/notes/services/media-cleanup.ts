@@ -1,8 +1,8 @@
 import MarkdownIt from 'markdown-it';
-import { isNoteBodyFile } from '../repositories.js';
+import { isNoteBodyFile, MetadataRepository } from '../repositories.js';
 import { MAX_LISTED_FILES, MAX_LISTED_KEY_BYTES } from '../../../lib/object-list-limits.js';
+import { env } from '../../../env.js';
 import { withNoteReferenceLock } from '../reference-lock.js';
-import { MetadataRepository } from '../repositories.js';
 import { createMediaDeletionClaim, deleteClaimedMedia } from './media-claims.js';
 
 export type CleanupNote = { id: string; bucketPath: string; bodyKey?: string | null };
@@ -93,6 +93,9 @@ export async function buildMediaReferenceIndex(deps: Pick<MediaCleanupDependenci
 }
 
 export async function cleanupMedia(deps: MediaCleanupDependencies, options: CleanupOptions = {}, target?: CleanupNote) {
+  if (deps.claimOrphan && !env.databaseUrl.startsWith('pgmem://')) {
+    throw new Error('Media cleanup test claim hook is unavailable outside pg-mem');
+  }
   const grace = options.gracePeriodMs ?? DEFAULT_MEDIA_GRACE_MS;
   if (!Number.isFinite(grace) || grace < 0) throw new Error('Invalid media cleanup grace period');
   const initial = await buildMediaReferenceIndex(deps);
@@ -162,7 +165,7 @@ export async function cleanupMedia(deps: MediaCleanupDependencies, options: Clea
         continue;
       }
       if (deps.claimOrphan) await deps.deleteFile(entry.bucket, entry.file, version.etag);
-      else if (!await deleteClaimedMedia(entry.bucket, entry.file, claimId, deps.deleteFile)) {
+      else if (!await deleteClaimedMedia(entry.bucket, entry.file, claimId, deps.deleteFile, { lockDuringDelete: false })) {
         deferred.push(entry);
         continue;
       }

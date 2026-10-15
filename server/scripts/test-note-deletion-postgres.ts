@@ -15,7 +15,8 @@ process.env.LOCAL_TESTING_KEK = '01'.repeat(32);
 const { pool } = await import('../src/db/index.js');
 const { initializeDatabase } = await import('../src/db/bootstrap.js');
 const { RustFS } = await import('../src/lib/rustfs.js');
-const { MetadataRepository } = await import('../src/modules/notes/repositories.js');
+const { MetadataRepository, NotesRepository } = await import('../src/modules/notes/repositories.js');
+const { cleanupMedia } = await import('../src/modules/notes/services/media-cleanup.js');
 const { createNote, updateNote, getNote, deleteNote } = await import('../src/modules/notes/services/notes.js');
 const { deleteNoteMedia } = await import('../src/modules/notes/services/media-deletion.js');
 const observer = new Pool({ connectionString: url.toString(), max: 1 });
@@ -40,6 +41,13 @@ RustFS.deleteFile = async (bucket, file) => { objects.delete(`${bucket}/${file}`
 const normalDelete = RustFS.deleteFile;
 const normalStat = RustFS.statFile;
 const normalMetadataDelete = MetadataRepository.deleteNoteMetadata;
+const cleanupDependencies = {
+  listNotes: MetadataRepository.listNotesForMediaCleanup,
+  getBody: NotesRepository.getBody,
+  listFiles: (bucket: string) => RustFS.listFiles(bucket),
+  statFile: (bucket: string, file: string) => RustFS.statFile(bucket, file),
+  deleteFile: (bucket: string, file: string, etag: string) => RustFS.deleteFile(bucket, file, etag),
+};
 
 function gate() {
   let resolve!: () => void;
@@ -130,6 +138,68 @@ try {
           MetadataRepository.deleteNoteMetadata = normalMetadataDelete;
         }
       }
+    }
+  }
+
+  // GRAV-250: the orphan claim commits before storage DELETE. A second native
+  // connection may publish immediately, but must reject the durable claim.
+  {
+    const f = await fixture();
+    const entered = gate();
+    const release = gate();
+    RustFS.deleteFile = async (...args) => {
+      if (args[1] === 'photo.png') { entered.resolve(); await release.promise; }
+      return normalDelete(...args);
+    };
+    let cleaning: ReturnType<typeof outcome> | undefined;
+    try {
+      cleaning = outcome(cleanupMedia(cleanupDependencies, {}, f.owner));
+      await entered.promise;
+      const publishing = await outcome(f.publish('update'));
+      assert.match(publishing.error?.message ?? '', /Note media references are unavailable/);
+      release.resolve();
+      assert.equal((await cleaning).error, undefined);
+      passed++;
+      console.log('PASS PostgreSQL orphan claim fences publication while DELETE is in flight');
+    } finally {
+      release.resolve();
+      await cleaning;
+      RustFS.deleteFile = normalDelete;
+    }
+  }
+
+  // Publication holding the table lock wins even if cleanup inventoried the
+  // object before the body pointer commits; its final locked scan defers it.
+  {
+    const f = await fixture();
+    const entered = gate();
+    const release = gate();
+    RustFS.statFile = async (...args) => {
+      RustFS.statFile = normalStat;
+      entered.resolve();
+      await release.promise;
+      return normalStat(...args);
+    };
+    let publishing: ReturnType<typeof outcome> | undefined;
+    let cleaning: ReturnType<typeof outcome> | undefined;
+    try {
+      publishing = outcome(f.publish('update'));
+      await entered.promise;
+      cleaning = outcome(cleanupMedia(cleanupDependencies, {}, f.owner));
+      await waitForLockWaiter();
+      release.resolve();
+      assert.equal((await publishing).error, undefined);
+      const result = await cleaning;
+      assert.equal(result.error, undefined);
+      assert.deepEqual(result.value?.deleted, []);
+      assert.deepEqual(result.value?.deferred.map(entry => entry.file), ['photo.png']);
+      assert.equal((await RustFS.readFile(f.owner.bucketPath, 'photo.png')).toString(), 'image');
+      passed++;
+      console.log('PASS PostgreSQL publication wins over orphan cleanup final scan');
+    } finally {
+      release.resolve();
+      await Promise.all([publishing, cleaning]);
+      RustFS.statFile = normalStat;
     }
   }
 
