@@ -29,7 +29,18 @@ export function registerMcpTools(tools: McpToolDefinition[]) {
       ...tool,
       inputSchema: { additionalProperties: false, ...tool.inputSchema },
       outputSchema: tool.outputSchema ?? {
-        type: 'object', properties: { data: {} }, required: ['data'], additionalProperties: false,
+        type: 'object',
+        properties: {
+          data: {},
+          error: {
+            type: 'object',
+            properties: { code: { type: 'string' }, message: { type: 'string' } },
+            required: ['code', 'message'],
+            additionalProperties: true,
+          },
+        },
+        oneOf: [{ required: ['data'] }, { required: ['error'] }],
+        additionalProperties: false,
       },
       annotations: {
         readOnlyHint: readOnly,

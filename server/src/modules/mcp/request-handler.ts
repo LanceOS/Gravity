@@ -23,7 +23,15 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
+type ToolFailure = { code: string; message: string; [key: string]: unknown };
+
+function toolResult(data: unknown): ReturnType<typeof createToolResult>;
+function toolResult(error: ToolFailure, isError: true): ReturnType<typeof createToolResult>;
 function toolResult(data: unknown, isError = false) {
+  return createToolResult(data, isError);
+}
+
+function createToolResult(data: unknown, isError: boolean) {
   return {
     content: [{ type: 'text' as const, text: JSON.stringify(data ?? null, null, 2) }],
     structuredContent: isError ? { error: data } : { data: data ?? null },
@@ -95,7 +103,17 @@ export class McpRequestHandler {
           const result = await executeTool(name, args, context.workspaceId, context.actorUserId, { tokenScopes: options.tokenScopes });
           const data = options.sanitize ? sanitize(result) : result;
           const domainFailure = isRecord(data) && data.ok === false;
-          return { jsonrpc: '2.0', id: payload.id, result: toolResult(data, domainFailure) };
+          if (domainFailure) {
+            // Keep the domain fields available to existing clients while giving
+            // every structured error a stable code and human-readable message.
+            const failure = {
+              ...data,
+              code: typeof data.status === 'string' ? data.status.toUpperCase() : 'DOMAIN_ERROR',
+              message: typeof data.message === 'string' ? data.message : 'Tool reported an error.',
+            };
+            return { jsonrpc: '2.0', id: payload.id, result: toolResult(failure, true) };
+          }
+          return { jsonrpc: '2.0', id: payload.id, result: toolResult(data) };
         } catch (error) {
           // Authorization failures remain protocol errors. Domain errors are
           // visible to the model as tool failures so it can correct its input.
