@@ -262,7 +262,7 @@ export const TicketBoard = React.memo(({
           columns={BOARD_COLUMNS}
           cards={formattedCards}
           cardRowHeight={TICKET_CARD_ROW_HEIGHT}
-          cardFocusSelector="input[type='checkbox'], .ticket-card"
+          cardFocusSelector=".ticket-card"
           onCardMove={handleCardMove}
           renderColumnHeader={renderColumnHeader}
         />

@@ -139,6 +139,7 @@ export const LabelProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     },
     onSuccess: (label) => {
       toast.show('Label created.', 'success');
+      void queryClient.invalidateQueries({ queryKey: ['workspaceLabels'] });
       if (label?.id) {
         if (label.teamId && !label.projectId) {
           void queryClient.invalidateQueries({ queryKey: ['teamLabels', label.teamId] });
@@ -172,6 +173,7 @@ export const LabelProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     },
     onSuccess: (updatedLabel, { id }) => {
       toast.show('Label saved.', 'success');
+      void queryClient.invalidateQueries({ queryKey: ['workspaceLabels'] });
       invalidateLabelQueries(id, updatedLabel?.projectId);
       return updatedLabel;
     },
@@ -202,6 +204,7 @@ export const LabelProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       return { projectId: cachedLabel?.projectId };
     },
     onSuccess: (_result, id, context: { projectId?: string | null } | undefined) => {
+      void queryClient.invalidateQueries({ queryKey: ['workspaceLabels'] });
       invalidateLabelQueries(id, context?.projectId);
     },
   });

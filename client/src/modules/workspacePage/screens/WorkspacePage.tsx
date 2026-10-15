@@ -442,6 +442,7 @@ export function WorkspacePage({
                           {(activeView === 'list' || activeView === 'board') && <BulkTicketTriage
                             key={selectionScope}
                             workspaceId={workspaceId}
+                            isTeamWorkspace={isTeamWorkspace}
                             visibleTickets={visibleTickets}
                             selectedTickets={selectedTickets}
                             projects={projects}

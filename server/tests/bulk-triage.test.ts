@@ -3,10 +3,31 @@ import * as realtime from '../src/realtime.js';
 import { eq } from 'drizzle-orm';
 import { createAuthenticatedApi, seedTicket, seedUser, seedWorkspaceFixture } from './helpers/test-helpers.js';
 import { db } from '../src/db/index.js';
-import { labels, projectMembers, ticketLabels, tickets, workspaceMembers, workspaceSettings } from '../src/db/schema.js';
+import { labels, projectMembers, projects, ticketLabels, ticketRelationships, tickets, workspaceMembers, workspaceSettings } from '../src/db/schema.js';
 import { getDefaultTeamId } from '../src/modules/workspaces/utils/default-team.js';
+import { createTicketDependencyRelation } from '../src/modules/tickets/services/tickets.js';
 
 describe('bulk ticket triage', () => {
+  it('refreshes related tickets after a bulk terminal status clears dependencies', async () => {
+    const actor = await createAuthenticatedApi({ email: 'bulk-relations@example.com', role: 'owner' });
+    const { workspace, project } = await seedWorkspaceFixture({ owner: { id: actor.user.id, email: actor.user.email, name: actor.user.name, role: 'owner' } });
+    const first = await seedTicket(project.id, { id: 'terminal', key: 'GRV-1' });
+    const second = await seedTicket(project.id, { id: 'dependent', key: 'GRV-2' });
+    await createTicketDependencyRelation(first.id, second.id, project.id, workspace.id);
+    const [snapshot] = await db.select().from(tickets).where(eq(tickets.id, first.id));
+    const broadcast = vi.spyOn(realtime, 'broadcastToWorkspace');
+    const response = await actor.post('/api/v1/tickets/bulk-triage').send({
+      workspaceId: workspace.id,
+      tickets: [{ id: first.id, projectId: project.id, updatedAt: snapshot.updatedAt.toISOString() }],
+      action: { type: 'status', value: 'done' },
+    });
+    expect(response.body.results[0].success).toBe(true);
+    expect(await db.select().from(ticketRelationships)).toHaveLength(0);
+    expect(broadcast).toHaveBeenCalledWith(workspace.id, 'tickets-updated', expect.objectContaining({
+      projectId: project.id, ticketId: second.id, relationshipCleanup: true,
+    }));
+  });
+
   it('reports stale and foreign workspace tickets individually while saving authorized tickets', async () => {
     const actor = await createAuthenticatedApi({ email: 'bulk-owner@example.com', role: 'owner' });
     const local = await seedWorkspaceFixture({
@@ -20,6 +41,9 @@ describe('bulk ticket triage', () => {
     const valid = await seedTicket(local.project.id, { id: 'bulk-valid', key: 'GRV-1' });
     const stale = await seedTicket(local.project.id, { id: 'bulk-stale', key: 'GRV-2' });
     const outsider = await seedTicket(foreign.project.id, { id: 'bulk-foreign', key: 'FOR-1' });
+    await db.insert(labels).values({ id: 'foreign-label', teamId: getDefaultTeamId(foreign.workspace.id), projectId: foreign.project.id, name: 'Foreign' });
+    const scopedLabels = await actor.get('/api/v1/labels').query({ workspaceId: local.workspace.id });
+    expect(scopedLabels.body).toEqual([]);
     const [validRow, staleRow, foreignRow] = await Promise.all([valid, stale, outsider].map(async (ticket) => {
       const [row] = await db.select().from(tickets).where(eq(tickets.id, ticket.id));
       return row;
@@ -54,6 +78,19 @@ describe('bulk ticket triage', () => {
       action: { type: 'priority', value: 'low' },
     });
     expect(retry.body.results[0]).toMatchObject({ success: false, error: expect.stringMatching(/changed/i) });
+
+    // Authorization can have a cached project-to-workspace answer while the
+    // project ownership changes. The write service must still reject it.
+    const [latestValid] = await db.select().from(tickets).where(eq(tickets.id, valid.id));
+    await db.update(projects).set({ workspaceId: foreign.workspace.id }).where(eq(projects.id, local.project.id));
+    const transferred = await actor.post('/api/v1/tickets/bulk-triage').send({
+      workspaceId: local.workspace.id,
+      tickets: [{ id: valid.id, projectId: local.project.id, updatedAt: latestValid.updatedAt.toISOString() }],
+      action: { type: 'status', value: 'done' },
+    });
+    expect(transferred.body.results[0].success).toBe(false);
+    const [unchangedAfterTransfer] = await db.select({ status: tickets.status }).from(tickets).where(eq(tickets.id, valid.id));
+    expect(unchangedAfterTransfer.status).toBe('todo');
   });
 
   it('rejects duplicate snapshots, unsupported actions, and unauthorized workspace requests', async () => {
@@ -64,8 +101,12 @@ describe('bulk ticket triage', () => {
     const snapshot = { id: ticket.id, projectId: project.id, updatedAt: row.updatedAt.toISOString() };
     const base = { workspaceId: workspace.id, tickets: [snapshot], action: { type: 'status', value: 'done' } };
     expect((await actor.post('/api/v1/tickets/bulk-triage').send({ ...base, tickets: [snapshot, snapshot] })).status).toBe(400);
+    expect((await actor.post('/api/v1/tickets/bulk-triage').send({ ...base,
+      tickets: Array.from({ length: 101 }, (_, index) => ({ ...snapshot, id: `ticket-${index}` })),
+    })).status).toBe(400);
     expect((await actor.post('/api/v1/tickets/bulk-triage').send({ ...base, action: { type: 'cycle', value: 'cycle-1' } })).status).toBe(400);
     expect((await actor.post('/api/v1/tickets/bulk-triage').send({ ...base, workspaceId: 'another-workspace' })).status).toBe(403);
+    expect((await actor.get('/api/v1/labels').query({ workspaceId: 'another-workspace' })).status).toBe(403);
     const [unchanged] = await db.select({ status: tickets.status }).from(tickets).where(eq(tickets.id, ticket.id));
     expect(unchanged.status).toBe('todo');
   });
@@ -77,6 +118,9 @@ describe('bulk ticket triage', () => {
     expect(secondProject.status).toBe(201);
     const otherProjectId = secondProject.body.id as string;
     await db.insert(labels).values({ id: 'only-first', teamId: getDefaultTeamId(workspace.id), projectId: project.id, name: 'Only first' });
+    const workspaceLabelResponse = await actor.get('/api/v1/labels').query({ workspaceId: workspace.id });
+    expect(workspaceLabelResponse.status).toBe(200);
+    expect(workspaceLabelResponse.body.map((label: { id: string }) => label.id)).toContain('only-first');
     const first = await seedTicket(project.id, { id: 'first', key: 'GRV-1' });
     const second = await seedTicket(otherProjectId, { id: 'second', key: 'OTH-1' });
     const snapshots = await Promise.all([first, second].map(async (ticket) => {
@@ -110,6 +154,10 @@ describe('bulk ticket triage', () => {
     await db.insert(workspaceMembers).values({ workspaceId: workspace.id, userId: eligible.id, role: 'member', createdAt: new Date() });
     await db.insert(projectMembers).values({ projectId: project.id, userId: eligible.id, role: 'member', createdAt: new Date() });
     await db.update(workspaceSettings).set({ hierarchyMode: 'teams' }).where(eq(workspaceSettings.workspaceId, workspace.id));
+    await db.insert(labels).values({ id: 'team-label', teamId: getDefaultTeamId(workspace.id), name: 'Team label' });
+    const teamLabelResponse = await actor.get('/api/v1/labels').query({ workspaceId: workspace.id });
+    expect(teamLabelResponse.status).toBe(200);
+    expect(teamLabelResponse.body.map((label: { id: string }) => label.id)).toEqual(['team-label']);
     const freshSnapshots = await Promise.all([first, second].map(async (item) => {
       const [current] = await db.select().from(tickets).where(eq(tickets.id, item.id));
       return { id: item.id, projectId: current.projectId, updatedAt: current.updatedAt.toISOString() };

@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { Label, Project, Ticket, User } from '../../../types/domain';
-import { apiClient } from '../../../utils/apiClient';
+import { apiClient, ApiError } from '../../../utils/apiClient';
 import './BulkTicketTriage.css';
 
 type ActionType = 'status' | 'priority' | 'assignee' | 'add_label' | 'remove_label';
@@ -9,6 +9,7 @@ type BulkResult = { id: string; success: boolean; ticket?: Ticket; error?: strin
 
 interface Props {
   workspaceId?: string;
+  isTeamWorkspace?: boolean;
   visibleTickets: Ticket[];
   selectedTickets: Ticket[];
   projects: Project[];
@@ -21,7 +22,7 @@ interface Props {
 const statuses: Ticket['status'][] = ['backlog', 'todo', 'in_progress', 'in_review', 'done', 'canceled'];
 const priorities: Ticket['priority'][] = ['no_priority', 'low', 'medium', 'high', 'urgent'];
 
-export function BulkTicketTriage({ workspaceId, visibleTickets, selectedTickets, projects, users, labels, onSelectVisible, onClear }: Props) {
+export function BulkTicketTriage({ workspaceId, isTeamWorkspace = false, visibleTickets, selectedTickets, projects, users, labels, onSelectVisible, onClear }: Props) {
   const queryClient = useQueryClient();
   const [actionType, setActionType] = useState<ActionType>('status');
   const [value, setValue] = useState('');
@@ -37,9 +38,9 @@ export function BulkTicketTriage({ workspaceId, visibleTickets, selectedTickets,
   const selectedValue = options.some((option) => option.value === value) ? value : '';
   const selectedLabel = actionType === 'add_label' || actionType === 'remove_label'
     ? labels.find((label) => label.id === selectedValue) : undefined;
-  const labelCompatible = (ticket: Ticket) => !selectedLabel || (selectedLabel.projectId
-    ? selectedLabel.projectId === ticket.projectId
-    : !!selectedLabel.teamId && selectedLabel.teamId === projectById.get(ticket.projectId)?.teamId);
+  const labelCompatible = (ticket: Ticket) => !selectedLabel || (isTeamWorkspace
+    ? !selectedLabel.projectId && !!selectedLabel.teamId && selectedLabel.teamId === projectById.get(ticket.projectId)?.teamId
+    : selectedLabel.projectId === ticket.projectId);
   const incompatibleCount = (actionType === 'add_label' || actionType === 'remove_label') && selectedLabel
     ? selectedTickets.filter((ticket) => !labelCompatible(ticket)).length : 0;
   const canSubmit = !!workspaceId && selectedTickets.length > 0 && selectedTickets.length <= 100 && !!selectedValue && !pending;
@@ -57,7 +58,12 @@ export function BulkTicketTriage({ workspaceId, visibleTickets, selectedTickets,
       });
       setResults(response.results);
     } catch (error) {
-      setRequestError(error instanceof Error ? `${error.message} Refresh before retrying; some changes may have completed.` : 'Bulk result unavailable. Refresh before retrying.');
+      const rejectedBeforeApply = error instanceof ApiError && [400, 401, 403].includes(error.status);
+      setRequestError(rejectedBeforeApply && error instanceof Error
+        ? error.message
+        : error instanceof Error
+          ? `${error.message} Refresh before retrying; some changes may have completed.`
+          : 'Bulk result unavailable. Refresh before retrying.');
     } finally {
       await Promise.allSettled([
         queryClient.invalidateQueries({ queryKey: ['tickets'] }),

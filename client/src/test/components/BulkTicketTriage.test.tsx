@@ -6,7 +6,10 @@ import { BulkTicketTriage } from '../../modules/tickets/components/BulkTicketTri
 import type { Ticket } from '../../types/domain';
 
 const post = vi.fn();
-vi.mock('../../utils/apiClient', () => ({ apiClient: { post: (...args: unknown[]) => post(...args) } }));
+vi.mock('../../utils/apiClient', () => ({
+  apiClient: { post: (...args: unknown[]) => post(...args) },
+  ApiError: class extends Error { status = 400; },
+}));
 
 const ticket = (id: string, projectId: string): Ticket => ({
   id, key: `GRV-${id}`, title: `Ticket ${id}`, description: '', status: 'todo', priority: 'medium',
@@ -38,7 +41,7 @@ describe('BulkTicketTriage', () => {
       { id: second.id, success: false, error: 'Label is not available for this project or team.' },
     ] });
     render(<QueryClientProvider client={new QueryClient()}><BulkTicketTriage
-      workspaceId="workspace-1" visibleTickets={[first, second]} selectedTickets={[first, second]}
+      workspaceId="workspace-1" isTeamWorkspace visibleTickets={[first, second]} selectedTickets={[first, second]}
       projects={[{ id: 'project-1', name: 'First', description: '', key: 'ONE', status: 'active', teamId: 'team-1' },
         { id: 'project-2', name: 'Second', description: '', key: 'TWO', status: 'active', teamId: 'team-2' }]}
       labels={[{ id: 'label-1', name: 'Ready', color: '#000', teamId: 'team-1' }]}

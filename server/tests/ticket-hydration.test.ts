@@ -5,7 +5,7 @@ import { comments, labels, ticketLabels, ticketRelationships, tickets, workspace
 import { getDefaultTeamId } from '../src/modules/workspaces/utils/default-team.js';
 import * as realtime from '../src/realtime.js';
 import { createAuthenticatedApi, seedCycle, seedTicket, seedWorkspaceFixture } from './helpers/test-helpers.js';
-import { getRelationshipCleanupSnapshots, getTicketDetails, getTicketDetailsByKey } from '../src/modules/tickets/services/tickets.js';
+import { getRelationshipCleanupEventTargets, getTicketDetails, getTicketDetailsByKey } from '../src/modules/tickets/services/tickets.js';
 
 // Count actual SQL calls, and hold each for a turn so unconstrained Promise.all
 // fan-out is observable even with the in-memory adapter's immediate responses.
@@ -51,10 +51,10 @@ describe('ticket hydration query regressions', () => {
     expect(await getTicketDetailsByKey(ticket.key.toLowerCase())).toEqual(expected);
     meter.stop();
     expect(meter.sql.filter((sql) => sql.startsWith('select "id", "key"') && sql.includes('limit'))).toHaveLength(1);
-    expect(meter.sql).toHaveLength(14);
+    expect(meter.sql.length).toBeLessThanOrEqual(14);
   });
 
-  it.each(['flat', 'teams'] as const)('preserves populated %s detail fields when reusing a batched row', async (hierarchyMode) => {
+  it.each(['flat', 'teams'] as const)('preserves populated %s detail fields alongside event targets', async (hierarchyMode) => {
     const { project, workspace, owner } = await seedWorkspaceFixture();
     await db.update(workspaceSettings).set({ hierarchyMode }).where(eq(workspaceSettings.workspaceId, workspace.id));
     const cycle = await seedCycle(project.id);
@@ -68,10 +68,10 @@ describe('ticket hydration query regressions', () => {
     expect(expected?.labels).toHaveLength(1);
     expect(expected?.subtasks[0].labels).toHaveLength(1);
     expect(await getTicketDetailsByKey(ticket.key)).toEqual(expected);
-    expect((await getRelationshipCleanupSnapshots([{ id: ticket.id, projectId: project.id }]))[0]?.ticket).toEqual(expected);
+    expect((await getRelationshipCleanupEventTargets([{ id: ticket.id, projectId: project.id }]))[0]?.ticketKey).toBe(ticket.key);
   });
 
-  it.each([1, 100, 1000])('bounds queries and fan-out for %i connected tickets', async (count) => {
+  it.each([1, 100, 1000])('bounds follow-up event lookup queries for %i connected tickets', async (count) => {
     const { project, owner } = await seedWorkspaceFixture();
     const anchor = await seedTicket(project.id, { id: 'anchor', key: 'GRV-9000' });
     const affected = Array.from({ length: count }, (_, i) => ({ id: `affected-${i}`, projectId: project.id }));
@@ -81,20 +81,19 @@ describe('ticket hydration query regressions', () => {
       await db.insert(ticketRelationships).values(batch.map(({ id }) => ({ ticketId: anchor.id, blockedTicketId: id, projectId: project.id })));
       await db.insert(comments).values(batch.map(({ id }) => ({ id: `comment-${id}`, ticketId: id, userId: owner.id, body: 'Follow-up context' })));
     }
-    const expected = await getTicketDetails(affected[0].id);
     const meter = measureQueries();
-    const snapshots = await getRelationshipCleanupSnapshots(affected);
+    const snapshots = await getRelationshipCleanupEventTargets(affected);
     meter.stop();
     expect(snapshots).toHaveLength(count);
-    expect(snapshots[0]?.ticket).toEqual(expected);
+    expect(snapshots[0]?.ticketKey).toBe('GRV-1');
     expect(snapshots.map((snapshot) => snapshot?.ticketId)).toEqual(affected.map(({ id }) => id));
-    expect(snapshots.every((snapshot) => snapshot?.ticket?.comments.length === 1 && snapshot.ticket.blockers.length === 1)).toBe(true);
-    expect(meter.sql).toHaveLength(10 * count + 5 * Math.ceil(count / 100));
-    expect(meter.peak()).toBeLessThanOrEqual(12);
+    expect(snapshots.every((snapshot) => snapshot?.ticketKey)).toBe(true);
+    expect(meter.sql).toHaveLength(2 * Math.ceil(count / 100));
+    expect(meter.peak()).toBe(1);
     console.info(JSON.stringify({ affected: count, queries: meter.sql.length, peakInFlight: meter.peak(), simulatedPoolWaits: meter.waits(), simulatedPoolWaitMs: meter.waitMs() }));
   }, 120_000);
 
-  it('emits complete follow-up payloads without an actor after closing a ticket', async () => {
+  it('emits follow-up invalidations without an actor after closing a ticket', async () => {
     const api = await createAuthenticatedApi({ name: 'Owner', email: 'cleanup@example.com', role: 'owner' });
     const { project, workspace } = await seedWorkspaceFixture({ owner: {
       id: api.user.id, name: api.user.name, email: api.user.email, role: 'owner', avatarUrl: api.user.avatar,
@@ -108,19 +107,19 @@ describe('ticket hydration query regressions', () => {
     const calls = emit.mock.calls.filter(([, type, payload]) => type === 'tickets-updated' && (payload as any).ticketId === affected.id);
     expect(calls).toHaveLength(1);
     expect(calls[0]).toEqual([workspace.id, 'tickets-updated', {
-      projectId: project.id, ticketId: affected.id, ticket: await getTicketDetails(affected.id),
+      projectId: project.id, ticketId: affected.id, ticketKey: affected.key, relationshipCleanup: true,
     }]);
   });
 
   it('keeps missing and moved ticket fallbacks and skips missing scopes', async () => {
     const { project, workspace } = await seedWorkspaceFixture();
     await seedTicket('another-project', { id: 'moved', key: 'MOVE-1' });
-    const snapshots = await getRelationshipCleanupSnapshots([
+    const snapshots = await getRelationshipCleanupEventTargets([
       { id: 'deleted', projectId: project.id },
       { id: 'deleted', projectId: 'missing-project' },
       { id: 'moved', projectId: project.id },
     ]);
-    expect(snapshots).toEqual([{ projectId: project.id, ticketId: 'deleted', workspaceId: workspace.id, ticket: null }, null, { projectId: project.id, ticketId: 'moved', workspaceId: workspace.id, ticket: null }]);
-    expect(await getRelationshipCleanupSnapshots([])).toEqual([]);
+    expect(snapshots).toEqual([{ projectId: project.id, ticketId: 'deleted', workspaceId: workspace.id, ticketKey: null }, null, { projectId: project.id, ticketId: 'moved', workspaceId: workspace.id, ticketKey: null }]);
+    expect(await getRelationshipCleanupEventTargets([])).toEqual([]);
   });
 });

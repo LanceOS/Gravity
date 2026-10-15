@@ -461,7 +461,7 @@ export const TicketList = React.memo(({
         items={listItems}
         height={viewportHeight || LIST_DEFAULT_VIRTUAL_HEIGHT}
         getItemKey={listItemKey}
-        itemFocusSelector="input[type='checkbox'], .ticket-row, .ticket-row-mobile, button:not(:disabled)"
+        itemFocusSelector=".ticket-row, .ticket-row-mobile, button:not(:disabled)"
         isItemFocusable={isListItemFocusable}
         virtualize={shouldUseVirtualList}
         measureRows={isMobileTicketLayout}

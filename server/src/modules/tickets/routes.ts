@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, isNull } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, or } from 'drizzle-orm';
 import { type Request, type Response, Router } from 'express';
 import { z } from 'zod';
 import { db } from '../../db/index.js';
@@ -24,7 +24,7 @@ import {
   hasTicketDependencyRelation,
   hasCircularDependency,
   getTicketDetails,
-  getRelationshipCleanupSnapshots,
+  getRelationshipCleanupEventTargets,
   listComments,
   listTicketBlockers,
   listTicketDependencies,
@@ -279,27 +279,21 @@ export function createTicketsRouter() {
       return;
     }
 
-    const affectedTicketSnapshots = await getRelationshipCleanupSnapshots(relationshipCleanup.affectedTickets);
+    const affectedTicketSnapshots = await getRelationshipCleanupEventTargets(relationshipCleanup.affectedTickets);
 
     for (const snapshot of affectedTicketSnapshots) {
       if (!snapshot) {
         continue;
       }
 
-      if (snapshot.ticket) {
-        // Deliberately omit actorUserId so the originating client processes
-        // follow-up ticket refreshes for other tickets affected by cleanup.
-        emitWorkspaceEvent(snapshot.workspaceId, 'tickets-updated', {
-          projectId: snapshot.projectId,
-          ticketId: snapshot.ticketId,
-          ticket: snapshot.ticket,
-        });
-        continue;
-      }
-
+      // The related ticket's updatedAt is unchanged, so tell clients to
+      // refetch instead of sending a snapshot rejected by their revision guard.
+      // Omitting actorUserId lets the originating client refresh as well.
       emitWorkspaceEvent(snapshot.workspaceId, 'tickets-updated', {
         projectId: snapshot.projectId,
         ticketId: snapshot.ticketId,
+        ...(snapshot.ticketKey ? { ticketKey: snapshot.ticketKey } : {}),
+        relationshipCleanup: true,
       });
     }
   }
@@ -733,9 +727,29 @@ export function createTicketsRouter() {
     try {
       const projectId = typeof req.query.projectId === 'string' ? req.query.projectId : getProjectIdFromRequest(req);
       const teamId = typeof req.query.teamId === 'string' ? req.query.teamId : undefined;
+      const workspaceId = typeof req.query.workspaceId === 'string' ? req.query.workspaceId : undefined;
+
+      if (workspaceId) {
+        const auth = await authorizeWorkspaceAccess(req, workspaceId);
+        if (!auth.allowed) {
+          res.status(auth.status).json({ error: auth.error });
+          return;
+        }
+        const rows = await db.select(labelSelectFields).from(labels)
+          .innerJoin(teams, eq(labels.teamId, teams.id))
+          .innerJoin(workspaceSettings, eq(workspaceSettings.workspaceId, teams.workspaceId))
+          .leftJoin(projects, eq(labels.projectId, projects.id))
+          .where(and(eq(teams.workspaceId, workspaceId), or(
+            and(eq(workspaceSettings.hierarchyMode, 'teams'), isNull(labels.projectId)),
+            and(eq(workspaceSettings.hierarchyMode, 'flat'), eq(projects.workspaceId, workspaceId)),
+          )))
+          .orderBy(asc(labels.createdAt));
+        res.json(rows);
+        return;
+      }
 
       if (!teamId && !projectId) {
-        res.status(400).json({ error: 'Either teamId or projectId is required, or project not found.' });
+        res.status(400).json({ error: 'A workspace, team, or project ID is required.' });
         return;
       }
 

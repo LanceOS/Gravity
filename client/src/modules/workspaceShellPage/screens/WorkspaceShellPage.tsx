@@ -574,6 +574,14 @@ export function WorkspaceShellPage() {
     gcTime: CACHE_CONFIGS.metadata.gcTime,
   });
 
+  const { data: workspaceLabels = [] } = useQuery<Label[]>({
+    queryKey: ['workspaceLabels', activeWorkspaceId],
+    queryFn: () => apiClient.get<Label[]>('/labels', { params: { workspaceId: activeWorkspaceId } }),
+    enabled: isWorkspaceAllTasksPath && !!activeWorkspaceId && !!currentUser,
+    staleTime: CACHE_CONFIGS.metadata.staleTime,
+    gcTime: CACHE_CONFIGS.metadata.gcTime,
+  });
+
   const routeScopedTickets = useMemo(
     () =>
       isWorkspaceAllTasksPath
@@ -976,7 +984,9 @@ export function WorkspaceShellPage() {
   const scopedProjectId = projectIdParam || activeProjectId;
   const scopedLabels = isTeamAggregatePath
     ? teamLabels
-    : labels.filter((label) => label.projectId === scopedProjectId);
+    : isWorkspaceAllTasksPath
+      ? workspaceLabels
+      : labels.filter((label) => label.projectId === scopedProjectId);
 
   const sidebarActiveViewId =
     route.teamIdParam && sidebarNavigationState.activeScope === 'views'

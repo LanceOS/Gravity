@@ -187,6 +187,14 @@ describe('TicketList', () => {
     expect(onVisibleTicketsChange).toHaveBeenLastCalledWith(['ticket-2']);
   });
 
+  it('keeps arrow navigation on ticket rows when selection checkboxes are present', () => {
+    renderTicketList({ onToggleTicketSelection: vi.fn() });
+    const firstRow = screen.getByRole('button', { name: 'TicketRow GRA-1 avatar-1.png' });
+    firstRow.focus();
+    fireEvent.keyDown(firstRow, { key: 'ArrowDown' });
+    expect(screen.getByRole('button', { name: 'TicketRow GRA-2 no-avatar' })).toHaveFocus();
+  });
+
   it('virtualizes a large single-status list from its first page and preserves row pitch after loading', async () => {
     const user = userEvent.setup();
     const onVisibleTicketsChange = vi.fn();
