@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react';
+import { lazy, Suspense, useCallback, useEffect } from 'react';
 
 import type { Ticket } from '../../../context/TicketContextContext';
 import { useCommentContext } from '../../../context/comment/CommentContext';
@@ -6,9 +6,13 @@ import { useTicketRelationsContext } from '../../../context/relation/TicketRelat
 import { useTicketDetailContext } from '../../../context/ticket/TicketDetailContext';
 import { useTicketMutations } from '../../../context/ticket/TicketMutationContext';
 import type { Cycle, Label, Project, User } from '../../../types/domain';
-import { CreateTicketModal, TicketDetailRoute, type TicketFilters, type TicketListSort } from '../../tickets';
+import type { TicketFilters, TicketListSort } from '../../tickets';
+import { LoadingCreateTicketDialog } from '../../tickets/components/CreateTicketModal/LoadingCreateTicketDialog';
 import { WorkspacePage } from '../../workspacePage';
 import type { WorkspaceIssueView } from '../../workspacePage/screens/WorkspacePage';
+
+const TicketDetailRoute = lazy(() => import('../../tickets/components/TicketDetailRoute').then(({ TicketDetailRoute }) => ({ default: TicketDetailRoute })));
+const CreateTicketModal = lazy(() => import('../../tickets/components/CreateTicketModal/CreateTicketModal').then(({ CreateTicketModal }) => ({ default: CreateTicketModal })));
 
 type Navigate = (to: string, options?: { replace?: boolean }) => void;
 
@@ -172,32 +176,34 @@ export function WorkspaceIssueSurface({
   return (
     <>
       {routeTicketKey ? (
-        <TicketDetailRoute
-          activeWorkspaceId={activeWorkspaceId}
-          activeTicket={activeRouteTicket}
-          activeTicketDetail={activeTicketDetail}
-          comments={comments}
-          tickets={tickets}
-          users={users}
-          projects={createTicketModal.projects}
-          labels={labels}
-          cycles={cycles}
-          onSelectTicket={onSelectTicket}
-          onSelectLabel={handleSelectLabel}
-          onUpdateTicket={updateTicket}
-          onDeleteTicket={handleDeleteTicket}
-          onAddComment={addComment}
-          onUpdateComment={updateComment}
-          onDeleteComment={deleteComment}
-          onOpenCreateSubtask={onOpenCreateSubtask}
-          onAddDependency={addTicketDependency}
-          onRemoveDependency={removeTicketDependency}
-          onAddBlocker={addTicketBlocker}
-          onRemoveBlocker={removeTicketBlocker}
-          ticketsById={ticketsById}
-          ticketsByParentId={ticketsByParentId}
-          isLoading={isLoadingTickets}
-        />
+        <Suspense fallback={<div role="status">Loading ticket details...</div>}>
+          <TicketDetailRoute
+            activeWorkspaceId={activeWorkspaceId}
+            activeTicket={activeRouteTicket}
+            activeTicketDetail={activeTicketDetail}
+            comments={comments}
+            tickets={tickets}
+            users={users}
+            projects={createTicketModal.projects}
+            labels={labels}
+            cycles={cycles}
+            onSelectTicket={onSelectTicket}
+            onSelectLabel={handleSelectLabel}
+            onUpdateTicket={updateTicket}
+            onDeleteTicket={handleDeleteTicket}
+            onAddComment={addComment}
+            onUpdateComment={updateComment}
+            onDeleteComment={deleteComment}
+            onOpenCreateSubtask={onOpenCreateSubtask}
+            onAddDependency={addTicketDependency}
+            onRemoveDependency={removeTicketDependency}
+            onAddBlocker={addTicketBlocker}
+            onRemoveBlocker={removeTicketBlocker}
+            ticketsById={ticketsById}
+            ticketsByParentId={ticketsByParentId}
+            isLoading={isLoadingTickets}
+          />
+        </Suspense>
       ) : (
         <WorkspacePage
           workspaceId={activeWorkspaceId}
@@ -237,19 +243,23 @@ export function WorkspaceIssueSurface({
         />
       )}
 
-      <CreateTicketModal
-        isOpen={createTicketModal.isOpen}
-        onClose={createTicketModal.onClose}
-        projects={createTicketModal.projects}
-        labels={createTicketModal.labels}
-        cycles={createTicketModal.cycles}
-        users={createTicketModal.users}
-        parentTicket={createTicketModal.parentTicket}
-        defaultProjectId={createTicketModal.defaultProjectId}
-        onSubmitTicket={handleCreateTicketSubmit}
-        initialStatus={createTicketModal.initialStatus}
-        parentId={createTicketModal.parentId}
-      />
+      {createTicketModal.isOpen && (
+        <Suspense fallback={<LoadingCreateTicketDialog onClose={createTicketModal.onClose} />}>
+          <CreateTicketModal
+            isOpen
+            onClose={createTicketModal.onClose}
+            projects={createTicketModal.projects}
+            labels={createTicketModal.labels}
+            cycles={createTicketModal.cycles}
+            users={createTicketModal.users}
+            parentTicket={createTicketModal.parentTicket}
+            defaultProjectId={createTicketModal.defaultProjectId}
+            onSubmitTicket={handleCreateTicketSubmit}
+            initialStatus={createTicketModal.initialStatus}
+            parentId={createTicketModal.parentId}
+          />
+        </Suspense>
+      )}
     </>
   );
 }

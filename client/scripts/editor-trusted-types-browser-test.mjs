@@ -274,7 +274,10 @@ try {
   const origin = `http://127.0.0.1:${server.address().port}`;
   for (const browserName of browserNames) {
     assert.ok(engines[browserName], `Unknown browser: ${browserName}`);
-    browser = await engines[browserName].launch({ headless: true });
+    browser = await engines[browserName].launch({
+      headless: true,
+      ...(browserName === 'chromium' && process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {}),
+    });
     await verifyEnforcement(origin);
     await verifyEditor(origin, false, browserName);
     await verifyEditor(origin, true, browserName);

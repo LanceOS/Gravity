@@ -3,11 +3,11 @@ import { Check } from 'lucide-react';
 import {
   toast,
   Button,
-  RichTextEditor,
-  type RichTextEditorHandle,
   createEmptyRichTextValue,
   isRichTextDocumentJSON,
 } from '@library';
+import type { RichTextEditorHandle } from '@library/components/richtext/RichTextEditor';
+import { LazyRichTextEditor } from '../../../components/LazyRichTextEditor';
 import { useNote } from '../hooks/useNote';
 import './NoteEditor.css';
 import { readDraft, writeDraft, subscribeDraft } from './noteDrafts';
@@ -317,7 +317,7 @@ function NoteEditorSession({ projectId, noteId, onTitleChange }: NoteEditorProps
           />
         </div>
 
-        <RichTextEditor
+        <LazyRichTextEditor
           readOnly={!note || reloading}
           ref={editorRef}
           value={body}

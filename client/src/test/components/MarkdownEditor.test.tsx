@@ -1,7 +1,7 @@
 import { act, fireEvent, render, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { MarkdownEditor } from '@library';
+import { MarkdownEditor } from '@library/components/markdowneditor/MarkdownEditor';
 
 describe('MarkdownEditor', () => {
   it('keeps single-line mode plain text and saves on Enter without formatting controls', async () => {

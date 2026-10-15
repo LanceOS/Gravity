@@ -1,8 +1,12 @@
 import type { LabelCreateScope } from '../../tickets/components/LabelCreateOverlay';
+import { lazy, Suspense } from 'react';
 import type { ReactNode } from 'react';
 import type { Cycle, Label, Project, Ticket, User } from '../../../types/domain';
-import { CreateTicketModal, LabelCreateOverlay } from '../../../modules/tickets';
+import { LabelCreateOverlay } from '../../../modules/tickets';
+import { LoadingCreateTicketDialog } from '../../../modules/tickets/components/CreateTicketModal/LoadingCreateTicketDialog';
 import { ProjectCreateOverlay } from '../../../components/WorkspaceProjectPanel';
+
+const CreateTicketModal = lazy(() => import('../../../modules/tickets/components/CreateTicketModal/CreateTicketModal').then(({ CreateTicketModal }) => ({ default: CreateTicketModal })));
 
 type CreateTicketOverlayProps = {
   isOpen: boolean;
@@ -60,19 +64,23 @@ export function AppShellOverlays({
 }: AppShellOverlaysProps) {
   return (
     <>
-      <CreateTicketModal
-        isOpen={!!createTicket?.isOpen}
-        onClose={createTicket?.onClose || (() => {})}
-        projects={createTicket?.projects || []}
-        labels={createTicket?.labels || []}
-        cycles={createTicket?.cycles || []}
-        users={createTicket?.users || []}
-        parentTicket={createTicket?.parentTicket || null}
-        defaultProjectId={createTicket?.defaultProjectId || ''}
-        onSubmitTicket={createTicket?.onSubmitTicket || (async () => false)}
-        initialStatus={createTicket?.initialStatus}
-        parentId={createTicket?.parentId}
-      />
+      {createTicket?.isOpen && (
+        <Suspense fallback={<LoadingCreateTicketDialog onClose={createTicket.onClose} />}>
+          <CreateTicketModal
+            isOpen
+            onClose={createTicket.onClose}
+            projects={createTicket.projects}
+            labels={createTicket.labels}
+            cycles={createTicket.cycles}
+            users={createTicket.users}
+            parentTicket={createTicket.parentTicket}
+            defaultProjectId={createTicket.defaultProjectId}
+            onSubmitTicket={createTicket.onSubmitTicket}
+            initialStatus={createTicket.initialStatus}
+            parentId={createTicket.parentId}
+          />
+        </Suspense>
+      )}
 
       {onboarding}
 

@@ -54,6 +54,11 @@ vi.mock('@library', async (importOriginal) => {
   };
 });
 
+vi.mock('../../components/LazyRichTextEditor', async () => {
+  const library = await import('@library') as unknown as { RichTextEditor: typeof import('@library/components/richtext/RichTextEditor').RichTextEditor };
+  return { LazyRichTextEditor: library.RichTextEditor };
+});
+
 function makeNote(overrides: Partial<NonNullable<ReturnType<typeof useNote>['note']>> = {}) {
   return {
     id: 'note-1', projectId: 'proj-1', userId: 'user-1',

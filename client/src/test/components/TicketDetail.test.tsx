@@ -142,29 +142,35 @@ vi.mock('@library', async (importOriginal) => {
     ),
     TextInput: ({ value, onChange, ...props }: MockTextInputProps) => <input value={value} onChange={onChange} {...props} />,
     Textarea: ({ value, onChange, autoGrow, inputStyle, ...props }: /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any) => <textarea value={value} onChange={onChange} {...props} />,
+    RichTextEditor: MockRichTextEditor,
+    ClickAwayListener: ({ children }: { children: ReactNode }) => children,
+    Portal: ({ children }: { children: ReactNode }) => <div data-testid="portal">{children}</div>,
+  };
+});
+
+vi.mock('../../components/LazyRichTextEditor', async () => {
+  const library = await import('@library') as unknown as { RichTextEditor: typeof import('@library/components/richtext/RichTextEditor').RichTextEditor };
+  return { LazyRichTextEditor: library.RichTextEditor };
+});
+vi.mock('@library/components/markdowneditor/MarkdownEditor', async () => {
+  const { MarkdownEditor: RealMarkdownEditor } = await vi.importActual<typeof import('@library/components/markdowneditor/MarkdownEditor')>('@library/components/markdowneditor/MarkdownEditor');
+  return {
     MarkdownEditor: ({ value, onSave, placeholder, ...props }: /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any) => {
       const [editing, setEditing] = useState(false);
-      if (editorTestOptions.realTitleEditor) return <actual.MarkdownEditor {...props} value={value} onSave={onSave} placeholder={placeholder} />;
-      if (!editing) {
-        return (
-          <div onClick={() => setEditing(true)}>{value || placeholder}</div>
-        );
-      }
+      if (editorTestOptions.realTitleEditor) return <RealMarkdownEditor {...props} value={value} onSave={onSave} placeholder={placeholder} />;
+      if (!editing) return <div onClick={() => setEditing(true)}>{value || placeholder}</div>;
       return (
         <textarea
           placeholder={placeholder}
           defaultValue={value}
-          onBlur={(e) => {
+          onBlur={(event) => {
             setEditing(false);
-            onSave(e.target.value);
+            onSave(event.target.value);
           }}
           autoFocus
         />
       );
     },
-    RichTextEditor: MockRichTextEditor,
-    ClickAwayListener: ({ children }: { children: ReactNode }) => children,
-    Portal: ({ children }: { children: ReactNode }) => <div data-testid="portal">{children}</div>,
   };
 });
 

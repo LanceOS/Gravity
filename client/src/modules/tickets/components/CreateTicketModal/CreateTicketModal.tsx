@@ -1,7 +1,8 @@
 import { useActionStatus } from '../../../../hooks/useActionStatus';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import type { Ticket } from '../../../../context/TicketContextContext';
-import { Button, Select, Textarea, Popover, RichTextEditor, createEmptyRichTextValue } from '@library';
+import { Button, Select, Textarea, Popover, createEmptyRichTextValue } from '@library';
+import { LazyRichTextEditor } from '../../../../components/LazyRichTextEditor';
 import { Plus, X } from 'lucide-react';
 import { ModalDialog } from '../../../../components/ModalDialog';
 import type { CreateTicketModalProps } from '../../types/CreateTicketModal';
@@ -180,7 +181,7 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
               </Button>
             </div>
 
-            <RichTextEditor
+            <LazyRichTextEditor
               value={description}
               onChange={setDescription}
               placeholder="Add a description..."

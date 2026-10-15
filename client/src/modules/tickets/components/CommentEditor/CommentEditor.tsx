@@ -1,5 +1,6 @@
 import { forwardRef } from 'react';
-import { RichTextEditor, type RichTextEditorHandle } from '@library';
+import type { RichTextEditorHandle } from '@library/components/richtext/RichTextEditor';
+import { LazyRichTextEditor } from '../../../../components/LazyRichTextEditor';
 import './CommentEditor.css';
 
 export interface CommentEditorProps {
@@ -26,7 +27,7 @@ export const CommentEditor = forwardRef<RichTextEditorHandle, CommentEditorProps
 ) {
   return (
     <div className={`comment-editor-container ${className || ''}`}>
-      <RichTextEditor
+      <LazyRichTextEditor
         ref={ref}
         value={value}
         onChange={onChange}

@@ -33,7 +33,6 @@ export * from './divider';
 export * from './drawer';
 export * from './dropdownmenu';
 
-export * from './markdowneditor';
 export * from './emptystate';
 export * from './fileuploader';
 export * from './flex';
@@ -45,6 +44,7 @@ export * from './list';
 export * from './listitem';
 export * from './masonry';
 export * from './megamenu';
+export * from './markdowneditor';
 export * from './modal';
 export * from './navbar';
 export * from './notificationcenter';
