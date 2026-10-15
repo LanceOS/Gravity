@@ -9,6 +9,8 @@ export interface FileUploaderProps {
 export function FileUploader({ onFileSelect, label }: FileUploaderProps) {
   const [isDragActive, setIsDragActive] = React.useState(false);
   const inputRef = React.useRef<HTMLInputElement | null>(null);
+  const labelId = React.useId();
+  const instructionId = React.useId();
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
@@ -31,34 +33,39 @@ export function FileUploader({ onFileSelect, label }: FileUploaderProps) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', width: '100%' }}>
-      {label && <label className="label">{label}</label>}
-      <div
+      {label && <span id={labelId} className="label">{label}</span>}
+      <input
+        ref={inputRef}
+        type="file"
+        multiple
+        onChange={(e) => e.target.files && onFileSelect(e.target.files)}
+        style={{ display: 'none' }}
+      />
+      <button
+        type="button"
         onDragEnter={handleDrag}
         onDragOver={handleDrag}
         onDragLeave={handleDrag}
         onDrop={handleDrop}
         onClick={() => inputRef.current?.click()}
-        className="clickable"
+        className="clickable lib-focus-ring"
+        aria-labelledby={label ? `${labelId} ${instructionId}` : instructionId}
         style={{
+          width: '100%',
           border: '2px dashed var(--color-border-default)',
           borderRadius: 'var(--radius-lg)',
           padding: '24px',
           textAlign: 'center',
           backgroundColor: isDragActive ? 'var(--color-state-selected-bg)' : 'var(--color-surface-card)',
           cursor: 'pointer',
+          color: 'var(--color-text-primary)',
+          font: 'inherit',
           transition: 'background-color var(--transition-normal), border-color var(--transition-normal)',
         }}
       >
-        <input
-          ref={inputRef}
-          type="file"
-          multiple
-          onChange={(e) => e.target.files && onFileSelect(e.target.files)}
-          style={{ display: 'none' }}
-        />
         <Upload size={24} style={{ color: 'var(--color-text-disabled)', marginBottom: '8px' }} aria-hidden="true" />
-        <p style={{ fontSize: '13px', margin: 0 }}>Drag and drop files here, or click to upload</p>
-      </div>
+        <span id={instructionId} style={{ display: 'block', fontSize: '13px' }}>Drag and drop files here, or click to upload</span>
+      </button>
     </div>
   );
 }
