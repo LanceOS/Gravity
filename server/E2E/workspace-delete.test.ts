@@ -49,9 +49,10 @@ describe('Workspace Deletion E2E', () => {
 
     // 4. Contributor requests to join
     const resJoinRequest = await request(app)
-      .post(`/api/v1/workspaces/invites/${inviteCode}/join-requests`)
+      .post('/api/v1/workspaces/invites/join-requests')
       .set('x-user-id', contributor.id)
       .send({
+        inviteCode,
         userId: contributor.id,
         message: 'Let me in',
       });

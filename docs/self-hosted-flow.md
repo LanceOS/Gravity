@@ -64,21 +64,24 @@ To invite peers, the owner generates an invitation. This creates a secure, uniqu
       "label": "Engineering Team Invitation"
     }
     ```
-*   **Response**: Returns a unique `code` (e.g., `inv_abc123xyz`). The invite URL distributed to users will look like:
+*   **Response**: Returns a one-use code that expires after 15 minutes. The invite URL distributed to users will look like:
     ```
-    http://<host-ip-or-domain>/?invite=inv_abc123xyz
+    http://<host-ip-or-domain>/#invite=WSP-<48-hex-characters>
     ```
 
 > [!TIP]
-> Owners can view and manage all active invites by performing a `GET /api/v1/workspaces/:workspaceId/invites`.
+> Workspace owners and admins can view and manage invites with `GET /api/v1/workspaces/:workspaceId/invites`.
+
+Invite links issued before this change used short codes and are rejected after upgrade. Create a new invite for any recipient who has not redeemed an older link.
 
 ### Step 3: Joining Request (Peer/Collaborator)
 When a peer clicks the invitation link or inputs the code, they submit a request to join the workspace.
 
-*   **API Endpoint**: `POST /api/v1/workspaces/invites/:code/join-requests`
+*   **API Endpoint**: `POST /api/v1/workspaces/invites/join-requests`
 *   **Payload**:
     ```json
     {
+      "inviteCode": "WSP-<48-hex-characters>",
       "userId": "collaborator-user-uuid",
       "message": "Requesting access to collaborate on the Core Engine."
     }

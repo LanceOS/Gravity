@@ -63,6 +63,15 @@ async function createPool() {
       implementation: () => null,
     });
 
+    // pg-mem does not implement PostgreSQL's wall-clock timestamp function.
+    memoryDb.public.registerFunction({
+      name: 'clock_timestamp',
+      args: [],
+      returns: DataType.timestamptz,
+      impure: true,
+      implementation: () => new Date(),
+    });
+
     const adapter = memoryDb.adapters.createPg();
     const patchQuery = (prototype: { query?: (...args: unknown[]) => unknown }) => {
       if (!prototype.query) {

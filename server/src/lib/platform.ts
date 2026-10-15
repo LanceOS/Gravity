@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import type { Request } from 'express';
 import * as cache from './cache.js';
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
@@ -59,8 +59,8 @@ export function createProjectInviteCode(projectKey: string) {
   return `INV-${normalizeEntityKey(projectKey)}-${randomUUID().replace(/-/g, '').slice(0, 8).toUpperCase()}`;
 }
 
-export function createWorkspaceInviteCode(workspaceKey: string) {
-  return `WSP-${normalizeEntityKey(workspaceKey)}-${Math.floor(1000 + Math.random() * 9000)}`;
+export function createWorkspaceInviteCode(_workspaceKey: string) {
+  return `WSP-${randomBytes(24).toString('hex').toUpperCase()}`;
 }
 
 export function normalizeIsoDate(value: unknown) {

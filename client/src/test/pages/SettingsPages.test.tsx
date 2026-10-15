@@ -69,13 +69,13 @@ function renderSettingsPage(overrides: Partial<Parameters<typeof SettingsPage>[0
     invites: [
       {
         id: 'invite-1',
-        code: 'WSP-GRAV-1234',
+        code: `WSP-${'A'.repeat(48)}`,
         label: 'Engineering Team',
-        expiresAt: null,
+        expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
         revokedAt: null,
         maxUses: null,
         useCount: 0,
-        createdAt: '2026-05-20T08:00:00.000Z',
+        createdAt: new Date().toISOString(),
         createdByName: 'Casey Carter',
         pendingJoinRequestCount: 0,
       },
@@ -262,6 +262,21 @@ describe('SettingsPage', () => {
     expect(props.onApproveJoinRequest).toHaveBeenCalledWith('request-1');
   });
 
+  it('warns before copying an invite and keeps the token in a URL fragment', async () => {
+    const user = userEvent.setup();
+    const writeText = vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue(undefined);
+    renderSettingsPage();
+    await user.click(screen.getByRole('button', { name: /Invites/i }));
+    await user.click(screen.getByRole('button', { name: 'Copy Invite URL' }));
+    expect(writeText).not.toHaveBeenCalled();
+    expect(screen.getByRole('alert')).toHaveTextContent('Your clipboard may be visible to other apps');
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(writeText).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'Copy Invite URL' }));
+    await user.click(screen.getByRole('button', { name: 'Copy invite' }));
+    expect(writeText).toHaveBeenCalledWith(`${window.location.origin}/#invite=WSP-${'A'.repeat(48)}`);
+  });
+
   it('handles MCP Tools disablement switches for owners', async () => {
     const user = userEvent.setup();
 
@@ -403,6 +418,17 @@ describe('SettingsPage', () => {
     });
 
     expect(screen.queryByRole('button', { name: /Download task and note audit data/i })).not.toBeInTheDocument();
+  });
+
+  it('shows invite controls only to workspace owners and admins', () => {
+    const member = renderSettingsPage({ workspace: { ...workspace, memberRole: 'member' } });
+    expect(screen.queryByRole('button', { name: /Invites/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Join Requests/i })).not.toBeInTheDocument();
+    member.unmount();
+
+    renderSettingsPage({ workspace: { ...workspace, memberRole: 'admin' } });
+    expect(screen.getByRole('button', { name: /Invites/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Join Requests/i })).toBeInTheDocument();
   });
 
   it('renders all sections stacked on mobile viewport', () => {

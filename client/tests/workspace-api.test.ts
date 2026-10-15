@@ -175,7 +175,8 @@ async function run() {
 
     const inviteCode = createInvite.data.code as string;
 
-    const joinRequest = await postJson(`/api/workspaces/invites/${encodeURIComponent(inviteCode)}/join-requests`, {
+    const joinRequest = await postJson('/api/workspaces/invites/join-requests', {
+      inviteCode,
       userId: collaboratorId,
       message: 'Requesting access for integration test.',
     });
