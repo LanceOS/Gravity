@@ -4,13 +4,14 @@ import { noteBodyRevisions, noteBucketCleanups, noteMetadata } from './schema.js
 import { RustFS } from '../../lib/rustfs.js';
 import { env } from '../../env.js';
 import { withNoteReferenceLock, type NoteTransaction } from './reference-lock.js';
+import { searchSnippet } from './search-text.js';
 
 export type NoteMetadata = typeof noteMetadata.$inferSelect;
 
 export type NoteListItem = Pick<NoteMetadata, 'id' | 'title' | 'excerpt' | 'version' | 'createdAt' | 'updatedAt'>;
 
-function buildSearchVector(title: string, excerpt: string) {
-  return sql`to_tsvector('english', ${title} || ' ' || ${excerpt})`;
+function buildSearchVector(title: string, content: string | ReturnType<typeof sql>) {
+  return sql`setweight(to_tsvector('english', ${title}), 'A') || setweight(to_tsvector('english', ${content}), 'B')`;
 }
 
 export class MetadataRepository {
@@ -27,6 +28,7 @@ export class MetadataRepository {
     userId: string;
     title: string;
     excerpt?: string;
+    searchText?: string;
     bucketPath: string;
     bodyKey?: string;
   }, validateReferences?: (tx: NoteTransaction) => Promise<void>): Promise<NoteMetadata> {
@@ -39,6 +41,7 @@ export class MetadataRepository {
       userId: data.userId,
       title: data.title,
       excerpt,
+      searchText: data.searchText ?? null,
       bucketPath: data.bucketPath,
       bodyKey: data.bodyKey,
     };
@@ -46,7 +49,7 @@ export class MetadataRepository {
     if (useSearchVector) {
       // Only include search vector when running against a real Postgres instance
       // because pg-mem does not support the tsvector type and related functions.
-      insertValues.searchVector = buildSearchVector(data.title, excerpt);
+      insertValues.searchVector = data.searchText === undefined ? null : buildSearchVector(data.title, data.searchText);
     }
 
     return commitRevision(data.bodyKey, data.bucketPath, async (tx) => {
@@ -100,14 +103,16 @@ export class MetadataRepository {
     limit: number = 20,
     offset: number = 0,
     sortDirection: 'desc' | 'asc' = 'desc'
-  ): Promise<NoteListItem[]> {
+  ): Promise<(NoteListItem & { snippet: string })[]> {
     const useSearchVector = typeof env.databaseUrl === 'string' && !env.databaseUrl.startsWith('pgmem://');
+    const pageSize = Math.max(1, Math.min(limit, 100));
+    const pageOffset = Math.max(0, Math.min(offset, 100000));
 
     if (useSearchVector) {
       // We use websearch_to_tsquery for user-friendly query parsing when tsvector is available
       const tsQuery = sql`websearch_to_tsquery('english', ${query})`;
 
-      return await db
+      const rows = await db
         .select({
           id: noteMetadata.id,
           title: noteMetadata.title,
@@ -115,6 +120,7 @@ export class MetadataRepository {
           version: noteMetadata.version,
           createdAt: noteMetadata.createdAt,
           updatedAt: noteMetadata.updatedAt,
+          headline: sql<string>`ts_headline('english', COALESCE(${noteMetadata.searchText}, ''), ${tsQuery}, 'MaxWords=30, MinWords=8, MaxFragments=1')`,
         })
         .from(noteMetadata)
         .where(
@@ -124,14 +130,15 @@ export class MetadataRepository {
             sql`${noteMetadata.searchVector} @@ ${tsQuery}`
           )
         )
-        .orderBy(desc(sql`ts_rank(${noteMetadata.searchVector}, ${tsQuery})`))
-        .limit(limit)
-        .offset(offset);
+        .orderBy(desc(sql`ts_rank(${noteMetadata.searchVector}, ${tsQuery})`), sortDirection === 'desc' ? desc(noteMetadata.updatedAt) : asc(noteMetadata.updatedAt), asc(noteMetadata.id))
+        .limit(pageSize)
+        .offset(pageOffset);
+      return rows.map(({ headline, ...row }) => ({ ...row, snippet: searchSnippet(headline.replace(/<\/?b>/g, ''), query) }));
     }
 
-    // Fallback for pg-mem or environments without tsvector: simple ILIKE on title/excerpt
+    // Fallback for pg-mem: match the same complete content with simple ILIKE.
     const likeQuery = `%${query}%`;
-    return await db
+    const rows = await db
       .select({
         id: noteMetadata.id,
         title: noteMetadata.title,
@@ -139,18 +146,21 @@ export class MetadataRepository {
         version: noteMetadata.version,
         createdAt: noteMetadata.createdAt,
         updatedAt: noteMetadata.updatedAt,
+        searchText: noteMetadata.searchText,
       })
       .from(noteMetadata)
       .where(
         and(
           eq(noteMetadata.projectId, projectId),
           eq(noteMetadata.userId, userId),
-          sql`(${noteMetadata.title} ILIKE ${likeQuery} OR ${noteMetadata.excerpt} ILIKE ${likeQuery})`
+          sql`(${noteMetadata.title} ILIKE ${likeQuery} OR ${noteMetadata.searchText} ILIKE ${likeQuery})`
         )
       )
-      .orderBy(sortDirection === 'desc' ? desc(noteMetadata.updatedAt) : asc(noteMetadata.updatedAt))
-      .limit(limit)
-      .offset(offset);
+      .orderBy(desc(sql`CASE WHEN ${noteMetadata.title} ILIKE ${likeQuery} THEN 1 ELSE 0 END`),
+        sortDirection === 'desc' ? desc(noteMetadata.updatedAt) : asc(noteMetadata.updatedAt), asc(noteMetadata.id))
+      .limit(pageSize)
+      .offset(pageOffset);
+    return rows.map(({ searchText, ...row }) => ({ ...row, snippet: searchSnippet(searchText ?? '', query) }));
   }
 
   /**
@@ -160,15 +170,13 @@ export class MetadataRepository {
   static async updateNoteMetadata(
     id: string,
     currentVersion: number,
-    updates: Partial<{ title: string; excerpt: string; bodyKey: string }>,
+    updates: Partial<{ title: string; excerpt: string; searchText: string; bodyKey: string }>,
     validateReferences?: (tx: NoteTransaction) => Promise<void>
   ): Promise<NoteMetadata> {
     const existing = await this.getNoteMetadata(id);
     if (!existing) throw new Error('Note not found');
 
     const newTitle = updates.title ?? existing.title;
-    const newExcerpt = updates.excerpt ?? existing.excerpt;
-
     return commitRevision(updates.bodyKey, existing.bucketPath, async (tx) => {
       await validateReferences?.(tx);
       const [record] = await tx
@@ -181,7 +189,9 @@ export class MetadataRepository {
               updatedAt: new Date(),
             };
             if (!(typeof env.databaseUrl === 'string' && env.databaseUrl.startsWith('pgmem://'))) {
-              base.searchVector = buildSearchVector(newTitle, newExcerpt);
+              // A title-only update must read the current indexed body in SQL:
+              // a concurrent backfill may have populated it after `existing`.
+              base.searchVector = buildSearchVector(newTitle, updates.searchText ?? sql`COALESCE(${noteMetadata.searchText}, '')`);
             }
             return base;
           })(),

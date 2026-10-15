@@ -13,6 +13,7 @@ export const noteMetadata = pgTable('note_metadata', {
   userId: text('user_id').notNull(),
   title: text('title').notNull(),
   excerpt: text('excerpt').notNull().default(''),
+  searchText: text('search_text'),
   bucketPath: text('bucket_path').notNull(),
   bodyKey: text('body_key').notNull().default('body.md'),
   searchVector: tsvector('search_vector'),

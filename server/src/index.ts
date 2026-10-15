@@ -90,6 +90,8 @@ async function main() {
     // Bucket creation follows the existing first-write provisioning policy.
     const { initializeObjectStorage } = await import('./lib/dependency-readiness.js');
     await initializeObjectStorage();
+    const { backfillNoteSearchIndex } = await import('./modules/notes/services/search-backfill.js');
+    await backfillNoteSearchIndex();
     await startServiceTokens();
     if (!isShuttingDown) {
       stopMcpEventBridge = startMcpEventBridge();
