@@ -57,10 +57,8 @@ function buildMessagePreview(content: string) {
   return `${trimmed.slice(0, CHAT_MESSAGE_PREVIEW_LENGTH - 1).trimEnd()}…`;
 }
 
-function isToolMessage(metadata: unknown) {
-  return metadata !== null && typeof metadata === 'object' && !Array.isArray(metadata)
-    && (metadata as Record<string, unknown>).source === 'tool';
-}
+// Replay reads persisted rows directly. Browser-facing chat history excludes tool results.
+const visibleChatMessage = sql`coalesce(${chatMessages.metadata}->>'source', '') <> 'tool'`;
 
 async function loadLastMessagePreviews(sessionIds: string[]): Promise<Map<string, string>> {
   if (sessionIds.length === 0) {
@@ -75,7 +73,7 @@ async function loadLastMessagePreviews(sessionIds: string[]): Promise<Map<string
     .from(chatMessages)
     .where(and(
       inArray(chatMessages.sessionId, sessionIds),
-      sql`coalesce(${chatMessages.metadata}->>'source', '') <> 'tool'`,
+      visibleChatMessage,
     ))
     .orderBy(chatMessages.sessionId, desc(chatMessages.createdAt), desc(chatMessages.id));
 
@@ -377,16 +375,10 @@ export function createChatsRouter() {
       const messageRows = await db
         .select()
         .from(chatMessages)
-        .where(eq(chatMessages.sessionId, chatId))
+        .where(and(eq(chatMessages.sessionId, chatId), visibleChatMessage))
         .orderBy(asc(chatMessages.createdAt), asc(chatMessages.id));
 
-      let lastMessage: (typeof messageRows)[number] | undefined;
-      for (let index = messageRows.length - 1; index >= 0; index--) {
-        if (!isToolMessage(messageRows[index].metadata)) {
-          lastMessage = messageRows[index];
-          break;
-        }
-      }
+      const lastMessage = messageRows[messageRows.length - 1];
       const lastMessagePreview = lastMessage ? buildMessagePreview(lastMessage.content) : null;
 
       res.json({

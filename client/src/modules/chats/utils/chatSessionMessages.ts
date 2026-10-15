@@ -24,22 +24,11 @@ export function normalizeChatHistoryRole(role: string): Message['role'] {
 }
 
 export function toChatMessages(detail: ChatSessionDetail): Message[] {
-  const transcript = detail.messages
+  return detail.messages
     .filter((message) => !isToolSourced(message.metadata))
     .map((message) => ({
       role: normalizeChatHistoryRole(message.role),
       content: message.content,
     }))
     .filter((message) => message.content.trim().length > 0);
-
-  if (transcript.length > 0) {
-    return transcript;
-  }
-
-  if (detail.messages.some((message) => isToolSourced(message.metadata))) {
-    return [];
-  }
-
-  const preview = detail.lastMessagePreview?.trim();
-  return preview ? [{ role: 'system', content: `Latest activity: ${preview}` }] : [];
 }

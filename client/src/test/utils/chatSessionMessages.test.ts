@@ -33,6 +33,7 @@ describe('reopened chat transcript', () => {
     expect(toChatMessages(detail([
       { role: 'system', content: 'Tool output (get_ticket): {"id":"internal-123"}', metadata: { source: 'tool' } },
     ], 'Tool output (get_ticket): {"id":"internal-123"}'))).toEqual([]);
+    expect(toChatMessages(detail([], 'Tool output (get_ticket): {"id":"internal-123"}'))).toEqual([]);
   });
 
   it('keeps user-facing system errors', () => {

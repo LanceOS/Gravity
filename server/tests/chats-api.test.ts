@@ -8,7 +8,7 @@ import { createId } from '../src/lib/platform.js';
 import { userSettings } from '../src/modules/users/schema.js';
 
 describe('chat sessions routes', () => {
-  it('uses only user-visible rows for list and detail previews while retaining tool rows', async () => {
+  it('excludes tool rows from list previews and reopened chat details', async () => {
     const ownerApi = await createAuthenticatedApi({
       name: 'Preview Owner', email: 'preview-owner@example.com', role: 'owner',
     });
@@ -20,7 +20,7 @@ describe('chat sessions routes', () => {
     const chatId = chat.body.id;
     await db.insert(chatMessages).values([
       { id: 'visible-message', sessionId: chatId, role: 'user', content: 'Show my tickets', metadata: {}, createdAt: new Date('2026-01-01T00:00:00.000Z') },
-      { id: 'tool-message', sessionId: chatId, role: 'system', content: 'Tool output (list_tickets): {"id":"internal-123"}', metadata: { source: 'tool' }, createdAt: new Date('2026-01-01T00:00:01.000Z') },
+      { id: 'tool-message', sessionId: chatId, role: 'system', content: 'Tool output (list_tickets): {"id":"internal-123"}', metadata: { source: 'tool', toolCall: { id: 'legacy-call', name: 'list_tickets' } }, createdAt: new Date('2026-01-01T00:00:01.000Z') },
     ]);
 
     const list = await ownerApi.get(`/api/v1/projects/${project.id}/chats`);
@@ -30,8 +30,10 @@ describe('chat sessions routes', () => {
     const detail = await ownerApi.get(`/api/v1/projects/${project.id}/chats/${chatId}`);
     expect(detail.status).toBe(200);
     expect(detail.body.lastMessagePreview).toBe('Show my tickets');
-    expect(detail.body.messages).toHaveLength(2);
-    expect(detail.body.messages[1]).toMatchObject({ id: 'tool-message', metadata: { source: 'tool' } });
+    expect(detail.body.messages).toMatchObject([{ id: 'visible-message', content: 'Show my tickets' }]);
+    expect(JSON.stringify(detail.body)).not.toContain('internal-123');
+    expect(JSON.stringify(detail.body)).not.toContain('legacy-call');
+    expect(await db.select().from(chatMessages).where(eq(chatMessages.id, 'tool-message'))).toHaveLength(1);
 
     const toolOnlyChat = await ownerApi.post(`/api/v1/projects/${project.id}/chats`).send({ title: 'Tool Only' });
     await db.insert(chatMessages).values({
@@ -43,7 +45,8 @@ describe('chat sessions routes', () => {
     expect(listWithToolOnly.body.find((session: { id: string }) => session.id === toolOnlyChat.body.id).lastMessagePreview).toBeNull();
     const toolOnlyDetail = await ownerApi.get(`/api/v1/projects/${project.id}/chats/${toolOnlyChat.body.id}`);
     expect(toolOnlyDetail.body.lastMessagePreview).toBeNull();
-    expect(toolOnlyDetail.body.messages).toHaveLength(1);
+    expect(toolOnlyDetail.body.messages).toEqual([]);
+    expect(JSON.stringify(toolOnlyDetail.body)).not.toContain('internal-456');
   });
 
   it('creates, lists, updates, retrieves with messages, paginates, and deletes chat sessions', async () => {
@@ -203,9 +206,7 @@ describe('chat sessions routes', () => {
     expect(getWithMessages.body.messages).toHaveLength(3);
     expect(getWithMessages.body.messages[0].content).toBe('Draft release strategy.');
     expect(getWithMessages.body.messages[1].content).toBe('Planned approach logged.');
-    // The single-session detail endpoint must compute a real preview from its own
-    // message rows, not hardcode null — the client falls back to this text when a
-    // chat's transcript renders empty, so a stale null silently blanks the chat.
+    // The detail preview should agree with the latest user-visible row.
     expect(getWithMessages.body.lastMessagePreview).toBe('Context references updated.');
 
     const sharedMessageTime = new Date('2026-01-02T12:00:00.000Z');
