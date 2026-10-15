@@ -5,7 +5,6 @@ export const CSP_REPORT_PATH = '/api/v1/csp-reports';
 const WINDOW_MS = 60_000;
 const MAX_REQUESTS_PER_WINDOW = 120;
 const MAX_REPORTS_PER_REQUEST = 20;
-const MAX_BUCKETS = 32;
 
 const knownDirectives = new Set([
   'base-uri', 'connect-src', 'default-src', 'font-src', 'form-action',
@@ -13,6 +12,9 @@ const knownDirectives = new Set([
   'script-src-attr', 'script-src-elem', 'style-src', 'style-src-attr',
   'style-src-elem', 'trusted-types', 'require-trusted-types-for',
 ]);
+// Each key is drawn from a fixed directive × 11-kind vocabulary. Keeping the
+// whole vocabulary prevents forged reports from hiding later real ones.
+const MAX_BUCKETS = (knownDirectives.size + 1) * 11; // +1 for "other"
 
 type Bucket = { directive: string; blockedKind: string; count: number };
 
@@ -85,6 +87,9 @@ export class CspReportCollector {
   }
 
   record(payload: unknown): void {
+    // Body parsing is asynchronous. The preceding request may have crossed
+    // the minute boundary while its bytes were arriving.
+    this.advance();
     const entries = Array.isArray(payload) ? payload : [payload];
     for (const entry of entries.slice(0, MAX_REPORTS_PER_REQUEST)) {
       const bucket = violation(entry);
@@ -104,15 +109,19 @@ export class CspReportCollector {
   flush(): void {
     if (this.timer) clearTimeout(this.timer);
     this.timer = undefined;
-    if (this.requests || this.droppedRequests) {
-      info('csp_violations', {
-        windowSeconds: WINDOW_MS / 1000,
-        requests: this.requests,
-        droppedRequests: this.droppedRequests,
-        ignoredReports: this.ignoredReports,
-        violations: [...this.buckets.values()].sort((a, b) =>
-          a.directive.localeCompare(b.directive) || a.blockedKind.localeCompare(b.blockedKind)),
-      });
+    if (this.requests || this.droppedRequests || this.ignoredReports || this.buckets.size) {
+      try {
+        info('csp_violations', {
+          windowSeconds: WINDOW_MS / 1000,
+          requests: this.requests,
+          droppedRequests: this.droppedRequests,
+          ignoredReports: this.ignoredReports,
+          violations: [...this.buckets.values()].sort((a, b) =>
+            a.directive.localeCompare(b.directive) || a.blockedKind.localeCompare(b.blockedKind)),
+        });
+      } catch {
+        // A failed diagnostic sink must not take down the HTTP service.
+      }
     }
     this.windowStarted = Date.now();
     this.requests = 0;
@@ -122,11 +131,13 @@ export class CspReportCollector {
   }
 }
 
-export function createCspReportRouter() {
+export function createCspReportRouter(collector = new CspReportCollector()) {
   const router = express.Router();
-  const collector = new CspReportCollector();
-  const limit: RequestHandler = (_req, res, next) => {
+  const noStore: RequestHandler = (_req, res, next) => {
     res.setHeader('Cache-Control', 'no-store');
+    next();
+  };
+  const limit: RequestHandler = (_req, res, next) => {
     if (!collector.allowRequest()) {
       res.setHeader('Retry-After', '60');
       res.sendStatus(429);
@@ -153,15 +164,15 @@ export function createCspReportRouter() {
     collector.record(payload);
     res.sendStatus(204);
   };
-  router.post(CSP_REPORT_PATH, limit,
+  router.post(CSP_REPORT_PATH, noStore,
     // Parse every content type so an unsupported type cannot bypass the byte cap.
     express.raw({ type: () => true, limit: '16kb', inflate: false }),
-    accept);
-  const bodyError: ErrorRequestHandler = (error: unknown, _req, res, next) => {
+    limit, accept);
+  const bodyError: ErrorRequestHandler = (error: unknown, _req, res) => {
     const parserError = object(error);
     if (parserError?.type === 'entity.too.large') res.sendStatus(413);
     else if (parserError?.type === 'encoding.unsupported') res.sendStatus(415);
-    else next(error);
+    else res.sendStatus(400);
   };
   router.use(CSP_REPORT_PATH, bodyError);
   return router;

@@ -139,6 +139,14 @@ describe('createApp', () => {
     expect(nginxPolicy).toContain('trusted-types gravity-editor dompurify ProseMirrorClipboard');
     expect(nginxPolicy).toContain("require-trusted-types-for 'script'");
     expect(nginxPolicy).toContain('report-uri /api/v1/csp-reports');
+    const reportLocation = nginxTemplate.match(/location = \/api\/v1\/csp-reports \{([\s\S]*?)\n  \}/)?.[1];
+    expect(reportLocation).toContain('access_log off;');
+    expect(reportLocation).toContain('client_max_body_size 16k;');
+    expect(reportLocation).toContain('proxy_pass ${BACKEND_UPSTREAM};');
+    for (const header of ['Authorization', 'Cookie', 'Referer', 'Forwarded', 'X-Forwarded-Host',
+      'X-Real-IP', 'X-Forwarded-For', 'X-Forwarded-Proto']) {
+      expect(reportLocation).toContain(`proxy_set_header ${header} "";`);
+    }
   });
 
   it('sets security headers on the SPA fallback, direct shell request, and unknown API routes', async () => {

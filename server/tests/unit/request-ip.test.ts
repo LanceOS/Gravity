@@ -82,11 +82,12 @@ describe('rate limit consumers and ingress', () => {
     expect(keys[0]).toMatch(/:192\.0\.2\.10$/);
   });
 
-  it('overwrites untrusted client IP headers at both nginx ingress locations', () => {
+  it('overwrites untrusted client IP headers and strips them from CSP reports', () => {
     const nginx = readFileSync(new URL('../../../client/nginx.template.conf', import.meta.url), 'utf8');
     expect(nginx).not.toContain('$proxy_add_x_forwarded_for');
     expect(nginx.match(/proxy_set_header X-Forwarded-For \$remote_addr;/g)).toHaveLength(2);
     expect(nginx.match(/proxy_set_header X-Forwarded-Host \$host;/g)).toHaveLength(2);
-    expect(nginx.match(/proxy_set_header Forwarded "";/g)).toHaveLength(2);
+    expect(nginx.match(/proxy_set_header Forwarded "";/g)).toHaveLength(3);
+    expect(nginx).toContain('proxy_set_header X-Forwarded-For "";');
   });
 });
