@@ -937,18 +937,17 @@ async function bootstrapDatabase() {
   // Ensure note_metadata has excerpt and full-text search vector columns/indexes
   await pool.query(`
     ALTER TABLE note_metadata ADD COLUMN IF NOT EXISTS excerpt TEXT NOT NULL DEFAULT '';
+    ALTER TABLE note_metadata ADD COLUMN IF NOT EXISTS search_text TEXT;
+    ALTER TABLE note_metadata ADD COLUMN IF NOT EXISTS search_indexed_version INTEGER;
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS note_metadata_search_backfill_idx ON note_metadata (id)
+      WHERE search_text IS NULL OR COALESCE(search_indexed_version, 0) <> version;
   `);
   // Add search_vector column and indexes only when running against real Postgres.
   if (!env.databaseUrl.startsWith('pgmem://')) {
     await pool.query(`
       ALTER TABLE note_metadata ADD COLUMN IF NOT EXISTS search_vector tsvector;
-    `);
-
-    // Backfill search_vector safely
-    await pool.query(`
-      UPDATE note_metadata
-      SET search_vector = to_tsvector('english', COALESCE(title, '') || ' ' || COALESCE(excerpt, ''))
-      WHERE search_vector IS NULL;
     `);
 
     await pool.query(`

@@ -13,6 +13,8 @@ export const noteMetadata = pgTable('note_metadata', {
   userId: text('user_id').notNull(),
   title: text('title').notNull(),
   excerpt: text('excerpt').notNull().default(''),
+  searchText: text('search_text'),
+  searchIndexedVersion: integer('search_indexed_version'),
   bucketPath: text('bucket_path').notNull(),
   bodyKey: text('body_key').notNull().default('body.md'),
   searchVector: tsvector('search_vector'),
@@ -24,6 +26,8 @@ export const noteMetadata = pgTable('note_metadata', {
   projectIdUserIdIdx: index('note_metadata_project_id_user_id_idx').on(table.projectId, table.userId),
   projectIdUserIdUpdatedAtIdx: index('note_metadata_project_id_user_id_updated_at_idx').on(table.projectId, table.userId, table.updatedAt),
   searchIdx: index('note_metadata_search_idx').using('gin', table.searchVector),
+  searchBackfillIdx: index('note_metadata_search_backfill_idx').on(table.id)
+    .where(sql`search_text IS NULL OR COALESCE(search_indexed_version, 0) <> version`),
 }));
 
 // Upload intents survive process crashes. Committed revisions are retained for

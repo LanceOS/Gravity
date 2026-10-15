@@ -6,80 +6,13 @@ import { MetadataRepository, NotesRepository, NoteRevisionRepository } from '../
 import { RustFS } from '../../../lib/rustfs.js';
 import { cleanupMedia, type CleanupOptions, type MediaCleanupDependencies } from './media-cleanup.js';
 import { assertNoteAttachmentsUnshared, validateMediaReferences } from './media-deletion.js';
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-}
+import { noteExcerpt, noteSearchText } from '../search-text.js';
 
 type NoteMetadata = NonNullable<Awaited<ReturnType<typeof MetadataRepository.getNoteMetadata>>>;
 
 export type NoteCleanupDependencies = MediaCleanupDependencies & {
   getMetadata: (id: string) => Promise<NoteMetadata | null>;
 };
-
-function extractRichTextExcerpt(body: string): string | null {
-  try {
-    const parsed = JSON.parse(body);
-    if (!isRecord(parsed) || parsed.type !== 'doc' || !Array.isArray(parsed.content)) {
-      return null;
-    }
-
-    const fragments: string[] = [];
-
-    const visit = (node: unknown) => {
-      if (typeof node === 'string') {
-        fragments.push(node);
-        return;
-      }
-
-      if (!isRecord(node)) {
-        return;
-      }
-
-      if (typeof node.text === 'string' && node.text.length > 0) {
-        fragments.push(node.text);
-      }
-
-      if (node.type === 'hard_break') {
-        fragments.push(' ');
-      }
-
-      if (Array.isArray(node.content)) {
-        for (const child of node.content) {
-          visit(child);
-        }
-      }
-    };
-
-    for (const child of parsed.content) {
-      visit(child);
-    }
-
-    return fragments.join(' ').replace(/\s+/g, ' ').trim();
-  } catch {
-    return null;
-  }
-}
-
-function extractExcerpt(body: string, maxLength: number = 500): string {
-  const richTextExcerpt = extractRichTextExcerpt(body);
-  if (richTextExcerpt !== null) {
-    return richTextExcerpt.length > maxLength
-      ? `${richTextExcerpt.substring(0, maxLength)}...`
-      : richTextExcerpt;
-  }
-
-  // Strip simple markdown formatting for legacy note bodies.
-  const plainText = body
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // links
-    .replace(/[#*`_~]/g, '') // formatting
-    .replace(/\n+/g, ' ') // newlines
-    .trim();
-  
-  return plainText.length > maxLength 
-    ? plainText.substring(0, maxLength) + '...'
-    : plainText;
-}
 
 export async function createNote(
   projectId: string,
@@ -90,7 +23,8 @@ export async function createNote(
   const noteUuid = randomUUID();
   const noteId = `note-${noteUuid}`;
   const bucketPath = RustFS.getBucketPath(projectId, userId, noteUuid);
-  const excerpt = extractExcerpt(body);
+  const searchText = noteSearchText(body);
+  const excerpt = noteExcerpt(searchText);
 
   const bodyKey = `.revisions/${randomUUID()}.md`;
   await NoteRevisionRepository.stage(bucketPath, bodyKey);
@@ -98,14 +32,15 @@ export async function createNote(
   try {
     await NotesRepository.saveBody(bucketPath, body, bodyKey);
     metadata = await MetadataRepository.createNoteMetadata({
-      id: noteId, projectId, userId, title, excerpt, bucketPath, bodyKey,
+      id: noteId, projectId, userId, title, excerpt, searchText, bucketPath, bodyKey,
     }, tx => validateMediaReferences(body, tx));
   } catch (err) {
     await discardRevision(bodyKey);
     throw err;
   }
 
-  return { ...metadata, body };
+  const { searchText: _searchText, ...publicMetadata } = metadata;
+  return { ...publicMetadata, body };
 }
 
 export async function getNote(noteId: string, projectId: string) {
@@ -116,10 +51,12 @@ export async function getNote(noteId: string, projectId: string) {
 
   try {
     const body = await NotesRepository.getBody(metadata.bucketPath, metadata.bodyKey);
-    return { ...metadata, body };
+    const { searchText: _searchText, ...publicMetadata } = metadata;
+    return { ...publicMetadata, body };
   } catch (err: any) {
     if (err.code === 'ENOENT' && metadata.bodyKey === 'body.md') {
-      return { ...metadata, body: '' }; // Fallback if file is missing somehow
+      const { searchText: _searchText, ...publicMetadata } = metadata;
+      return { ...publicMetadata, body: '' }; // Fallback if file is missing somehow
     }
     throw err;
   }
@@ -137,7 +74,8 @@ export async function updateNote(
   }
 
   if (existing.version !== currentVersion) throw new Error('CONFLICT');
-  const newExcerpt = updates.body !== undefined ? extractExcerpt(updates.body) : existing.excerpt;
+  const searchText = updates.body !== undefined ? noteSearchText(updates.body) : undefined;
+  const newExcerpt = searchText !== undefined ? noteExcerpt(searchText) : existing.excerpt;
   const bodyKey = updates.body !== undefined ? `.revisions/${randomUUID()}.md` : undefined;
   let body = updates.body;
   // Read the captured immutable pointer before committing title-only changes.
@@ -154,7 +92,7 @@ export async function updateNote(
   try {
     if (bodyKey) await NotesRepository.saveBody(existing.bucketPath, body, bodyKey);
     updatedMeta = await MetadataRepository.updateNoteMetadata(noteId, currentVersion, {
-      title: updates.title, excerpt: newExcerpt, ...(bodyKey ? { bodyKey } : {}),
+      title: updates.title, excerpt: newExcerpt, ...(searchText !== undefined ? { searchText } : {}), ...(bodyKey ? { bodyKey } : {}),
     }, updates.body !== undefined ? tx => validateMediaReferences(updates.body!, tx) : undefined);
   } catch (err: any) {
     if (bodyKey) await discardRevision(bodyKey);
@@ -163,7 +101,8 @@ export async function updateNote(
     throw err;
   }
 
-  return { ...updatedMeta, body };
+  const { searchText: _searchText, ...publicMetadata } = updatedMeta;
+  return { ...publicMetadata, body };
 }
 
 export async function deleteNote(noteId: string, projectId: string) {
