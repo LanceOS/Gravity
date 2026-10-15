@@ -68,6 +68,65 @@ function renderWorkspaceDirectoryPage(overrides: Partial<Parameters<typeof Works
 }
 
 describe('WorkspaceDirectoryPage', () => {
+  it('keeps the email masked by default, reveals and hides it from the keyboard, then masks it on return', async () => {
+    const user = userEvent.setup();
+    const page = renderWorkspaceDirectoryPage();
+    const viewButton = screen.getByRole('button', { name: 'View email' });
+
+    expect(screen.queryByText(currentUser.email)).not.toBeInTheDocument();
+    expect(document.body.innerHTML).not.toContain(currentUser.email);
+    expect(screen.getByText('••••••••')).toBeInTheDocument();
+    expect(screen.getByText('Email hidden')).toBeInTheDocument();
+    expect(viewButton).toHaveAttribute('aria-expanded', 'false');
+    expect(document.getElementById(viewButton.getAttribute('aria-controls')!)).toHaveTextContent('Email hidden');
+    expect(viewButton).not.toHaveAttribute('title');
+    expect(viewButton.getAttribute('aria-label')).not.toContain(currentUser.email);
+
+    viewButton.focus();
+    await user.keyboard('{Enter}');
+    const hideButton = screen.getByRole('button', { name: 'Hide email' });
+    expect(screen.getByText(currentUser.email)).toBeInTheDocument();
+    expect(hideButton).toHaveAttribute('aria-expanded', 'true');
+
+    await user.keyboard(' ');
+    expect(screen.queryByText(currentUser.email)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'View email' })).toHaveAttribute('aria-expanded', 'false');
+    expect(document.body.innerHTML).not.toContain(currentUser.email);
+
+    await user.click(screen.getByRole('button', { name: 'View email' }));
+    expect(screen.getByText(currentUser.email)).toBeInTheDocument();
+    page.unmount();
+    renderWorkspaceDirectoryPage();
+    expect(screen.queryByText(currentUser.email)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'View email' })).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('masks the email when the current user or their address changes without unmounting the directory', async () => {
+    const user = userEvent.setup();
+    const page = renderWorkspaceDirectoryPage();
+    const nextUser = { ...currentUser, id: 'user-2', email: 'robin@example.com' };
+
+    await user.click(screen.getByRole('button', { name: 'View email' }));
+    expect(screen.getByText(currentUser.email)).toBeInTheDocument();
+
+    page.rerender(<WorkspaceDirectoryPage {...page.props} currentUser={nextUser} />);
+    expect(document.body.innerHTML).not.toContain(nextUser.email);
+    expect(document.body.innerHTML).not.toContain(currentUser.email);
+    expect(screen.getByRole('button', { name: 'View email' })).toHaveAttribute('aria-expanded', 'false');
+
+    await user.click(screen.getByRole('button', { name: 'View email' }));
+    expect(screen.getByText(nextUser.email)).toBeInTheDocument();
+
+    const updatedUser = { ...nextUser, email: 'robin.new@example.com' };
+    page.rerender(<WorkspaceDirectoryPage {...page.props} currentUser={updatedUser} />);
+    expect(document.body.innerHTML).not.toContain(updatedUser.email);
+    expect(screen.getByRole('button', { name: 'View email' })).toHaveAttribute('aria-expanded', 'false');
+
+    page.rerender(<WorkspaceDirectoryPage {...page.props} currentUser={currentUser} />);
+    expect(document.body.innerHTML).not.toContain(currentUser.email);
+    expect(screen.getByRole('button', { name: 'View email' })).toHaveAttribute('aria-expanded', 'false');
+  });
+
   it('renders workspace cards and top-level account actions', async () => {
     const user = userEvent.setup({ delay: 0 });
     const { props } = renderWorkspaceDirectoryPage({
@@ -167,6 +226,14 @@ describe('WorkspaceDirectoryPage', () => {
 
     // Trigger resize to force isMobile state to true
     window.dispatchEvent(new Event('resize'));
+
+    expect(screen.queryByText(currentUser.email)).not.toBeInTheDocument();
+    const viewEmailButton = screen.getByRole('button', { name: 'View email' });
+    expect(viewEmailButton).toHaveStyle({ width: '48px', height: '48px' });
+    await user.click(viewEmailButton);
+    expect(screen.getByText(currentUser.email)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Hide email' }));
+    expect(screen.queryByText(currentUser.email)).not.toBeInTheDocument();
 
     // Verify accordion button is visible
     const accordionButton = screen.getByRole('button', { name: /Create or Join Workspace/i });
