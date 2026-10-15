@@ -887,10 +887,13 @@
 
 .workspace-page__tickets-loading {
   height: 100%;
-  display: grid;
-  place-items: center;
-  gap: 14px;
-  padding: 48px 24px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 24px;
   text-align: center;
   color: var(--color-text-disabled);
 }
