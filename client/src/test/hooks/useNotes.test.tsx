@@ -8,7 +8,6 @@ describe('useNotes', () => {
   const baseNoteMetadata = {
     projectId: 'proj-1',
     userId: 'user-1',
-    visibility: 'private' as const,
     createdAt: '2026-05-01T00:00:00.000Z',
     updatedAt: '2026-05-01T00:00:00.000Z',
   };
