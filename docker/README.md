@@ -1,13 +1,16 @@
-This Docker Compose setup attaches services to an internal network to avoid port conflicts.
+This Docker Compose setup attaches services to an internal network.
 
-From the repository root, copy `.env.example` to `.env` and fill in the four
+From the repository root, copy `.env.example` to `.env` and fill in the five
 required secrets described in
 [deployment configuration](../docs/deployment-configuration.md). The `docker/`
 Compose file reads `../.env`; `docker/.env.example` is only a reference template.
 Run Compose from the repository root, or pass `--env-file ../.env` when running
 from `docker/`. A missing `.env` or empty required secret stops configuration.
 
-The `frontend` service is published to the host by default so you can access the UI in your browser at `http://localhost:${GRAVITY_FRONTEND_PORT:-5173}`.
+The `frontend` service is published on loopback by default, at
+`http://localhost:${GRAVITY_FRONTEND_PORT:-5173}`. Set `GRAVITY_BIND_ADDRESS`
+only if another host interface is required; `0.0.0.0` exposes the port on every
+interface.
 
 Start the stack:
 

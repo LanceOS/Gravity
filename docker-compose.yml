@@ -3,6 +3,7 @@ services:
     image: docker.io/library/postgres:16-alpine
     restart: unless-stopped
     environment:
+      NODE_ENV: ${NODE_ENV:-production}
       POSTGRES_DB: ${GRAVITY_POSTGRES_DB:-gravity_workspace}
       POSTGRES_USER: ${GRAVITY_POSTGRES_USER:-gravity_user}
       POSTGRES_PASSWORD: ${GRAVITY_POSTGRES_PASSWORD:?Set GRAVITY_POSTGRES_PASSWORD in .env}
@@ -22,6 +23,7 @@ services:
     image: docker.io/library/redis:7-alpine
     restart: unless-stopped
     environment:
+      NODE_ENV: ${NODE_ENV:-production}
       GRAVITY_REDIS_PASSWORD: ${GRAVITY_REDIS_PASSWORD:?Set GRAVITY_REDIS_PASSWORD in .env}
     entrypoint: ["/bin/sh", "/usr/local/bin/gravity-start-service", "redis"]
     volumes:
@@ -44,7 +46,7 @@ services:
       RUSTFS_CONSOLE_ADDRESS: 0.0.0.0:9001
       RUSTFS_CONSOLE_ENABLE: true
       RUSTFS_ACCESS_KEY: ${RUSTFS_ACCESS_KEY:-admin}
-      RUSTFS_SECRET_KEY: ${RUSTFS_SECRET_KEY:-password}
+      RUSTFS_SECRET_KEY: ${RUSTFS_SECRET_KEY:?Set RUSTFS_SECRET_KEY in .env}
     volumes:
       - gravity_rustfs_data:/data/rustfs
       - gravity_rustfs_logs:/logs
@@ -77,7 +79,7 @@ services:
       TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
       RUSTFS_ENDPOINT: ${RUSTFS_ENDPOINT:-http://rustfs:9000}
       RUSTFS_ACCESS_KEY: ${RUSTFS_ACCESS_KEY:-admin}
-      RUSTFS_SECRET_KEY: ${RUSTFS_SECRET_KEY:-password}
+      RUSTFS_SECRET_KEY: ${RUSTFS_SECRET_KEY:?Set RUSTFS_SECRET_KEY in .env}
       RUSTFS_BUCKET: ${RUSTFS_BUCKET:-notes}
       OBJECT_STORAGE_REQUIRED: ${OBJECT_STORAGE_REQUIRED:-true}
       REDIS_REQUIRED: ${REDIS_REQUIRED:-false}
@@ -131,7 +133,7 @@ services:
     environment:
       BACKEND_UPSTREAM: http://backend:8080
     ports:
-      - "${GRAVITY_FRONTEND_PORT:-5173}:5173"
+      - "${GRAVITY_BIND_ADDRESS:-127.0.0.1}:${GRAVITY_FRONTEND_PORT:-5173}:5173"
     depends_on:
       backend:
         condition: service_healthy

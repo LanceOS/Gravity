@@ -3,15 +3,23 @@
 ## Compose secret setup
 
 From the repository root, run `cp .env.example .env` before using any Compose
-file. Keep `.env` private (`chmod 600 .env` on Unix). Generate four independent values with
+file. Keep `.env` private (`chmod 600 .env` on Unix). Generate five independent values with
 `openssl rand -hex 32` and set `GRAVITY_POSTGRES_PASSWORD`,
-`GRAVITY_REDIS_PASSWORD`, `BETTER_AUTH_SECRET`, and
-`NODE_IDENTITY_MASTER_KEY`. The root and `docker/` manifests require these
-values during Compose configuration; `server/docker-compose.yml` requires the
-two service passwords. Their PostgreSQL and Redis container entrypoints also
-exit immediately if either password is empty. Do not use example placeholders
-or a shared secret. Use URL-safe password characters because the root manifest
-places these values in connection URLs.
+`GRAVITY_REDIS_PASSWORD`, `BETTER_AUTH_SECRET`,
+`NODE_IDENTITY_MASTER_KEY`, and `RUSTFS_SECRET_KEY`. The root and `docker/`
+manifests require all five during Compose configuration;
+`server/docker-compose.yml` requires the PostgreSQL, Redis, and RustFS service
+passwords. The PostgreSQL and Redis entrypoints also exit immediately if either
+password is empty. Do not use example placeholders or a shared secret. Use
+URL-safe password characters because the app manifests place these values in
+connection URLs.
+
+`NODE_ENV=development` in `.env.example` is for a local stack. Production
+Compose defaults to `NODE_ENV=production` when it is unset. In production, the
+PostgreSQL and Redis entrypoints reject passwords shorter than 32 characters
+and familiar placeholder values. The backend rejects known application and
+storage secrets during its configuration check. Choose random values in every
+environment; development mode only relaxes the service password length check.
 
 Both app Compose files build `DATABASE_URL` and `REDIS_URL` from those values,
 overriding any URL values in the backend's `env_file`. The service passwords
@@ -25,10 +33,23 @@ Run the `docker/` variant from the repository root with
 `docker/` with `docker compose --env-file ../.env up -d`. Use the same `.env`
 for `server/docker-compose.yml` (`--env-file ../.env` from `server/`).
 The examples are templates only: copying one without setting the required
-values causes Compose to fail before it creates containers.
+values causes Compose to fail before it creates containers. On a fresh checkout
+without `.env`, Compose configuration fails; supply a completed `.env` before
+running `up`.
 Use `docker compose config --quiet` to validate a manifest without printing its
 resolved environment. Compose environment variables remain visible to users
 with access to the Docker API and the container configuration.
+Run `node scripts/docker/compose-secrets.test.mjs` from the repository root to
+check missing-secret failures and custom-password wiring across all three
+Compose manifests; this check does not start containers.
+
+Published ports in the root, `docker/`, and `server/` manifests bind to
+`127.0.0.1` by default. The root and `docker/` manifests publish the frontend;
+`server/` also publishes PostgreSQL, Redis, and RustFS for local development.
+Set `GRAVITY_BIND_ADDRESS` only when you deliberately need another host
+interface; `0.0.0.0` exposes these ports on every interface. Use an external
+reverse proxy and firewall for public access. The internal Docker networks do
+not replace host port access controls.
 
 For production, also set the browser origin, storage credentials, and webhook
 secret described below, then run the backend configuration check.

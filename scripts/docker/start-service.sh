@@ -17,6 +17,24 @@ validate_password() {
       exit 1
       ;;
   esac
+
+  case "${NODE_ENV:-production}" in
+    development|test) return ;;
+    production) ;;
+    *) echo 'NODE_ENV must be development, test, or production.' >&2; exit 1 ;;
+  esac
+
+  if [ "${#value}" -lt 32 ]; then
+    echo "$name must be at least 32 characters in production." >&2
+    exit 1
+  fi
+  normalized=$(printf '%s' "$value" | tr '[:upper:]' '[:lower:]')
+  case "$normalized" in
+    *password*|*placeholder*|*changeme*|*replace*|*example*|*default*|admin|redis|postgres|gravity|secret|testing)
+      echo "$name must not be a known or placeholder secret in production." >&2
+      exit 1
+      ;;
+  esac
 }
 
 case "${1:-}" in
