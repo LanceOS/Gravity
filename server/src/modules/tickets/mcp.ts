@@ -1421,7 +1421,7 @@ export const ticketToolDefinitions: McpToolDefinition[] = [
   },
   {
     name: 'delete_ticket',
-    description: 'Delete an existing ticket by ticket key.',
+    description: 'Permanently delete a ticket and its subticket subtree, including their comments, labels, and blocker/dependency relationships.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -1432,7 +1432,7 @@ export const ticketToolDefinitions: McpToolDefinition[] = [
   },
   {
     name: 'update_ticket',
-    description: 'Modify properties of an existing ticket by its unique ticket key.',
+    description: 'Modify a ticket by key. Setting status to done or canceled removes all of its blocker/dependency relationships. Setting labels or labelIds replaces all existing labels; null assigneeId, cycleId, or parentId clears that field and its association. Changing title regenerates the branch name.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -1762,8 +1762,8 @@ const searchProperties: Record<string, JsonSchema> = {
   updatedAfter: { type: 'string' }, updatedBefore: { type: 'string' },
 };
 
-function focusedTool(name: string, description: string, properties: Record<string, JsonSchema> = {}, required: string[] = []): McpToolDefinition {
-  return { name, description, annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+function focusedTool(name: string, description: string, properties: Record<string, JsonSchema> = {}, required: string[] = [], destructiveHint = false): McpToolDefinition {
+  return { name, description, annotations: { readOnlyHint: false, destructiveHint, idempotentHint: true, openWorldHint: false },
     inputSchema: { type: 'object', properties: { ticketKey: idSchema, ...properties }, required: ['ticketKey', ...required], additionalProperties: false } };
 }
 
@@ -1772,7 +1772,7 @@ for (const definition of ticketToolDefinitions) {
   schema.additionalProperties = false;
   definition.annotations = {
     readOnlyHint: /^(list_|get_|read_|preview_)/.test(definition.name),
-    destructiveHint: /^(delete_|remove_|unmark_|set_ticket_labels)/.test(definition.name),
+    destructiveHint: /^(delete_|remove_|unmark_|set_ticket_labels|update_ticket)/.test(definition.name),
     idempotentHint: !/^(create_|add_comment|add_ticket_dependency|mark_ticket_blocked|add_dependency)/.test(definition.name),
     openWorldHint: false,
   };
@@ -1821,19 +1821,19 @@ ticketToolDefinitions.push(
   { name: 'search_tickets', description: 'Search workspace tickets by createdAt and ID. Defaults to asc (oldest first); use desc and limit 1 for the newest ticket. Pages default to 50, maximum 100. Pass nextCursor with the same workspace, filters and order; page size may change. Legacy offset cursors must restart without a cursor. Inserts/deletes before the cursor do not shift pages; changes to creation times or filters are not a snapshot.',
     inputSchema: { type: 'object', properties: { ...searchProperties, order: { type: 'string', enum: ['asc', 'desc'], description: 'Creation time and ID direction; defaults to asc for compatibility.' }, cursor: { type: 'string', maxLength: 1024 } }, additionalProperties: false },
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false } },
-  focusedTool('set_ticket_status', 'Set only the ticket workflow status.', { status: statusSchema }, ['status']),
+  focusedTool('set_ticket_status', 'Set the ticket workflow status. Setting it to done or canceled removes all blocker/dependency relationships involving this ticket.', { status: statusSchema }, ['status'], true),
   focusedTool('set_ticket_priority', 'Set only the ticket priority.', { priority: prioritySchema }, ['priority']),
   focusedTool('assign_ticket', 'Assign a ticket to an eligible project user. Discover IDs with list_project_assignees.', { assigneeId: idSchema }, ['assigneeId']),
-  focusedTool('unassign_ticket', 'Clear the ticket assignee.'),
-  focusedTool('set_ticket_cycle', 'Schedule a ticket in a cycle belonging to its project team.', { cycleId: idSchema }, ['cycleId']),
-  focusedTool('clear_ticket_cycle', 'Remove the ticket from its cycle.'),
-  focusedTool('set_ticket_parent', 'Make a ticket a subtask of a ticket in the same project. Self and ancestor cycles are rejected.', { parentId: idSchema }, ['parentId']),
-  focusedTool('clear_ticket_parent', 'Detach a ticket from its parent.'),
+  focusedTool('unassign_ticket', 'Clear the ticket assignee.', {}, [], true),
+  focusedTool('set_ticket_cycle', 'Schedule a ticket in a cycle belonging to its project team, replacing any existing cycle assignment.', { cycleId: idSchema }, ['cycleId'], true),
+  focusedTool('clear_ticket_cycle', 'Remove the ticket from its cycle.', {}, [], true),
+  focusedTool('set_ticket_parent', 'Make a ticket a subtask of a ticket in the same project, replacing any existing parent relationship. Self and ancestor cycles are rejected.', { parentId: idSchema }, ['parentId'], true),
+  focusedTool('clear_ticket_parent', 'Detach a ticket from its parent.', {}, [], true),
   { ...focusedTool('edit_ticket_content', 'Edit the title or description of a ticket.', { title: { type: 'string', minLength: 1, maxLength: 1000 }, description: { type: 'string' } }),
     inputSchema: { ...focusedTool('', '').inputSchema, properties: { ticketKey: idSchema, title: { type: 'string', minLength: 1, maxLength: 1000 }, description: { type: 'string' } }, anyOf: [{ required: ['title'] }, { required: ['description'] }] } },
   { ...focusedTool('set_ticket_pr', 'Set the ticket pull-request status or URL; null clears its URL.', { prStatus: prStatusSchema, prUrl: { type: ['string', 'null'] } }),
     inputSchema: { ...focusedTool('', '').inputSchema, properties: { ticketKey: idSchema, prStatus: prStatusSchema, prUrl: { type: ['string', 'null'] } }, anyOf: [{ required: ['prStatus'] }, { required: ['prUrl'] }] } },
-  focusedTool('move_ticket', 'Move a ticket to a project in the same workspace. Detaches parent and children; clears incompatible cycles/labels. An assigned user must be eligible in the destination.', { projectId: idSchema }, ['projectId']),
+  focusedTool('move_ticket', 'Move a ticket to another project in the same workspace. Detaches it from its parent and detaches its children. A move to a different team clears its cycle and labels; a move from a flat-hierarchy project also clears its project labels. Its assignee must be eligible in the destination.', { projectId: idSchema }, ['projectId'], true),
 );
 
 // Keep each required alternative self-contained for strict JSON Schema validators.

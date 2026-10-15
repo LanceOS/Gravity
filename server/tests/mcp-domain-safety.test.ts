@@ -53,6 +53,23 @@ function pauseNextTransaction() {
 }
 
 describe('MCP domain safety and discovery', () => {
+  it('advertises destructive effects for ticket moves, terminal status updates, and removals', () => {
+    const tools = new Map(ticketToolDefinitions.map(tool => [tool.name, tool]));
+    for (const name of [
+      'delete_ticket', 'update_ticket', 'set_ticket_status', 'move_ticket',
+      'set_ticket_cycle', 'clear_ticket_cycle', 'set_ticket_parent', 'clear_ticket_parent', 'unassign_ticket',
+      'remove_ticket_labels', 'set_ticket_labels', 'unmark_ticket_blocked',
+    ]) {
+      expect(tools.get(name)?.annotations, name).toMatchObject({ readOnlyHint: false, destructiveHint: true });
+    }
+    expect(tools.get('list_tickets')?.annotations).toMatchObject({ readOnlyHint: true, destructiveHint: false });
+    expect(tools.get('assign_ticket')?.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: false });
+    expect(tools.get('move_ticket')?.description).toMatch(/detaches.*parent.*children.*cycle.*labels/i);
+    for (const name of ['update_ticket', 'set_ticket_status']) {
+      expect(tools.get(name)?.description, name).toMatch(/done or canceled.*blocker\/dependency relationships/i);
+    }
+  });
+
   it('advertises tool schemas that compile under the shared strict runtime validator', () => {
     for (const tool of [...ticketToolDefinitions, ...workspaceToolDefinitions]) {
       try { validateToolArguments(tool, {}); } catch (error) {

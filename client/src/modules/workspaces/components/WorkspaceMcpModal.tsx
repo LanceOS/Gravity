@@ -310,7 +310,7 @@ export function WorkspaceMcpModal({ workspaceId, workspaceName, isOpen, onClose,
                 <label key={tool.name} style={{ display: 'block', marginBottom: 'var(--space-sm)' }} title={tool.description}>
                   <input type="checkbox" checked={selectedTools.includes(tool.name)} disabled={tool.allowedForConnection === false}
                     onChange={event => setSelectedTools(names => event.target.checked ? [...names, tool.name] : names.filter(name => name !== tool.name))} />
-                  {' '}{mcpToolLabel(tool.name)} ({tool.annotations?.readOnlyHint === true ? 'read' : tool.annotations?.destructiveHint ? 'delete' : 'write'})
+                  {' '}{mcpToolLabel(tool.name)} ({tool.annotations?.destructiveHint === true ? 'destructive' : tool.annotations?.readOnlyHint === true ? 'read' : 'write'})
                 </label>
               ))}
             </div>
