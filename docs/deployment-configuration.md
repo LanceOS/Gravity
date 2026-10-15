@@ -9,17 +9,28 @@ file. Keep `.env` private (`chmod 600 .env` on Unix). Generate five independent 
 `NODE_IDENTITY_MASTER_KEY`, and `RUSTFS_SECRET_KEY`. The root and `docker/`
 manifests require all five during Compose configuration;
 `server/docker-compose.yml` requires the PostgreSQL, Redis, and RustFS service
-passwords. The PostgreSQL and Redis entrypoints also exit immediately if either
-password is empty. Do not use example placeholders or a shared secret. Use
-URL-safe password characters because the app manifests place these values in
-connection URLs.
+passwords; it does not run the backend or read its auth and identity secrets.
+Each service entrypoint also exits before launching if its secret is empty.
+Do not use example placeholders or a shared secret. Use URL-safe characters
+for the PostgreSQL and Redis passwords because the app manifests place those
+values in connection URLs.
 
 `NODE_ENV=development` in `.env.example` is for a local stack. Production
-Compose defaults to `NODE_ENV=production` when it is unset. In production, the
-PostgreSQL and Redis entrypoints reject passwords shorter than 32 characters
-and familiar placeholder values. The backend rejects known application and
-storage secrets during its configuration check. Choose random values in every
-environment; development mode only relaxes the service password length check.
+Compose defaults to `NODE_ENV=production` when it is unset and passes that
+mode to PostgreSQL, Redis, RustFS, and the backend where present. An invalid mode fails at
+service startup. All three service entrypoints reject familiar placeholders
+in every mode. In production, they also reject secrets shorter than 32
+characters or with fewer than eight distinct characters. The backend rejects
+known application and storage secrets during its configuration check. Choose
+independent random values in every environment; development and test mode
+only relax the service secret length and distinct-character checks. Compose
+interpolation catches missing and empty values, while the entrypoints and
+backend perform the additional startup checks.
+Do not use `NODE_ENV=development` for a public deployment: it relaxes these
+service checks and the backend's production configuration checks.
+The development override enables encrypted credentials by default and needs an
+independent `LOCAL_TESTING_KEK` value; set
+`ENCRYPTED_CREDENTIALS_MODE=disabled` if those features are not needed locally.
 
 Both app Compose files build `DATABASE_URL` and `REDIS_URL` from those values,
 overriding any URL values in the backend's `env_file`. The service passwords
@@ -40,8 +51,8 @@ Use `docker compose config --quiet` to validate a manifest without printing its
 resolved environment. Compose environment variables remain visible to users
 with access to the Docker API and the container configuration.
 Run `node scripts/docker/compose-secrets.test.mjs` from the repository root to
-check missing-secret failures and custom-password wiring across all three
-Compose manifests; this check does not start containers.
+check missing-secret failures, startup rejection, and custom-password wiring
+across all three Compose manifests; this check does not start containers.
 
 Published ports in the root, `docker/`, and `server/` manifests bind to
 `127.0.0.1` by default. The root and `docker/` manifests publish the frontend;
@@ -50,6 +61,10 @@ Set `GRAVITY_BIND_ADDRESS` only when you deliberately need another host
 interface; `0.0.0.0` exposes these ports on every interface. Use an external
 reverse proxy and firewall for public access. The internal Docker networks do
 not replace host port access controls.
+
+Existing PostgreSQL data volumes keep the database role password established
+at initialization. Coordinate a role-password change with any `.env` password
+rotation; changing `.env` alone does not update an initialized database.
 
 For production, also set the browser origin, storage credentials, and webhook
 secret described below, then run the backend configuration check.
@@ -141,7 +156,8 @@ precedence, even when this opt-in is set. Production rejects the opt-in.
 The root Compose manifest forwards signing, proxy, origin, service-token, and
 security settings explicitly. The `docker/` manifest loads other backend
 settings from the root `.env` through `env_file`; both manifests construct
-service connection URLs. Neither supplies
+service connection URLs. In both app manifests, only the backend receives the
+full `.env`; RustFS receives just its own explicit settings. Neither supplies
 application test keys by default. Set public URLs and keys before deployment;
 the examples intentionally contain empty placeholders and local URLs and are
 not production-ready configuration.

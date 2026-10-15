@@ -27,8 +27,10 @@ services:
     image: rustfs/rustfs:latest
     restart: unless-stopped
     command: /data/rustfs --console-enable
+    entrypoint: ["/bin/sh", "/usr/local/bin/gravity-start-service", "rustfs"]
     user: "0:0"
     environment:
+      NODE_ENV: ${NODE_ENV:-production}
       RUSTFS_ADDRESS: 0.0.0.0:9000
       RUSTFS_CONSOLE_ADDRESS: 0.0.0.0:9001
       RUSTFS_CONSOLE_ENABLE: true
@@ -37,6 +39,7 @@ services:
     volumes:
       - gravity_rustfs_data:/data/rustfs
       - gravity_rustfs_logs:/logs
+      - ../scripts/docker/start-service.sh:/usr/local/bin/gravity-start-service:ro
     healthcheck:
       test: ["CMD", "sh", "-ec", "curl -s http://localhost:9000/ >/dev/null && curl -s http://localhost:9001/ >/dev/null"]
       interval: 10s

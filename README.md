@@ -13,6 +13,9 @@ passwords. See
 [deployment configuration](docs/deployment-configuration.md)
 for the remaining startup settings and production requirements. Compose rejects
 blank required secrets before starting services.
+The development override enables local encrypted credentials by default, so
+also set `LOCAL_TESTING_KEK` to a separate `openssl rand -hex 32` value. To run
+without credential features, set `ENCRYPTED_CREDENTIALS_MODE=disabled` instead.
 
 Podman (recommended):
 
