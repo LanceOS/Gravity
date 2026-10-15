@@ -53,7 +53,6 @@ vi.mock('../../context/label/LabelContext', () => ({
 
 vi.mock('@library', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@library')>();
-  const { MarkdownEditor: RealMarkdownEditor } = await vi.importActual<typeof import('@library/components/markdowneditor/MarkdownEditor')>('@library/components/markdowneditor/MarkdownEditor');
   const buildDoc = (text: string) =>
     JSON.stringify({
       type: 'doc',
@@ -143,26 +142,6 @@ vi.mock('@library', async (importOriginal) => {
     ),
     TextInput: ({ value, onChange, ...props }: MockTextInputProps) => <input value={value} onChange={onChange} {...props} />,
     Textarea: ({ value, onChange, autoGrow, inputStyle, ...props }: /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any) => <textarea value={value} onChange={onChange} {...props} />,
-    MarkdownEditor: ({ value, onSave, placeholder, ...props }: /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any) => {
-      const [editing, setEditing] = useState(false);
-      if (editorTestOptions.realTitleEditor) return <RealMarkdownEditor {...props} value={value} onSave={onSave} placeholder={placeholder} />;
-      if (!editing) {
-        return (
-          <div onClick={() => setEditing(true)}>{value || placeholder}</div>
-        );
-      }
-      return (
-        <textarea
-          placeholder={placeholder}
-          defaultValue={value}
-          onBlur={(e) => {
-            setEditing(false);
-            onSave(e.target.value);
-          }}
-          autoFocus
-        />
-      );
-    },
     RichTextEditor: MockRichTextEditor,
     ClickAwayListener: ({ children }: { children: ReactNode }) => children,
     Portal: ({ children }: { children: ReactNode }) => <div data-testid="portal">{children}</div>,
@@ -174,8 +153,25 @@ vi.mock('../../components/LazyRichTextEditor', async () => {
   return { LazyRichTextEditor: library.RichTextEditor };
 });
 vi.mock('@library/components/markdowneditor/MarkdownEditor', async () => {
-  const library = await import('@library') as unknown as { MarkdownEditor: typeof import('@library/components/markdowneditor/MarkdownEditor').MarkdownEditor };
-  return { MarkdownEditor: library.MarkdownEditor };
+  const { MarkdownEditor: RealMarkdownEditor } = await vi.importActual<typeof import('@library/components/markdowneditor/MarkdownEditor')>('@library/components/markdowneditor/MarkdownEditor');
+  return {
+    MarkdownEditor: ({ value, onSave, placeholder, ...props }: /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any) => {
+      const [editing, setEditing] = useState(false);
+      if (editorTestOptions.realTitleEditor) return <RealMarkdownEditor {...props} value={value} onSave={onSave} placeholder={placeholder} />;
+      if (!editing) return <div onClick={() => setEditing(true)}>{value || placeholder}</div>;
+      return (
+        <textarea
+          placeholder={placeholder}
+          defaultValue={value}
+          onBlur={(event) => {
+            setEditing(false);
+            onSave(event.target.value);
+          }}
+          autoFocus
+        />
+      );
+    },
+  };
 });
 
 vi.mock('../../modules/tickets/components/MarkdownContent', () => ({

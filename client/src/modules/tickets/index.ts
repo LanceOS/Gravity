@@ -1,4 +1,5 @@
 export { TicketBoard } from './components/TicketBoard';
+export { TicketDetail, TicketDetailRoute, CreateTicketModal } from './lazyComponents';
 export { TicketFilterBar } from './components/TicketFilterBar/TicketFilterBar';
 export { TicketList } from './components/TicketList';
 export { TicketContextMenu } from './components/TicketContextMenu';

@@ -395,7 +395,9 @@ export function WorkspacePage({
                       <ErrorBoundary onReset={reset}>
                         <WorkspaceViewContainer>
                           {isNoteEditor ? (
-                            <Suspense fallback={<div role="status">Loading note editor...</div>}><NoteEditor projectId={filters.projectId || ''} noteId={activeNoteId} onTitleChange={setActiveNoteTitle} /></Suspense>
+                            <Suspense fallback={<div role="status">Loading note editor...</div>}>
+                              <NoteEditor projectId={filters.projectId || ''} noteId={activeNoteId} onTitleChange={setActiveNoteTitle} />
+                            </Suspense>
                           ) : (
                             <NotesList projectId={filters.projectId || ''} onSelectNote={onSelectNote || (() => { })} sortDirection={notesSort} />
                           )}

@@ -23,6 +23,7 @@ export interface RichTextEditorProps {
   autoFocus?: boolean;
   readOnly?: boolean;
   onBlur?: () => void;
+  onReady?: () => void;
   toolbarMode?: 'full' | 'bubble' | 'none';
   style?: React.CSSProperties;
 }
@@ -38,6 +39,7 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorPro
     autoFocus = false,
     readOnly = false,
     onBlur,
+    onReady,
     toolbarMode = 'full',
     style,
   },
@@ -53,6 +55,10 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorPro
     onBlur,
     toolbarMode,
   });
+
+  React.useEffect(() => {
+    if (view) onReady?.();
+  }, [view, onReady]);
 
   useImperativeHandle(ref, () => ({
     focus: () => {
