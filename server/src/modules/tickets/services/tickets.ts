@@ -1,7 +1,7 @@
 import { and, asc, desc, eq, gt, lt, gte, ilike, inArray, isNull, lte, or, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { db } from '../../../db/index.js';
-import { authUsers, comments, tickets, ticketRelationships, userProfiles, projects, cycles, labels, ticketLabels, workspaceSettings, workspaceMembers, workspaces, projectMembers } from '../../../db/schema.js';
+import { authUsers, comments, tickets, ticketRelationships, userProfiles, projects, cycles, teams, labels, ticketLabels, workspaceSettings, workspaceMembers, workspaces, projectMembers } from '../../../db/schema.js';
 import { createId, getProjectByKeyPrefix, nextTicketKey, normalizeIsoDate } from '../../../lib/platform.js';
 import { audit } from '../../../lib/logger.js';
 import {
@@ -11,6 +11,7 @@ import {
 } from '../../../lib/html-sanitization.js';
 import { isWorkspaceMember } from '../../workspaces/services/membership.js';
 import generateBranchName from '../utils/branch.js';
+import { recordCycleProgressTransitions } from './cycle-progress.js';
 
 type TicketRecord = typeof tickets.$inferSelect;
 type RelatedTicketRecord = {
@@ -161,7 +162,9 @@ async function assertTicketRelationships(
 ) {
   if (cycleId) {
     const [cycle] = await tx.select({ id: cycles.id }).from(cycles)
-      .where(and(eq(cycles.id, cycleId), eq(cycles.teamId, project.teamId))).for('key share');
+      .innerJoin(teams, eq(teams.id, cycles.teamId))
+      .where(and(eq(cycles.id, cycleId), eq(cycles.teamId, project.teamId),
+        eq(teams.workspaceId, project.workspaceId)));
     if (!cycle) throw new Error(TICKET_CYCLE_SCOPE_VIOLATION);
   }
   const visited = new Set([ticketId]);
@@ -1057,6 +1060,9 @@ export async function createTicketRecord(input: {
     await lockTicketProjectScopes(tx, [projectScope]);
     await assertAssigneeInProjectScope(tx, projectScope, nextAssigneeId);
     await assertTicketRelationships(tx, projectScope, ticketId, input.cycleId, input.parentId);
+    if (input.cycleId) await recordCycleProgressTransitions(tx, [{
+      ticketId, before: null, after: { cycleId: input.cycleId, status: canonicalizeStatus(input.status ?? 'todo') },
+    }]);
     const key = await nextTicketKey(tx, input.projectId);
     const rows = await tx
       .insert(tickets)
@@ -1261,7 +1267,7 @@ export async function updateTicketRecordWithEffects(
     // Serialize hierarchy writes per project so concurrent parent changes cannot create a cycle.
     await lockTicketProjectScopes(tx, [sourceProject, targetProject]);
     const [currentTicket] = await tx.select().from(tickets)
-      .where(and(eq(tickets.id, ticketId), eq(tickets.projectId, sourceProject.id))).limit(1);
+      .where(and(eq(tickets.id, ticketId), eq(tickets.projectId, sourceProject.id))).limit(1).for('update');
     // Another move may have completed between the initial lookup and acquiring the project lock.
     if (!currentTicket) return null;
     if (expectedUpdatedAt && currentTicket.updatedAt.getTime() !== expectedUpdatedAt.getTime()) return null;
@@ -1274,6 +1280,12 @@ export async function updateTicketRecordWithEffects(
     await assertTicketRelationships(tx, targetProject, ticketId,
       nextCycleId !== undefined ? nextCycleId : currentTicket.cycleId,
       nextParentId !== undefined ? nextParentId : currentTicket.parentId);
+    await recordCycleProgressTransitions(tx, [{
+      ticketId,
+      before: { cycleId: currentTicket.cycleId, status: currentTicket.status },
+      after: { cycleId: nextCycleId !== undefined ? nextCycleId : currentTicket.cycleId,
+        status: updates.status !== undefined ? nextStatus : currentTicket.status },
+    }]);
 
     const shouldUpdateLabels = updates.labelIds !== undefined || projectLabelScopeChanged || teamChanged;
     const labelIdsForTicket = nextLabelIds ?? [];
@@ -1426,6 +1438,11 @@ export async function deleteTicketRecordWithEffects(ticketId: string, projectId?
     }
 
     const subtreeIds = [...ids];
+    const cycled = await tx.select({ id: tickets.id, cycleId: tickets.cycleId, status: tickets.status })
+      .from(tickets).where(inArray(tickets.id, subtreeIds));
+    await recordCycleProgressTransitions(tx, cycled.map(ticket => ({
+      ticketId: ticket.id, before: { cycleId: ticket.cycleId, status: ticket.status }, after: null,
+    })));
     await tx.delete(comments).where(inArray(comments.ticketId, subtreeIds));
     await tx.delete(ticketLabels).where(inArray(ticketLabels.ticketId, subtreeIds));
     await tx.delete(ticketRelationships).where(or(

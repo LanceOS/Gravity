@@ -20,6 +20,7 @@ import {
   getDefaultTeamId,
 } from '../utils/default-team.js';
 import { normalizeProjectKey } from '../utils/project-key.js';
+import { recordCycleProgressTransitions } from '../../tickets/services/cycle-progress.js';
 import {
   invalidateProjectWorkspaceCache,
   invalidateProjectMembershipCache,
@@ -249,6 +250,24 @@ export async function updateProjectRecord(projectId: string, params: { name?: st
       .from(projects)
       .where(eq(projects.id, projectId))
       .limit(1).for('update');
+    const teamChanged = typeof params.teamId === 'string' && !!currentProject?.teamId
+      && currentProject.teamId !== params.teamId;
+    const availableCycles = teamChanged
+      ? await tx.select({ id: cycles.id }).from(cycles).where(eq(cycles.teamId, params.teamId!))
+      : [];
+    const outOfTeam = and(
+      eq(tickets.projectId, projectId),
+      availableCycles.length > 0 ? notInArray(tickets.cycleId, availableCycles.map(cycle => cycle.id)) : isNotNull(tickets.cycleId),
+    );
+    if (teamChanged) {
+      const departing = await tx.select({ id: tickets.id, cycleId: tickets.cycleId, status: tickets.status })
+        .from(tickets).where(outOfTeam).orderBy(asc(tickets.id)).for('update');
+      // Capture the old team while the project still belongs to it. This is
+      // essential for the first baseline of a preexisting cycle.
+      await recordCycleProgressTransitions(tx, departing.map(ticket => ({
+        ticketId: ticket.id, before: { cycleId: ticket.cycleId, status: ticket.status }, after: null,
+      })));
+    }
     const updatedRows = await tx
       .update(projects)
       .set({
@@ -262,13 +281,9 @@ export async function updateProjectRecord(projectId: string, params: { name?: st
       .where(eq(projects.id, projectId))
       .returning();
 
-    if (updatedRows[0] && typeof params.teamId === 'string' && currentProject?.teamId && currentProject.teamId !== updatedRows[0].teamId) {
+    if (updatedRows[0] && teamChanged) {
       await tx.update(labels).set({ teamId: updatedRows[0].teamId }).where(eq(labels.projectId, projectId));
-      const availableCycles = await tx.select({ id: cycles.id }).from(cycles).where(eq(cycles.teamId, updatedRows[0].teamId));
-      await tx.update(tickets).set({ cycleId: null, updatedAt: new Date() }).where(and(
-        eq(tickets.projectId, projectId),
-        availableCycles.length > 0 ? notInArray(tickets.cycleId, availableCycles.map(cycle => cycle.id)) : isNotNull(tickets.cycleId),
-      ));
+      await tx.update(tickets).set({ cycleId: null, updatedAt: new Date() }).where(outOfTeam);
     }
 
     return updatedRows;
@@ -323,6 +338,11 @@ export async function deleteProjectRecord(projectId: string, workspaceId: string
   const labelRows = await db.select({ id: labels.id }).from(labels).where(eq(labels.projectId, projectId));
   const labelIds = labelRows.map((label) => label.id);
   await db.transaction(async (tx) => {
+    // Match ticket writers' project-first lock order. No ticket may be added
+    // after the exit inventory is read and before the project is deleted.
+    const [project] = await tx.select({ id: projects.id }).from(projects)
+      .where(and(eq(projects.id, projectId), eq(projects.workspaceId, workspaceId))).for('update');
+    if (!project) return;
     // 1. Delete comments belonging to tickets in this project
     await tx.delete(comments).where(sql`${comments.ticketId} in (
       select ${tickets.id}
@@ -343,7 +363,12 @@ export async function deleteProjectRecord(projectId: string, workspaceId: string
       await tx.delete(labels).where(inArray(labels.id, labelIds));
     }
 
-    // 4. Delete tickets in this project
+    // 4. Preserve cycle history before deleting the project's tickets.
+    const departing = await tx.select({ id: tickets.id, cycleId: tickets.cycleId, status: tickets.status })
+      .from(tickets).where(eq(tickets.projectId, projectId)).orderBy(asc(tickets.id)).for('update');
+    await recordCycleProgressTransitions(tx, departing.map(ticket => ({
+      ticketId: ticket.id, before: { cycleId: ticket.cycleId, status: ticket.status }, after: null,
+    })));
     await tx.delete(tickets).where(eq(tickets.projectId, projectId));
 
     // 5. Delete project members

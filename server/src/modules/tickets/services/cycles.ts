@@ -1,6 +1,7 @@
-import { and, asc, eq, gt, inArray, lt, ne } from 'drizzle-orm';
+import { and, asc, eq, gt, inArray, lt, ne, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../../../db/index.js';
+import { env } from '../../../env.js';
 import { cycles, projects, teams, tickets } from '../../../db/schema.js';
 import { createId, normalizeIsoDate } from '../../../lib/platform.js';
 
@@ -115,6 +116,7 @@ export async function createCycleRecord(teamId: string, input: z.infer<typeof cr
     const [cycle] = await tx.insert(cycles).values({
       id: createId('c'), teamId, name: input.name, ...range,
       completed: input.completed ?? false,
+      progressTrackedAt: env.databaseUrl.startsWith('pgmem://') ? sql`now()` : sql`clock_timestamp()`,
     }).returning();
     return cycle;
   });

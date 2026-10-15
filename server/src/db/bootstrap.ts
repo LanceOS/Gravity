@@ -466,6 +466,24 @@ async function bootstrapDatabase() {
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
 
+    CREATE TABLE IF NOT EXISTS cycle_progress_events (
+      id BIGSERIAL PRIMARY KEY,
+      cycle_id TEXT NOT NULL REFERENCES cycles(id) ON DELETE CASCADE,
+      ticket_id TEXT NOT NULL,
+      status TEXT,
+      delta_total INTEGER NOT NULL,
+      delta_completed INTEGER NOT NULL,
+      recorded_at TIMESTAMPTZ NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS cycle_progress_daily_deltas (
+      cycle_id TEXT NOT NULL REFERENCES cycles(id) ON DELETE CASCADE,
+      day TEXT NOT NULL,
+      delta_total INTEGER NOT NULL,
+      delta_completed INTEGER NOT NULL,
+      PRIMARY KEY (cycle_id, day)
+    );
+
     CREATE TABLE IF NOT EXISTS ticket_relationships (
       ticket_id TEXT NOT NULL REFERENCES tickets (id) ON DELETE CASCADE,
       blocked_ticket_id TEXT NOT NULL REFERENCES tickets (id) ON DELETE CASCADE,
@@ -600,6 +618,7 @@ async function bootstrapDatabase() {
     CREATE INDEX IF NOT EXISTS tickets_project_id_idx ON tickets (project_id);
     CREATE INDEX IF NOT EXISTS tickets_assignee_id_idx ON tickets (assignee_id);
     CREATE INDEX IF NOT EXISTS tickets_cycle_id_idx ON tickets (cycle_id);
+    CREATE INDEX IF NOT EXISTS cycle_progress_events_cycle_time_idx ON cycle_progress_events (cycle_id, recorded_at, id);
     CREATE INDEX IF NOT EXISTS tickets_parent_id_idx ON tickets (parent_id);
         CREATE INDEX IF NOT EXISTS ticket_relationships_ticket_id_idx ON ticket_relationships (ticket_id);
     CREATE INDEX IF NOT EXISTS ticket_relationships_blocked_ticket_id_idx ON ticket_relationships (blocked_ticket_id);
@@ -614,6 +633,7 @@ async function bootstrapDatabase() {
         ALTER TABLE projects ADD COLUMN IF NOT EXISTS github_repo_url TEXT;
     ALTER TABLE projects ADD COLUMN IF NOT EXISTS team_id TEXT;
     ALTER TABLE cycles ADD COLUMN IF NOT EXISTS team_id TEXT;
+    ALTER TABLE cycles ADD COLUMN IF NOT EXISTS progress_tracked_at TIMESTAMPTZ;
     ALTER TABLE labels ADD COLUMN IF NOT EXISTS team_id TEXT;
     ALTER TABLE labels ADD COLUMN IF NOT EXISTS project_id TEXT;
     ALTER TABLE labels ALTER COLUMN project_id DROP NOT NULL;

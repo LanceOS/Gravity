@@ -30,3 +30,28 @@ new dangling references or deleting a referenced cycle. It is installed as
 `NOT VALID` in PostgreSQL so existing orphaned IDs remain for a separate repair.
 After the last assignment is removed, deletion succeeds and invalidates the
 workspace sidebar cache. Create and edit also invalidate that cache.
+
+`GET /cycles/:cycleId/progress` uses the same team read authorization as cycle
+detail and remains available after completion. It returns `summary` with ticket
+counts (`total`, `completed`, `remaining`, and all six workflow statuses),
+`historyAvailableFrom`, `historyUnavailableBefore`, and `dailyRemaining` points
+with UTC dates and counts. `completed` counts `done`; `remaining` is total minus
+done, so canceled tickets remain visible in the status breakdown and count as
+remaining. Summary reads current ticket rows across every project in the team.
+
+The progress event ledger records membership and status transitions in the
+same transaction as ticket writes. Each UTC daily point reflects events before
+the next midnight, or before the cycle end/current time on a partial day.
+Daily deltas are maintained in the same transaction, so progress reads scale
+with the number of active days rather than every historical ticket event.
+PostgreSQL serves the cycle, current summary, day deltas, and partial-day events
+from one read-only repeatable-read snapshot, preventing a concurrent ticket
+commit from mixing different progress states in one response.
+Historical points are never recomputed from present ticket rows. New cycles
+start tracking when created. Cycles created before the ledger have null
+`historyAvailableFrom` and no daily points until their first ticket change;
+that write records a baseline at the current time. Earlier dates stay marked
+unavailable. Removing or deleting a ticket records an exit while keeping its
+earlier event history. Deleting the cycle itself removes its ledger rows.
+Direct SQL changes to ticket cycle or status fields are outside the application
+ledger contract and must be accompanied by equivalent progress writes.
