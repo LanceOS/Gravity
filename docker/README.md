@@ -1,7 +1,7 @@
 This Docker Compose setup attaches services to an internal network to avoid port conflicts.
 
 From the repository root, copy `.env.example` to `.env` and fill in the four
-required secrets and matching `DATABASE_URL`/`REDIS_URL` described in
+required secrets described in
 [deployment configuration](../docs/deployment-configuration.md). The `docker/`
 Compose file reads `../.env`; `docker/.env.example` is only a reference template.
 Run Compose from the repository root, or pass `--env-file ../.env` when running

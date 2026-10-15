@@ -29,7 +29,7 @@ services:
     expose:
       - "6379"
     healthcheck:
-      test: ["CMD-SHELL", "redis-cli -a \"$$GRAVITY_REDIS_PASSWORD\" ping"]
+      test: ["CMD-SHELL", "REDISCLI_AUTH=\"$$GRAVITY_REDIS_PASSWORD\" redis-cli ping"]
       timeout: 5s
       retries: 5
     networks:
@@ -69,6 +69,8 @@ services:
     environment:
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?Set BETTER_AUTH_SECRET in ../.env}
       NODE_IDENTITY_MASTER_KEY: ${NODE_IDENTITY_MASTER_KEY:?Set NODE_IDENTITY_MASTER_KEY in ../.env}
+      DATABASE_URL: postgresql://${GRAVITY_POSTGRES_USER:-gravity_user}:${GRAVITY_POSTGRES_PASSWORD:?Set GRAVITY_POSTGRES_PASSWORD in ../.env}@postgres:5432/${GRAVITY_POSTGRES_DB:-gravity_workspace}
+      REDIS_URL: redis://default:${GRAVITY_REDIS_PASSWORD:?Set GRAVITY_REDIS_PASSWORD in ../.env}@redis:6379
       BETTER_AUTH_BASE_URL: ${BETTER_AUTH_BASE_URL:-${GRAVITY_FRONTEND_PUBLIC_URL:-http://localhost:5173}}
       CORS_ORIGINS: ${CORS_ORIGINS:-${GRAVITY_FRONTEND_PUBLIC_URL:-http://localhost:5173}}
       TRUSTED_ORIGINS: ${TRUSTED_ORIGINS:-${GRAVITY_FRONTEND_PUBLIC_URL:-http://localhost:5173}}

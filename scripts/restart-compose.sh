@@ -25,11 +25,7 @@ else
 fi
 
 compose() {
-  if [ -f "$ENV_FILE" ]; then
-    "$COMPOSE_CLI" compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" "$@"
-  else
-    "$COMPOSE_CLI" compose -f "$COMPOSE_FILE" "$@"
-  fi
+  "$COMPOSE_CLI" compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" "$@"
 }
 
 usage() {

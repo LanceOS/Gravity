@@ -7,9 +7,9 @@ Quick instructions for running the app in development with a live-reloading fron
 Before running Compose, copy `.env.example` to `.env` in the repository root.
 Set `GRAVITY_POSTGRES_PASSWORD`, `GRAVITY_REDIS_PASSWORD`,
 `BETTER_AUTH_SECRET`, and `NODE_IDENTITY_MASTER_KEY` to four independent
-nonempty secrets (for example, run `openssl rand -hex 32` four times). Set
-`DATABASE_URL` and `REDIS_URL` to use the matching passwords if you use the
-`docker/` Compose variant. See [deployment configuration](docs/deployment-configuration.md)
+nonempty secrets (for example, run `openssl rand -hex 32` four times). Both
+Compose variants build their internal connection URLs from these values. See
+[deployment configuration](docs/deployment-configuration.md)
 for the remaining startup settings and production requirements. Compose rejects
 blank required secrets before starting services.
 
