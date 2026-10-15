@@ -1,4 +1,4 @@
-import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { Router, type Request } from 'express';
 import { and, eq, gt, isNull, or, sql } from 'drizzle-orm';
 import { fromNodeHeaders } from 'better-auth/node';
@@ -26,16 +26,12 @@ export const OAUTH_ACCESS_TTL_SECONDS = 60 * 60;
 const REQUEST_TTL_MS = 10 * 60 * 1000;
 const CODE_TTL_MS = 2 * 60 * 1000;
 const opaqueToken = () => randomBytes(32).toString('base64url');
+// These credentials have 256 random bits. SQL comparison timing may vary with
+// digest prefixes or a hit/miss, but SHA-256 does not turn that into a token
+// prefix oracle. Keep indexed equality for lookup and atomic consume/rotation;
+// comparing a digest after an exact SQL match adds no timing protection.
 const tokenHash = (value: string) => createHash('sha256').update(value).digest('hex');
 const isOpaqueToken = (value: string) => /^[A-Za-z0-9_-]{43}$/.test(value);
-
-function matchesTokenHash(stored: string | null, presented: string): boolean {
-  // Indexed equality on random SHA-256 token hashes reveals at most a full
-  // match, not a token prefix. Keep that lookup for atomic consume/rotation,
-  // then verify the retrieved digest without a variable-time JS comparison.
-  return stored !== null && /^[0-9a-f]{64}$/.test(stored)
-    && timingSafeEqual(Buffer.from(stored, 'hex'), Buffer.from(presented, 'hex'));
-}
 const scopeFor = (name: string) => `tools/call:${name}`;
 const publicBase = () => new URL(env.betterAuthBaseUrl).origin;
 export const OAUTH_DISABLED_MESSAGE = 'OAuth sign-in requires an HTTPS Gravity URL. HTTP is supported only on localhost or 127.0.0.1 for local testing. Manual connections remain available.';
@@ -135,7 +131,7 @@ export const gravityOAuthProvider: OAuthServerProvider = {
     const [request] = await db.select().from(mcpOAuthRequests).where(and(eq(mcpOAuthRequests.codeHash, hash),
       eq(mcpOAuthRequests.clientId, client.client_id), eq(mcpOAuthRequests.status, 'approved'),
       gt(mcpOAuthRequests.codeExpiresAt, new Date()))).limit(1);
-    if (!request || !matchesTokenHash(request.codeHash, hash)) throw new InvalidGrantError('Invalid or expired authorization code.');
+    if (!request) throw new InvalidGrantError('Invalid or expired authorization code.');
     return request.codeChallenge;
   },
   async exchangeAuthorizationCode(client, code, _verifier, redirectUri, resource) {
@@ -151,7 +147,7 @@ export const gravityOAuthProvider: OAuthServerProvider = {
         eq(mcpOAuthRequests.status, 'approved'), eq(mcpOAuthRequests.resource, resource!.href),
         eq(mcpOAuthRequests.redirectUri, redirectUri ?? ''), gt(mcpOAuthRequests.codeExpiresAt, now),
       )).returning();
-      if (!request || !matchesTokenHash(request.codeHash, hash) || !request.actorUserId || !request.approvedScopes) {
+      if (!request?.actorUserId || !request.approvedScopes) {
         throw new InvalidGrantError('Invalid, expired, or already used authorization code.');
       }
       await assertCurrentGrantScopes(request.workspaceId, request.actorUserId, request.approvedScopes, tx);
@@ -176,7 +172,7 @@ export const gravityOAuthProvider: OAuthServerProvider = {
         .from(mcpOAuthRefreshTokens).innerJoin(mcpOAuthGrants, eq(mcpOAuthGrants.connectionId, mcpOAuthRefreshTokens.connectionId))
         .where(and(eq(mcpOAuthRefreshTokens.tokenHash, hash), eq(mcpOAuthGrants.clientId, client.client_id),
           eq(mcpOAuthGrants.resource, resource!.href))).limit(1);
-      if (!found || !matchesTokenHash(found.refresh.tokenHash, hash)) throw new InvalidGrantError('Invalid refresh token.');
+      if (!found) throw new InvalidGrantError('Invalid refresh token.');
       // Serialize the entire family, including replay checks, with revocation.
       const [connection] = await tx.select().from(mcpConnectionTokens).where(eq(mcpConnectionTokens.id, found.grant.connectionId)).for('update');
       const now = new Date();
@@ -211,8 +207,7 @@ export const gravityOAuthProvider: OAuthServerProvider = {
       .innerJoin(mcpOAuthGrants, eq(mcpOAuthGrants.connectionId, mcpConnectionTokens.id))
       .where(and(eq(mcpConnectionTokens.tokenHash, hash), eq(mcpConnectionTokens.connectionType, 'oauth'),
         eq(mcpConnectionTokens.status, 'active'), gt(mcpConnectionTokens.expiresAt, now), gt(mcpOAuthGrants.accessExpiresAt, now))).limit(1);
-    if (!row || !matchesTokenHash(row.connection.tokenHash, hash)
-      || !await getMcpWorkspaceRole(row.connection.workspaceId, row.connection.generatedBy)) throw new InvalidTokenError('Invalid or expired token.');
+    if (!row || !await getMcpWorkspaceRole(row.connection.workspaceId, row.connection.generatedBy)) throw new InvalidTokenError('Invalid or expired token.');
     const [current] = await db.update(mcpConnectionTokens).set({ usedAt: now, usageCount: sql`${mcpConnectionTokens.usageCount} + 1` })
       .where(and(eq(mcpConnectionTokens.id, row.connection.id), eq(mcpConnectionTokens.tokenHash, hash), eq(mcpConnectionTokens.status, 'active'))).returning({ id: mcpConnectionTokens.id });
     if (!current) throw new InvalidTokenError('Invalid or expired token.');
@@ -223,14 +218,17 @@ export const gravityOAuthProvider: OAuthServerProvider = {
   async revokeToken(client, { token }) {
     if (!isOpaqueToken(token)) return;
     const hash = tokenHash(token);
-    const [row] = await db.select({ connectionId: mcpOAuthGrants.connectionId,
-      accessHash: mcpConnectionTokens.tokenHash, refreshHash: mcpOAuthRefreshTokens.tokenHash }).from(mcpOAuthGrants)
-      .innerJoin(mcpConnectionTokens, eq(mcpConnectionTokens.id, mcpOAuthGrants.connectionId))
-      .leftJoin(mcpOAuthRefreshTokens, eq(mcpOAuthRefreshTokens.connectionId, mcpOAuthGrants.connectionId))
-      .where(and(eq(mcpOAuthGrants.clientId, client.client_id), or(eq(mcpConnectionTokens.tokenHash, hash), eq(mcpOAuthRefreshTokens.tokenHash, hash)))).limit(1);
-    if (row && (matchesTokenHash(row.accessHash, hash) || matchesTokenHash(row.refreshHash, hash))) {
-      await db.update(mcpConnectionTokens).set({ status: 'revoked', revokedAt: new Date() }).where(eq(mcpConnectionTokens.id, row.connectionId));
-    }
+    // Each token type has its own hash index. Avoid joining every rotated
+    // refresh token into an OR lookup when checking an access token.
+    const [access] = await db.select({ connectionId: mcpConnectionTokens.id }).from(mcpConnectionTokens)
+      .innerJoin(mcpOAuthGrants, eq(mcpOAuthGrants.connectionId, mcpConnectionTokens.id))
+      .where(and(eq(mcpConnectionTokens.tokenHash, hash), eq(mcpConnectionTokens.connectionType, 'oauth'),
+        eq(mcpOAuthGrants.clientId, client.client_id))).limit(1);
+    const [refresh] = access ? [] : await db.select({ connectionId: mcpOAuthRefreshTokens.connectionId }).from(mcpOAuthRefreshTokens)
+      .innerJoin(mcpOAuthGrants, eq(mcpOAuthGrants.connectionId, mcpOAuthRefreshTokens.connectionId))
+      .where(and(eq(mcpOAuthRefreshTokens.tokenHash, hash), eq(mcpOAuthGrants.clientId, client.client_id))).limit(1);
+    const connectionId = access?.connectionId ?? refresh?.connectionId;
+    if (connectionId) await db.update(mcpConnectionTokens).set({ status: 'revoked', revokedAt: new Date() }).where(eq(mcpConnectionTokens.id, connectionId));
   },
 };
 

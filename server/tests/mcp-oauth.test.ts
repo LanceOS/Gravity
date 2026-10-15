@@ -3,7 +3,7 @@ import { eq } from 'drizzle-orm';
 import express from 'express';
 import supertest from 'supertest';
 import { createOAuthAuthorizationRouter, gravityOAuthProvider } from '../src/modules/mcp/oauth.js';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { db } from '../src/db/index.js';
 import { mcpConnectionTokens, mcpOAuthRequests, mcpOAuthRefreshTokens, mcpOAuthGrants, workspaceMembers, workspaces } from '../src/db/schema.js';
 import { env } from '../src/env.js';
@@ -120,6 +120,7 @@ describe('workspace OAuth MCP authorization', () => {
     const otherClient = await register();
     const request = await authorize(client.client_id);
     const code = await consent(account, request.requestId);
+    expect(code).toMatch(/^[A-Za-z0-9_-]{43}$/);
     expect((await exchange(client.client_id, code, 'wrong-verifier')).status).toBe(400);
     expect((await exchange(otherClient.client_id, code, request.verifier)).status).toBe(400);
     expect((await exchange(client.client_id, code, request.verifier, { redirect_uri: 'https://example.com/wrong' })).status).toBe(400);
@@ -158,6 +159,8 @@ describe('workspace OAuth MCP authorization', () => {
     const issued = await exchange(client.client_id, code, request.verifier);
     expect(issued.status).toBe(200);
     const { access_token: access, refresh_token: refreshToken } = issued.body;
+    expect(access).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(refreshToken).toMatch(/^[A-Za-z0-9_-]{43}$/);
     await expect(gravityOAuthProvider.verifyAccessToken('!')).rejects.toThrow();
     await expect(gravityOAuthProvider.verifyAccessToken(invalidToken(access))).rejects.toThrow();
     expect((await refresh(client.client_id, '!')).status).toBe(400);
@@ -170,6 +173,7 @@ describe('workspace OAuth MCP authorization', () => {
     const { client, tokens } = await grant();
     const otherClient = await register();
     await gravityOAuthProvider.revokeToken(otherClient, { token: tokens.access_token });
+    await gravityOAuthProvider.revokeToken(otherClient, { token: tokens.refresh_token });
     await gravityOAuthProvider.revokeToken(client, { token: '!' });
     await gravityOAuthProvider.revokeToken(client, { token: invalidToken(tokens.refresh_token) });
     expect((await call(tokens.access_token)).status).toBe(200);
@@ -179,15 +183,24 @@ describe('workspace OAuth MCP authorization', () => {
     await gravityOAuthProvider.revokeToken(client, { token: tokens.access_token });
     expect((await call(rotated.body.access_token)).status).toBe(200);
     await gravityOAuthProvider.revokeToken(client, { token: rotated.body.refresh_token });
-    expect((await call(rotated.body.access_token)).status).toBe(401);
+    await expect(gravityOAuthProvider.verifyAccessToken(rotated.body.access_token)).rejects.toThrow();
     expect((await refresh(client.client_id, rotated.body.refresh_token)).status).toBe(400);
   });
 
   it('revokes an access token and its refresh family', async () => {
     const { client, tokens } = await grant();
     await gravityOAuthProvider.revokeToken(client, { token: tokens.access_token });
-    expect((await call(tokens.access_token)).status).toBe(401);
+    await expect(gravityOAuthProvider.verifyAccessToken(tokens.access_token)).rejects.toThrow();
     expect((await refresh(client.client_id, tokens.refresh_token)).status).toBe(400);
+  });
+
+  it('revokes the family when given a previously rotated refresh token', async () => {
+    const { client, tokens } = await grant();
+    const rotated = await refresh(client.client_id, tokens.refresh_token);
+    expect(rotated.status).toBe(200);
+    await gravityOAuthProvider.revokeToken(client, { token: tokens.refresh_token });
+    await expect(gravityOAuthProvider.verifyAccessToken(rotated.body.access_token)).rejects.toThrow();
+    expect((await refresh(client.client_id, rotated.body.refresh_token)).status).toBe(400);
   });
 
   it('rotates refresh tokens without extending the grant and revokes the family on replay', async () => {
@@ -207,6 +220,31 @@ describe('workspace OAuth MCP authorization', () => {
     expect((await refresh(client.client_id, tokens.refresh_token)).status).toBe(400);
     expect((await call(rotated.body.access_token)).status).toBe(401);
     expect((await refresh(client.client_id, rotated.body.refresh_token)).status).toBe(400);
+  });
+
+  it('rejects an access token rotated after its lookup but before its usage update', async () => {
+    const { client, tokens } = await grant();
+    const [connection] = await db.select().from(mcpConnectionTokens);
+    const [oauthGrant] = await db.select().from(mcpOAuthGrants);
+    let rotated: { access_token: string } | undefined;
+    // Return the old lookup snapshot after a real refresh has committed. The
+    // verifier's UPDATE stays real, exercising its token-hash compare-and-swap.
+    const select = vi.spyOn(db, 'select').mockImplementationOnce(() => ({
+      from: () => ({ innerJoin: () => ({ where: () => ({ limit: async () => {
+        const response = await refresh(client.client_id, tokens.refresh_token);
+        expect(response.status).toBe(200);
+        rotated = response.body;
+        return [{ connection, grant: oauthGrant }];
+      } }) }) }),
+    }) as never);
+    try {
+      await expect(gravityOAuthProvider.verifyAccessToken(tokens.access_token)).rejects.toThrow();
+    } finally {
+      select.mockRestore();
+    }
+    const [current] = await db.select().from(mcpConnectionTokens);
+    expect(current.usageCount).toBe(0);
+    expect((await call(rotated!.access_token)).status).toBe(200);
   });
 
   it('enforces current workspace access and shared account revocation on access and refresh', async () => {
