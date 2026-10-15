@@ -138,6 +138,15 @@ describe('createApp', () => {
     expect(nginxPolicy).toBe(APP_SHELL_CONTENT_SECURITY_POLICY);
     expect(nginxPolicy).toContain('trusted-types gravity-editor dompurify ProseMirrorClipboard');
     expect(nginxPolicy).toContain("require-trusted-types-for 'script'");
+    expect(nginxPolicy).toContain('report-uri /api/v1/csp-reports');
+    const reportLocation = nginxTemplate.match(/location = \/api\/v1\/csp-reports \{([\s\S]*?)\n  \}/)?.[1];
+    expect(reportLocation).toContain('access_log off;');
+    expect(reportLocation).toContain('client_max_body_size 16k;');
+    expect(reportLocation).toContain('proxy_pass ${BACKEND_UPSTREAM};');
+    for (const header of ['Authorization', 'Cookie', 'Referer', 'Forwarded', 'X-Forwarded-Host',
+      'X-Real-IP', 'X-Forwarded-For', 'X-Forwarded-Proto']) {
+      expect(reportLocation).toContain(`proxy_set_header ${header} "";`);
+    }
   });
 
   it('sets security headers on the SPA fallback, direct shell request, and unknown API routes', async () => {
@@ -166,6 +175,10 @@ describe('createApp', () => {
 
       expect(directShellResponse.status).toBe(200);
       expect(directShellResponse.headers['content-security-policy']).toBe(APP_SHELL_CONTENT_SECURITY_POLICY);
+
+      const oauthConsentResponse = await request(createApp()).get('/oauth/consent?request=fixture');
+      expect(oauthConsentResponse.status).toBe(200);
+      expect(oauthConsentResponse.headers['content-security-policy']).toBe(APP_SHELL_CONTENT_SECURITY_POLICY);
     } finally {
       mockCwd.mockRestore();
       if (fixturesRoot) {
@@ -178,5 +191,16 @@ describe('createApp', () => {
     expect(notFoundResponse.status).toBe(404);
     expect(notFoundResponse.body).toEqual({ error: 'Not found' });
     expect(notFoundResponse.headers['x-content-type-options']).toBe('nosniff');
+  });
+
+  it('accepts CSP reports on the public API path before dependency admission', async () => {
+    const response = await request(createApp()).post('/api/v1/csp-reports')
+      .set('Content-Type', 'application/csp-report')
+      .send(JSON.stringify({ 'csp-report': {
+        'effective-directive': 'script-src', 'blocked-uri': 'inline',
+      } }));
+
+    expect(response.status).toBe(204);
+    expect(response.headers['cache-control']).toBe('no-store');
   });
 });

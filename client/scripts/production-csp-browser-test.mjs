@@ -34,6 +34,7 @@ function assertCspHeader(response) {
   assert.match(policy, /(?:^|;)\s*trusted-types\s+[^;]*\bdompurify\b/i);
   assert.match(policy, /(?:^|;)\s*trusted-types\s+[^;]*\bProseMirrorClipboard\b/i);
   assert.match(policy, /(?:^|;)\s*require-trusted-types-for\s+'script'(?:\s|;|$)/i);
+  assert.match(policy, /(?:^|;)\s*report-uri\s+\/api\/v1\/csp-reports(?:\s|;|$)/i);
 }
 
 async function createFixture(page) {
