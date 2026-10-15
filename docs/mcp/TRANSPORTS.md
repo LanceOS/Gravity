@@ -38,6 +38,13 @@ Use a Streamable HTTP client with URL `https://your-gravity-host/api/v1/mcp` and
 
 An explicit bearer credential takes precedence over a browser session cookie: its scopes and revocation status still apply when both are present.
 
+Failed or concurrent bearer verification is limited per source IP to 10
+attempts per minute by default, including malformed bearer headers. The next
+request receives 429. A successful verification releases its reservation while
+earlier failures remain until their window expires.
+Operators can tune this policy and alert on repeated failures as described in
+[deployment configuration](../deployment-configuration.md).
+
 The endpoint is stateless. A client completes `initialize`, `notifications/initialized`, `tools/list`, and successive `tools/call` requests using the same reusable credential. POST returns JSON; valid notifications receive HTTP 202 without a body. GET and DELETE return 405 because this transport does not provide an SSE stream or server-side session resource. The old POST `/api/v1/mcp/sse` path remains an alias; it is not a legacy SSE transport. Application realtime updates use a separate channel.
 
 Supported protocol versions are `2025-11-25`, `2025-06-18`, `2025-03-26`, and `2024-11-05`. Clients send the negotiated `MCP-Protocol-Version` header on subsequent requests. Supplied unsupported versions are rejected. Browser Origin headers must match configured `TRUSTED_ORIGINS`, `CORS_ORIGINS`, or the configured `BETTER_AUTH_BASE_URL` origin. Non-browser clients may omit Origin. Requests use `Content-Type: application/json` and accept JSON responses.

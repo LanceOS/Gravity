@@ -34,9 +34,11 @@ describe('MCP concurrency', () => {
     const results = await Promise.all(promises);
     const successCount = results.filter((r) => r.status === 200).length;
     const unauthorizedCount = results.filter((r) => r.status === 401).length;
+    const throttledCount = results.filter((r) => r.status === 429).length;
 
     expect(successCount).toBe(1);
-    expect(unauthorizedCount).toBe(concurrency - 1);
+    expect(unauthorizedCount + throttledCount).toBe(concurrency - 1);
+    expect(throttledCount).toBeGreaterThan(0);
     }
   );
 });
