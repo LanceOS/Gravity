@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { APP_SHELL_CONTENT_SECURITY_POLICY, createApp } from '../src/app.js';
+import { env } from '../src/env.js';
 
 describe('createApp', () => {
   it('returns the ready payload at the root route', async () => {
@@ -37,6 +38,60 @@ describe('createApp', () => {
     const response = await request(createApp()).get('/');
 
     expect(response.headers['x-content-type-options']).toBe('nosniff');
+  });
+
+  it('uses trusted origins for credentialed CORS when CORS_ORIGINS is empty', async () => {
+    const configuredCors = [...env.corsOrigins];
+    const configuredTrusted = [...env.trustedOrigins];
+    try {
+      env.corsOrigins.splice(0);
+      env.trustedOrigins.splice(0, env.trustedOrigins.length, 'https://app.example');
+      const app = createApp();
+
+      const allowed = await request(app).options('/api/v1/health/live')
+        .set('Origin', 'https://app.example')
+        .set('Access-Control-Request-Method', 'GET');
+      expect(allowed.status).toBe(204);
+      expect(allowed.headers['access-control-allow-origin']).toBe('https://app.example');
+      expect(allowed.headers['access-control-allow-credentials']).toBe('true');
+
+      const hostile = await request(app).get('/api/v1/health/live')
+        .set('Origin', 'https://evil.example');
+      expect(hostile.status).toBe(200);
+      expect(hostile.headers).not.toHaveProperty('access-control-allow-origin');
+      expect(hostile.headers).not.toHaveProperty('access-control-allow-credentials');
+
+      const hostilePreflight = await request(app).options('/api/v1/health/live')
+        .set('Origin', 'https://evil.example')
+        .set('Access-Control-Request-Method', 'GET');
+      expect(hostilePreflight.headers).not.toHaveProperty('access-control-allow-origin');
+      expect(hostilePreflight.headers).not.toHaveProperty('access-control-allow-credentials');
+    } finally {
+      env.corsOrigins.splice(0, env.corsOrigins.length, ...configuredCors);
+      env.trustedOrigins.splice(0, env.trustedOrigins.length, ...configuredTrusted);
+    }
+  });
+
+  it('uses an explicitly configured CORS origin as the development override', async () => {
+    const configuredCors = [...env.corsOrigins];
+    const configuredTrusted = [...env.trustedOrigins];
+    try {
+      env.corsOrigins.splice(0, env.corsOrigins.length, 'http://localhost:5173');
+      env.trustedOrigins.splice(0, env.trustedOrigins.length, 'http://localhost:8080');
+      const app = createApp();
+
+      const allowed = await request(app).get('/api/v1/health/live')
+        .set('Origin', 'http://localhost:5173');
+      expect(allowed.headers['access-control-allow-origin']).toBe('http://localhost:5173');
+      expect(allowed.headers['access-control-allow-credentials']).toBe('true');
+
+      const notListed = await request(app).get('/api/v1/health/live')
+        .set('Origin', 'http://localhost:8080');
+      expect(notListed.headers).not.toHaveProperty('access-control-allow-origin');
+    } finally {
+      env.corsOrigins.splice(0, env.corsOrigins.length, ...configuredCors);
+      env.trustedOrigins.splice(0, env.trustedOrigins.length, ...configuredTrusted);
+    }
   });
 
   it('keeps the nginx and Express application-shell CSPs aligned', async () => {

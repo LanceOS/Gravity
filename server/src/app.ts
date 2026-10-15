@@ -51,9 +51,13 @@ export function createApp() {
     next();
   });
 
+  const allowedCorsOrigins = env.corsOrigins.length > 0 ? env.corsOrigins : env.trustedOrigins;
   app.use(
     cors({
-      origin: env.corsOrigins.length > 0 ? env.corsOrigins : true,
+      // An absent CORS_ORIGINS follows the browser origins trusted by auth/CSRF.
+      // Additional cross-origin clients must be opted in explicitly.
+      origin: (requestOrigin, callback) => callback(null,
+        !!requestOrigin && allowedCorsOrigins.includes(requestOrigin)),
       credentials: true,
     }),
   );
