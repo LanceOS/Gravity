@@ -9,7 +9,7 @@ import type { McpRequestPayload } from './types.js';
 import { getDisabledTools } from './workspace-tools.js';
 import { desanitize, sanitize, withMcpStateScope } from './state-map.js';
 import { getAvailableTools, hasToolCallScope } from './policy.js';
-import { validateToolArguments } from './validation.js';
+import { isValidToolOutput, validateToolArguments } from './validation.js';
 
 export const SUPPORTED_MCP_PROTOCOL_VERSIONS = ['2025-11-25', '2025-06-18', '2025-03-26', '2024-11-05'] as const;
 
@@ -142,7 +142,15 @@ export class McpRequestHandler {
             };
             return { jsonrpc: '2.0', id: payload.id, result: toolResult(failure, true) };
           }
-          return { jsonrpc: '2.0', id: payload.id, result: toolResult(data) };
+          const success = toolResult(data);
+          // Custom schemas must match the JSON shape an SDK client will see.
+          if (!isValidToolOutput(definition, success.structuredContent)) {
+            return { jsonrpc: '2.0', id: payload.id, result: toolResult({
+              code: 'TOOL_OUTPUT_INVALID',
+              message: 'Tool returned invalid structured output. Contact support if it persists.',
+            }, true) };
+          }
+          return { jsonrpc: '2.0', id: payload.id, result: success };
         } catch (error) {
           // Authorization failures remain protocol errors. Domain errors are
           // visible to the model as tool failures so it can correct its input.

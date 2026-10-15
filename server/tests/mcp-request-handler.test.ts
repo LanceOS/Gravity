@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { AjvJsonSchemaValidator } from '@modelcontextprotocol/sdk/validation/ajv';
 import { McpRequestHandler } from '../src/modules/mcp/request-handler.js';
 import { bootstrapMcpRegistries } from '../src/modules/mcp/bootstrap.js';
+import { getToolDefinition, mcpToolsList, registerMcpTools } from '../src/modules/mcp/tools.js';
 import * as accessModule from '../src/modules/mcp/access.js';
 import * as executorModule from '../src/modules/mcp/tool-executor.js';
 import * as workspaceToolsModule from '../src/modules/mcp/workspace-tools.js';
@@ -64,6 +66,39 @@ describe('McpRequestHandler', () => {
     expect(response).toMatchObject({ result: { isError: true, structuredContent: { error: {
       code: 'RATE_LIMITED', message: 'Rate limit exceeded. Please wait a moment and try again.',
     } } } });
+  });
+
+  it('replaces invalid custom output with a schema-conforming tool error', async () => {
+    bootstrapMcpRegistries();
+    const name = 'custom_output_probe';
+    registerMcpTools([{
+      name,
+      description: 'Output validation probe',
+      inputSchema: { type: 'object', properties: {} },
+      outputSchema: { type: 'object', properties: { count: { type: 'number' } }, required: ['count'] },
+    }]);
+    try {
+      const executeSpy = vi.spyOn(executorModule, 'executeTool');
+      executeSpy.mockResolvedValueOnce({ count: 2 }).mockResolvedValueOnce({ count: 'private-invalid-value' });
+      const handler = new McpRequestHandler();
+      const call = () => handler.handle({
+        jsonrpc: '2.0', id: 7, method: 'tools/call', params: { name, arguments: {} },
+      }, 'workspace-1', 'user-1');
+      const validate = new AjvJsonSchemaValidator().getValidator(getToolDefinition(name)!.outputSchema!);
+
+      const success: any = await call();
+      expect(success.result.isError).toBe(false);
+      expect(validate(success.result.structuredContent).valid).toBe(true);
+
+      const invalid: any = await call();
+      expect(invalid.result).toMatchObject({ isError: true, structuredContent: { error: {
+        code: 'TOOL_OUTPUT_INVALID', message: 'Tool returned invalid structured output. Contact support if it persists.',
+      } } });
+      expect(validate(invalid.result.structuredContent).valid).toBe(true);
+      expect(JSON.stringify(invalid)).not.toContain('private-invalid-value');
+    } finally {
+      mcpToolsList.splice(mcpToolsList.findIndex((tool) => tool.name === name), 1);
+    }
   });
 
   it('preserves actionable authorization errors from workspace access checks', async () => {
