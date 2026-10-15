@@ -102,3 +102,16 @@ it('resynchronizes the DataGrid window after data shrink clamps the browser scro
   expect(screen.getByRole('textbox', { name: '1-name' })).toBeInTheDocument();
   expect(screen.queryByRole('textbox', { name: '20-name' })).not.toBeInTheDocument();
 });
+
+it('bounds the DataGrid window when data shrinks before the browser clamps scrollTop', () => {
+  const data = Array.from({ length: 50 }, (_, code) => ({ code, label: `Row ${code}` }));
+  const { container, rerender } = render(
+    <DataGrid columns={columns} data={data} getRowKey={getRowKey} height={90} rowHeight={30} />,
+  );
+  const viewport = container.firstElementChild!;
+  fireEvent.scroll(viewport, { target: { scrollTop: 600 } });
+  rerender(<DataGrid columns={columns} data={data.slice(0, 2)} getRowKey={getRowKey} height={90} rowHeight={30} />);
+  expect(viewport.scrollTop).toBe(600); // jsdom does not clamp scroll positions.
+  expect(screen.getByRole('textbox', { name: '0-name' })).toBeInTheDocument();
+  expect(screen.getByRole('textbox', { name: '1-name' })).toBeInTheDocument();
+});

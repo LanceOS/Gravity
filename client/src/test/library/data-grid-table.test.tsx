@@ -227,13 +227,14 @@ describe('DataGrid windowing', () => {
     let headerHeight = 30;
     let notifyResize: ResizeObserverCallback | undefined;
     const observed: Element[] = [];
+    const disconnect = vi.fn();
     const measure = vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (this: Element) {
       return { height: this instanceof HTMLElement && this.style.position === 'sticky' ? headerHeight : 0 } as DOMRect;
     });
     class TestResizeObserver {
       constructor(callback: ResizeObserverCallback) { notifyResize = callback; }
       observe(element: Element) { observed.push(element); }
-      disconnect() {}
+      disconnect() { disconnect(); }
     }
     vi.stubGlobal('ResizeObserver', TestResizeObserver);
 
@@ -242,15 +243,23 @@ describe('DataGrid windowing', () => {
       const viewport = view.container.firstElementChild!;
       const header = viewport.firstElementChild!;
       const body = header.nextElementSibling!;
-      expect(observed).toEqual([header, viewport]);
+      expect(observed).toEqual([header, viewport, body]);
       expect(body).toHaveStyle({ position: 'relative', height: '3000px' });
       expect(screen.getByText('Row 0').parentElement).toHaveStyle({ top: '0px' });
 
       fireEvent.scroll(viewport, { target: { scrollTop: 600 } });
       expect(screen.getByText('Row 30')).toBeInTheDocument();
+      expect(measure).toHaveBeenCalledTimes(1);
+
+      view.rerender(<DataGrid getRowKey={row => row.id} columns={[{ ...columns[0], title: 'Renamed', width: 200 }]} data={rows} height={180} rowHeight={30} />);
+      expect(screen.getByText('Renamed')).toHaveStyle({ width: '200px' });
+      expect(observed).toEqual([header, viewport, body]);
+      expect(disconnect).not.toHaveBeenCalled();
+      expect(measure).toHaveBeenCalledTimes(1);
 
       headerHeight = 120;
       act(() => notifyResize?.([], {} as ResizeObserver));
+      expect(measure).toHaveBeenCalledTimes(2);
       expect(screen.queryByText('Row 30')).not.toBeInTheDocument();
       expect(screen.getByText('Row 27')).toBeInTheDocument();
       expect(body).toHaveStyle({ height: '3000px' });
@@ -259,6 +268,13 @@ describe('DataGrid windowing', () => {
       headerHeight = 30;
       act(() => notifyResize?.([], {} as ResizeObserver));
       expect(screen.getByText('Row 30')).toBeInTheDocument();
+
+      // A theme can add canvas padding without changing the row pitch.
+      (body as HTMLElement).style.paddingBottom = '600px';
+      Object.defineProperty(viewport, 'scrollHeight', { configurable: true, value: 3630 });
+      act(() => notifyResize?.([], {} as ResizeObserver));
+      fireEvent.scroll(viewport, { target: { scrollTop: 3400 } });
+      expect(renderedRows()).toHaveLength(0);
     } finally {
       view.unmount();
       measure.mockRestore();

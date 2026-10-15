@@ -24,6 +24,10 @@ Sorting and filtering are supplied through `data`; column visibility and widths
 are supplied through `columns`. These components do not expose built-in sorting,
 selection, or drag-resizing controls.
 
+DataGrid measures its sticky header and scroll viewport as they resize. Its
+virtual rows use a fixed pixel pitch from `rowHeight` (36 by default); update
+that prop when row height changes instead of overriding row height with CSS.
+
 Regression coverage: `client/src/test/library/data-grid-table-identity.test.tsx`
 checks DOM identity, unsaved input state, focus, immutable row updates, column
 changes, virtual row positioning, and scroll-window recovery after data shrinks.
