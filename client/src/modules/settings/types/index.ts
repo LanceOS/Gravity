@@ -37,6 +37,8 @@ export interface SettingsScreenData {
   revokeLoadingId: string | null;
   exportLoading?: boolean;
   exportError?: string | null;
+  noteExportLoading?: boolean;
+  noteExportError?: string | null;
 }
 
 export interface SettingsScreenActions {
@@ -48,6 +50,8 @@ export interface SettingsScreenActions {
   onRevokeInvite: (inviteId: string) => Promise<boolean>;
   onApproveJoinRequest: (requestId: string) => Promise<boolean>;
   onExportTasks?: () => Promise<boolean>;
+  onExportNotes?: () => Promise<boolean>;
+  onCancelExportNotes?: () => void;
   deleteLoading?: boolean;
   deleteError?: string | null;
   onDeleteWorkspace?: () => Promise<void>;

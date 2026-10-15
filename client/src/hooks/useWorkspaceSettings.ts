@@ -77,6 +77,20 @@ function resolveDownloadFilename(contentDisposition: string | null, workspaceId:
   return match?.[1] || `gravity-${workspaceId}-tasks-export.json`;
 }
 
+function parseNoteExportManifest(tail: string): { type: 'manifest'; complete: boolean; diagnosticCount: number } {
+  const lastLine = tail.trimEnd().split('\n').at(-1);
+  let manifest: { type?: string; complete?: boolean; diagnosticCount?: number } | null = null;
+  try {
+    manifest = lastLine ? JSON.parse(lastLine) : null;
+  } catch {
+    // A truncated or malformed final record must never be treated as complete.
+  }
+  if (manifest?.type !== 'manifest' || typeof manifest.complete !== 'boolean' || typeof manifest.diagnosticCount !== 'number') {
+    throw new Error('Note export ended without a valid manifest.');
+  }
+  return manifest as { type: 'manifest'; complete: boolean; diagnosticCount: number };
+}
+
 function normalizeWorkspaceInvite(invite: Record<string, unknown>): WorkspaceInvite {
   return {
     id: String(invite.id ?? ''),
@@ -104,6 +118,8 @@ export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWork
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
+  const [noteExportError, setNoteExportError] = useState<string | null>(null);
+  const noteExportAbortRef = useRef<AbortController | null>(null);
 
   const enabled = !!currentUser && !!activeWorkspaceId;
   const userId = currentUser?.id;
@@ -398,6 +414,86 @@ export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWork
     },
   });
 
+  const exportNotesMutation = useMutation({
+    mutationFn: async () => {
+      type FileHandle = { createWritable: () => Promise<{ write: (chunk: Uint8Array) => Promise<void>; close: () => Promise<void>; abort: () => Promise<void> }> };
+      const picker = (window as Window & { showSaveFilePicker?: (options: { suggestedName: string }) => Promise<FileHandle> }).showSaveFilePicker;
+      // Open the picker during the click's user activation. Supported browsers
+      // then write response chunks directly to disk without buffering the file.
+      const handle = picker ? await picker.call(window, { suggestedName: `gravity-${activeWorkspaceId}-notes-${new Date().toISOString().slice(0, 10)}.jsonl` }) : null;
+      const abort = new AbortController();
+      noteExportAbortRef.current = abort;
+      try {
+        const response = await apiClient.raw(`/workspaces/${activeWorkspaceId}/export/notes`, {
+          headers: buildHeaders(), signal: abort.signal,
+        });
+        if (!response.ok) {
+          const data = await response.json().catch(() => null) as { error?: string } | null;
+          throw new ApiError(response.status, data?.error || 'Failed to export notes.', data);
+        }
+        let tail = '';
+        if (handle && response.body) {
+          const writable = await handle.createWritable();
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder();
+          try {
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              await writable.write(value);
+              tail = (tail + decoder.decode(value, { stream: true })).slice(-64 * 1024);
+            }
+            tail = (tail + decoder.decode()).slice(-64 * 1024);
+            const manifest = parseNoteExportManifest(tail);
+            await writable.close();
+            return manifest;
+          } catch (error) {
+            abort.abort();
+            void reader.cancel(error).catch(() => undefined);
+            try { await writable.abort(); } catch { /* Preserve the original download failure. */ }
+            throw error;
+          } finally {
+            reader.releaseLock();
+          }
+        } else {
+          const blob = await response.blob();
+          tail = await blob.slice(Math.max(0, blob.size - 64 * 1024)).text();
+          const manifest = parseNoteExportManifest(tail);
+          const filename = resolveDownloadFilename(response.headers.get('Content-Disposition'), activeWorkspaceId)
+            .replace(/tasks-export\.json$/, 'notes-export.jsonl');
+          const url = window.URL.createObjectURL(blob);
+          const anchor = document.createElement('a');
+          anchor.href = url;
+          anchor.download = filename;
+          document.body.appendChild(anchor);
+          anchor.click();
+          anchor.remove();
+          window.URL.revokeObjectURL(url);
+          return manifest;
+        }
+      } catch (error) {
+        abort.abort();
+        throw error;
+      } finally {
+        noteExportAbortRef.current = null;
+      }
+    },
+    onMutate: () => setNoteExportError(null),
+    onSuccess: (manifest) => {
+      if (manifest.complete) toast.show('Note export downloaded.', 'success');
+      else {
+        const message = `Note export downloaded with ${manifest.diagnosticCount ?? 0} diagnostics. Review its manifest and diagnostic records.`;
+        setNoteExportError(message);
+        toast.show(message, 'error');
+      }
+    },
+    onError: (err: Error) => {
+      const message = err.name === 'AbortError' ? 'Note export cancelled.' : err.message || 'Failed to export notes.';
+      setNoteExportError(message);
+      toast.show(message, 'error');
+    },
+  });
+
   // --- Exposed Callbacks ---
 
   const updateSettings = useCallback((updates: Partial<WorkspaceAdminSettings>) => {
@@ -464,6 +560,16 @@ export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWork
     }
   }, [exportTasksMutation]);
 
+  const exportNotes = useCallback(async () => {
+    try {
+      await exportNotesMutation.mutateAsync();
+      return true;
+    } catch {
+      return false;
+    }
+  }, [exportNotesMutation]);
+  const cancelExportNotes = useCallback(() => noteExportAbortRef.current?.abort(), []);
+
   const clearDeleteError = useCallback(() => setDeleteError(null), []);
 
   const updateMemberActivity = useCallback((userId: string, lastActiveAt: string) => {
@@ -491,6 +597,8 @@ export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWork
     revokeLoadingId: revokeInviteMutation.isPending ? revokeInviteMutation.variables : null,
     exportLoading: exportTasksMutation.isPending,
     exportError,
+    noteExportLoading: exportNotesMutation.isPending,
+    noteExportError,
     deleteLoading: deleteWorkspaceMutation.isPending,
     deleteError,
     updateSettings,
@@ -500,6 +608,8 @@ export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWork
     approveJoinRequest,
     refreshWorkspaceAdmin,
     exportTasks,
+    exportNotes,
+    cancelExportNotes,
     deleteWorkspace,
     clearDeleteError,
     updateMemberActivity,

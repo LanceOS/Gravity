@@ -57,6 +57,10 @@ export function WorkspaceSettingsPageRoute() {
     exportTasks,
     exportLoading,
     exportError,
+    exportNotes,
+    noteExportLoading,
+    noteExportError,
+    cancelExportNotes,
     deleteWorkspace,
     deleteLoading,
     deleteError,
@@ -143,6 +147,8 @@ export function WorkspaceSettingsPageRoute() {
         revokeLoadingId={revokeLoadingId || null}
         exportLoading={exportLoading}
         exportError={exportError}
+        noteExportLoading={noteExportLoading}
+        noteExportError={noteExportError}
         deleteLoading={deleteLoading}
         deleteError={deleteError}
         onBackToWorkspace={() => backFromSettings(navigate, location, `/workspaces/${workspaceId}`)}
@@ -153,6 +159,8 @@ export function WorkspaceSettingsPageRoute() {
         onRevokeInvite={async (inviteId: string) => Boolean(await revokeInvite(inviteId))}
         onApproveJoinRequest={async (requestId: string) => Boolean(await approveJoinRequest(requestId))}
         onExportTasks={async () => Boolean(await exportTasks())}
+        onExportNotes={async () => Boolean(await exportNotes())}
+        onCancelExportNotes={cancelExportNotes}
         onDeleteWorkspace={handleDeleteWorkspace}
         onClearDeleteError={clearDeleteError}
       />

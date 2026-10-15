@@ -47,6 +47,49 @@ describe('useWorkspaceSettings', () => {
     vi.unstubAllGlobals();
   });
 
+  it.each(['disk write', 'manifest'] as const)('cancels the note response after a %s failure', async (failure) => {
+    const currentUser = { id: 'owner-1', name: 'Owner', email: 'owner@example.com', avatar: '', role: 'owner', tutorial_completed: 1 };
+    const cancelSource = vi.fn();
+    const abortFile = vi.fn(async () => undefined);
+    const closeFile = vi.fn(async () => undefined);
+    const writeFile = vi.fn(async () => {
+      if (failure === 'disk write') throw new Error('disk full');
+    });
+    vi.stubGlobal('showSaveFilePicker', vi.fn(async () => ({ createWritable: async () => ({
+      write: writeFile, close: closeFile, abort: abortFile,
+    }) })));
+    let exportSignal: AbortSignal | undefined;
+    const fetchMock = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url.endsWith('/export/notes')) {
+        exportSignal = init?.signal as AbortSignal;
+        const body = new ReadableStream<Uint8Array>({
+          start(controller) {
+            controller.enqueue(new TextEncoder().encode(failure === 'manifest' ? '{"type":"note"}\n' : '{"type":"header"}\n'));
+            if (failure === 'manifest') controller.close();
+          },
+          cancel: cancelSource,
+        });
+        return new Response(body, { status: 200 });
+      }
+      if (url.endsWith('/settings')) return jsonResponse({ workspaceId: 'workspace-1', key: 'GRA', hostUrl: '', joinMode: 'approval_required', workspaceKey: '', disabledMcpTools: [] });
+      if (url.endsWith('/members') || url.endsWith('/invites') || url.endsWith('/join-requests')) return jsonResponse([]);
+      throw new Error(`Unexpected fetch call: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const wrapper = ({ children }: { children: React.ReactNode }) => <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+    const { result } = renderHook(() => useWorkspaceSettings({ currentUser, activeWorkspaceId: 'workspace-1' }), { wrapper });
+    await waitFor(() => expect(result.current.settingsLoading).toBe(false));
+    let succeeded = true;
+    await act(async () => { succeeded = await result.current.exportNotes(); });
+    expect(succeeded).toBe(false);
+    expect(exportSignal?.aborted).toBe(true);
+    expect(abortFile).toHaveBeenCalledOnce();
+    expect(closeFile).not.toHaveBeenCalled();
+    if (failure === 'disk write') expect(cancelSource).toHaveBeenCalledOnce();
+  });
+
   it('authenticates join-request approvals with the active user header', async () => {
     const currentUser = {
       id: 'owner-1',
