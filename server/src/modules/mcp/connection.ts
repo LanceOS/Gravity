@@ -12,6 +12,7 @@ const DEFAULT_TOKEN_TTL_SECONDS = 24 * 60 * 60;
 export const MCP_MAX_CONNECTION_TTL_SECONDS = 30 * 24 * 60 * 60;
 const SHA256_DIGEST_BYTES = 32;
 const SHA256_HEX_PATTERN = /^[0-9a-f]{64}$/;
+const RAW_TOKEN_PREVIEW_PATTERN = /^[0-9a-f]{64}$/;
 
 function connectionTokenExpiresAt(ttlSeconds?: number) {
   const ttl = ttlSeconds ?? DEFAULT_TOKEN_TTL_SECONDS;
@@ -19,6 +20,14 @@ function connectionTokenExpiresAt(ttlSeconds?: number) {
     throw new RangeError(`MCP connection lifetime must be an integer from 1 through ${MCP_MAX_CONNECTION_TTL_SECONDS} seconds.`);
   }
   return new Date(Date.now() + ttl * 1000);
+}
+
+// Audit payloads use the `maskedPreview` key: the logger deliberately redacts
+// every key containing "token". Never expose an unexpected or shorter value
+// under that key, since its contents bypass the logger's sensitive-key rule.
+export function maskedConnectionTokenPreview(raw: string): string {
+  if (!RAW_TOKEN_PREVIEW_PATTERN.test(raw)) return '[REDACTED]';
+  return `${raw.slice(0, 8)}...${raw.slice(-4)}`;
 }
 
 function readSha256Hex(value: unknown): { bytes: Buffer; valid: boolean } {
@@ -146,7 +155,6 @@ export async function createConnectionToken(opts: CreateOptions): Promise<Connec
   });
 
   // Audit: token created (do not include raw token)
-  const masked = `${raw.slice(0, 8)}...${raw.slice(-4)}`;
   auditConnectionTokenEvent('mcp.token.created', {
     id,
     workspaceId: opts.workspaceId,
@@ -157,7 +165,7 @@ export async function createConnectionToken(opts: CreateOptions): Promise<Connec
     sourceIp: opts.sourceIp ?? null,
     expiresAt: expiresAt.toISOString(),
     hmacKeyId,
-    maskedToken: masked,
+    maskedPreview: maskedConnectionTokenPreview(raw),
   });
 
   return {
@@ -223,7 +231,6 @@ export async function refreshConnectionToken(
   }).where(eq(mcpConnectionTokens.id, tokenId));
 
   // Audit: token refreshed
-  const masked = `${raw.slice(0, 8)}...${raw.slice(-4)}`;
   auditConnectionTokenEvent('mcp.token.refreshed', {
     id: row.id,
     workspaceId: row.workspaceId,
@@ -233,7 +240,7 @@ export async function refreshConnectionToken(
     connectionType: row.connectionType,
     sourceIp: opts.sourceIp === undefined ? row.sourceIp : opts.sourceIp,
     expiresAt: expiresAt.toISOString(),
-    maskedToken: masked,
+    maskedPreview: maskedConnectionTokenPreview(raw),
   });
 
   return {

@@ -13,6 +13,14 @@ describe('MCP connection advanced flows', () => {
     await resetTestApp();
   });
 
+  it('does not expose short or malformed credentials as masked previews', async () => {
+    const { maskedConnectionTokenPreview } = await import('../../src/modules/mcp/connection.js');
+
+    expect(maskedConnectionTokenPreview('short-secret')).toBe('[REDACTED]');
+    expect(maskedConnectionTokenPreview('g'.repeat(64))).toBe('[REDACTED]');
+    expect(maskedConnectionTokenPreview('a'.repeat(64))).toBe('aaaaaaaa...aaaa');
+  });
+
   it('increments usageCount for multi-use tokens and keeps status active', async () => {
     const { api: publicApi, createAuthenticatedApi, seedWorkspaceFixture } = await import('../helpers/test-helpers.js');
     const { db } = await import('../../src/db/index.js');
@@ -114,6 +122,41 @@ describe('MCP connection advanced flows', () => {
     // Wrong IP should be rejected
     const bad = await conn.verifyAndConsumeToken(rawToken, workspace.id, { sourceIp: '5.6.7.8' });
     expect(bad).toBeNull();
+  });
+
+  it('logs masked previews for created and refreshed tokens without logging full credentials', async () => {
+    const { createAuthenticatedApi, seedWorkspaceFixture } = await import('../helpers/test-helpers.js');
+    const ownerApi = await createAuthenticatedApi({
+      name: 'Audit Preview Owner',
+      email: `audit-preview-owner+${Date.now()}@example.com`,
+      role: 'owner',
+    });
+    const owner = ownerApi.user;
+    const { workspace } = await seedWorkspaceFixture({
+      owner: { id: owner.id, name: owner.name, email: owner.email, role: owner.role, avatarUrl: owner.avatar },
+    });
+    const auditSinkSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
+    const conn = await import('../../src/modules/mcp/connection.js');
+
+    const created = await conn.createConnectionToken({ workspaceId: workspace.id, generatedBy: owner.id });
+    const refreshed = await conn.refreshConnectionToken(created.id, owner.id);
+    expect(refreshed).not.toBeNull();
+
+    const auditLines = auditSinkSpy.mock.calls.map(([line]) => String(line));
+    expect(auditLines.join('\n')).not.toContain(created.rawToken);
+    expect(auditLines.join('\n')).not.toContain(refreshed!.rawToken);
+
+    for (const [event, credential] of [
+      ['mcp.token.created', created.rawToken],
+      ['mcp.token.refreshed', refreshed!.rawToken],
+    ]) {
+      const serialized = auditLines.find((line) => JSON.parse(line).event === event);
+      expect(serialized).toBeDefined();
+      const logged = JSON.parse(serialized!);
+      expect(logged.maskedPreview).toBe(`${credential.slice(0, 8)}...${credential.slice(-4)}`);
+      expect(logged.maskedToken).toBeUndefined();
+      expect(serialized).not.toContain(credential);
+    }
   });
 
   it('emits a security alert when a connection-token audit write fails', async () => {
