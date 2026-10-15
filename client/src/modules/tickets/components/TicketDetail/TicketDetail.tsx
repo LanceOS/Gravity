@@ -372,10 +372,12 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
           </div>
 
           <div className="ticket-detail__sidebar" data-testid="desktop-sidebar">
-            <div className="ticket-detail__sidebar-heading">
-              Properties
+            <div className="ticket-detail__sidebar-scroll" data-testid="desktop-sidebar-scroll">
+              <div className="ticket-detail__sidebar-heading">
+                Properties
+              </div>
+              {propertiesContent}
             </div>
-            {propertiesContent}
           </div>
 
 
