@@ -30,6 +30,19 @@ beforeEach(() => {
 afterEach(() => vi.restoreAllMocks());
 
 describe('WorkspaceMcpModal', () => {
+  it('labels destructive writes by effect, including a move', async () => {
+    const original = mocks.catalog.tools[2];
+    mocks.catalog.tools[2] = { ...original, name: 'move_ticket', description: 'Move a ticket', allowedForConnection: true };
+    try {
+      render(<WorkspaceMcpModal workspaceId="workspace-1" isOpen onClose={vi.fn()} />);
+      await waitFor(() => expect(screen.getByLabelText('List Tickets (read)')).toBeChecked());
+      expect(screen.getByLabelText('Assign Ticket (write)')).not.toBeChecked();
+      expect(screen.getByLabelText('Move Ticket (destructive)')).not.toBeChecked();
+    } finally {
+      mocks.catalog.tools[2] = original;
+    }
+  });
+
   it('offers a 30-day lifetime for generated connections', async () => {
     const user = userEvent.setup();
     render(<WorkspaceMcpModal workspaceId="workspace-1" isOpen onClose={vi.fn()} />);
@@ -50,7 +63,7 @@ describe('WorkspaceMcpModal', () => {
     render(<WorkspaceMcpModal workspaceId="workspace-1" isOpen onClose={vi.fn()} />);
     await waitFor(() => expect(screen.getByLabelText('List Tickets (read)')).toBeChecked());
     expect(screen.getByLabelText('Assign Ticket (write)')).not.toBeChecked();
-    expect(screen.getByLabelText('Delete Ticket (delete)')).toBeDisabled();
+    expect(screen.getByLabelText('Delete Ticket (destructive)')).toBeDisabled();
     await user.click(screen.getByRole('button', { name: 'Generate connection' }));
     await waitFor(() => expect(mocks.createConnection).toHaveBeenCalledWith({ scopes: ['tools/list', 'tools/call:list_tickets'], ttlSeconds: 86400, singleUse: false, bindToIp: false }));
     expect(screen.getByRole('alert')).toHaveTextContent('Connection generated successfully.');
@@ -91,7 +104,7 @@ describe('WorkspaceMcpModal', () => {
     await user.click(screen.getByRole('button', { name: 'Select All' }));
     expect(screen.getByLabelText('List Tickets (read)')).toBeChecked();
     expect(screen.getByLabelText('Assign Ticket (write)')).toBeChecked();
-    expect(screen.getByLabelText('Delete Ticket (delete)')).not.toBeChecked();
+    expect(screen.getByLabelText('Delete Ticket (destructive)')).not.toBeChecked();
     await user.click(screen.getByLabelText('List Tickets (read)'));
     await user.click(screen.getByRole('button', { name: 'Connection lifetime' }));
     await user.click(screen.getByRole('option', { name: '1 hour' }));

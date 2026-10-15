@@ -53,6 +53,28 @@ function pauseNextTransaction() {
 }
 
 describe('MCP domain safety and discovery', () => {
+  it('advertises destructive effects for ticket moves, terminal status updates, and removals', () => {
+    const tools = new Map(ticketToolDefinitions.map(tool => [tool.name, tool]));
+    for (const name of [
+      'delete_ticket', 'update_ticket', 'set_ticket_status', 'move_ticket',
+      'set_ticket_priority', 'assign_ticket', 'unassign_ticket',
+      'set_ticket_cycle', 'clear_ticket_cycle', 'set_ticket_parent', 'clear_ticket_parent',
+      'edit_ticket_content', 'set_ticket_pr', 'update_comment',
+      'remove_ticket_labels', 'set_ticket_labels', 'unmark_ticket_blocked',
+    ]) {
+      expect(tools.get(name)?.annotations, name).toMatchObject({ readOnlyHint: false, destructiveHint: true });
+    }
+    expect(tools.get('list_tickets')?.annotations).toMatchObject({ readOnlyHint: true, destructiveHint: false });
+    expect(tools.get('add_ticket_labels')?.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: false });
+    expect(tools.get('move_ticket')?.description).toMatch(/detaches.*parent.*children.*cycle.*labels/i);
+    expect(tools.get('move_ticket')?.description).toMatch(/flat hierarchy.*any project move clears all labels/i);
+    for (const name of ['update_ticket', 'set_ticket_status']) {
+      expect(tools.get(name)?.description, name).toMatch(/done or canceled.*blocker\/dependency relationships/i);
+    }
+    expect(tools.get('edit_ticket_content')?.description).toMatch(/replace.*title or description.*branch name/i);
+    expect(tools.get('set_ticket_pr')?.description).toMatch(/replace.*status or URL.*null clears/i);
+  });
+
   it('advertises tool schemas that compile under the shared strict runtime validator', () => {
     for (const tool of [...ticketToolDefinitions, ...workspaceToolDefinitions]) {
       try { validateToolArguments(tool, {}); } catch (error) {
@@ -144,6 +166,30 @@ describe('MCP domain safety and discovery', () => {
           data: expect.objectContaining({ ticket: expect.objectContaining({ id: ticket.id, parentId: null, subtasks: [] }) }) }),
       ]));
     } finally { unsubscribe(); }
+  });
+
+  it.each([
+    { hierarchyMode: 'flat', otherTeam: false, keepCycle: true, keepLabels: false },
+    { hierarchyMode: 'teams', otherTeam: false, keepCycle: true, keepLabels: true },
+    { hierarchyMode: 'teams', otherTeam: true, keepCycle: false, keepLabels: false },
+  ] as const)('matches the advertised move cleanup in $hierarchyMode hierarchy with otherTeam=$otherTeam', async scenario => {
+    const base = await fixture();
+    if (scenario.hierarchyMode === 'teams') {
+      await db.update(workspaceSettings).set({ hierarchyMode: 'teams' }).where(eq(workspaceSettings.workspaceId, base.workspace.id));
+    }
+    const cycleId = await seedCycle(base.scope.teamId);
+    await db.insert(labels).values({ id: 'move-label', teamId: base.scope.teamId,
+      ...(scenario.hierarchyMode === 'flat' ? { projectId: base.project.id } : {}), name: 'Move label' });
+    const ticket = await createTicketRecord({ projectId: base.project.id, title: 'Move effects', cycleId, labelIds: ['move-label'] });
+    const destinationTeamId = scenario.otherTeam ? 'destination-team' : base.scope.teamId;
+    if (scenario.otherTeam) await db.insert(teams).values({ id: destinationTeamId, workspaceId: base.workspace.id, name: 'Destination' });
+    const projectId = await secondProject(base, destinationTeamId);
+
+    await ticketToolHandlers.move_ticket({ ticketKey: ticket.key, projectId }, base.context);
+
+    expect((await getTicketById(ticket.id))?.cycleId).toBe(scenario.keepCycle ? cycleId : null);
+    expect(await db.select().from(ticketLabels).where(eq(ticketLabels.ticketId, ticket.id)))
+      .toHaveLength(scenario.keepLabels ? 1 : 0);
   });
 
   it('refreshes both parent detail snapshots when changing or clearing a parent', async () => {
