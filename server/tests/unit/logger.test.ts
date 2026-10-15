@@ -49,6 +49,21 @@ describe('logger redaction and trace propagation', () => {
     expect(logged.traceId).toBe('header-id');
   });
 
+  it('retains a masked preview in audit data while redacting raw token fields', () => {
+    logger.audit('mcp.token.created', {
+      maskedPreview: '12345678...cdef',
+      token: 'raw-token-value',
+      rawToken: 'another-raw-token-value',
+    });
+
+    const serialized = infoSpy.mock.calls[0][0];
+    const logged = JSON.parse(serialized);
+    expect(logged.maskedPreview).toBe('12345678...cdef');
+    expect(logged.token).toBe('[REDACTED]');
+    expect(logged.rawToken).toBe('[REDACTED]');
+    expect(serialized).not.toContain('raw-token-value');
+  });
+
   it('marks security failures as alertable errors and redacts sensitive context', () => {
     const delivered = logger.securityAlert('security.service_token_refresh_failed', {
       failureReason: 'configured_token_file_unreadable',

@@ -21,6 +21,12 @@ function connectionTokenExpiresAt(ttlSeconds?: number) {
   return new Date(Date.now() + ttl * 1000);
 }
 
+// Audit payloads use the `maskedPreview` key: the logger deliberately redacts
+// every key containing "token". Only this shortened value may use that key.
+function maskedConnectionTokenPreview(raw: string): string {
+  return `${raw.slice(0, 8)}...${raw.slice(-4)}`;
+}
+
 function readSha256Hex(value: unknown): { bytes: Buffer; valid: boolean } {
   const bytes = Buffer.alloc(SHA256_DIGEST_BYTES);
   if (typeof value !== 'string' || !SHA256_HEX_PATTERN.test(value)) return { bytes, valid: false };
@@ -146,7 +152,6 @@ export async function createConnectionToken(opts: CreateOptions): Promise<Connec
   });
 
   // Audit: token created (do not include raw token)
-  const masked = `${raw.slice(0, 8)}...${raw.slice(-4)}`;
   auditConnectionTokenEvent('mcp.token.created', {
     id,
     workspaceId: opts.workspaceId,
@@ -157,7 +162,7 @@ export async function createConnectionToken(opts: CreateOptions): Promise<Connec
     sourceIp: opts.sourceIp ?? null,
     expiresAt: expiresAt.toISOString(),
     hmacKeyId,
-    maskedToken: masked,
+    maskedPreview: maskedConnectionTokenPreview(raw),
   });
 
   return {
@@ -223,7 +228,6 @@ export async function refreshConnectionToken(
   }).where(eq(mcpConnectionTokens.id, tokenId));
 
   // Audit: token refreshed
-  const masked = `${raw.slice(0, 8)}...${raw.slice(-4)}`;
   auditConnectionTokenEvent('mcp.token.refreshed', {
     id: row.id,
     workspaceId: row.workspaceId,
@@ -233,7 +237,7 @@ export async function refreshConnectionToken(
     connectionType: row.connectionType,
     sourceIp: opts.sourceIp === undefined ? row.sourceIp : opts.sourceIp,
     expiresAt: expiresAt.toISOString(),
-    maskedToken: masked,
+    maskedPreview: maskedConnectionTokenPreview(raw),
   });
 
   return {
