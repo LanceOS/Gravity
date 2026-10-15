@@ -2,7 +2,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import express from 'express';
 import supertest from 'supertest';
-import { createOAuthAuthorizationRouter } from '../src/modules/mcp/oauth.js';
+import { createOAuthAuthorizationRouter, gravityOAuthProvider } from '../src/modules/mcp/oauth.js';
 import { describe, expect, it } from 'vitest';
 import { db } from '../src/db/index.js';
 import { mcpConnectionTokens, mcpOAuthRequests, mcpOAuthRefreshTokens, mcpOAuthGrants, workspaceMembers, workspaces } from '../src/db/schema.js';
@@ -16,6 +16,7 @@ const scopes = ['tools/list', 'tools/call:get_workspace'];
 const hash = (input: string) => createHash('sha256').update(input).digest('base64url');
 const endpoint = '/api/v1/workspaces/oauth-workspace/mcp';
 const resource = `${origin}${endpoint}`;
+const invalidToken = (token: string) => `${token[0] === 'A' ? 'B' : 'A'}${token.slice(1)}`;
 
 async function fixture() {
   const account = await createAuthenticatedApi({ email: `oauth-${randomBytes(5).toString('hex')}@example.com` });
@@ -143,6 +144,50 @@ describe('workspace OAuth MCP authorization', () => {
     expect(row.tokenHash).not.toBe(token.body.access_token);
     const [refreshRow] = await db.select().from(mcpOAuthRefreshTokens);
     expect(refreshRow.tokenHash).not.toBe(token.body.refresh_token);
+  });
+
+  it('rejects malformed and wrong same-length codes and tokens without consuming valid credentials', async () => {
+    const account = await fixture();
+    const client = await register();
+    const request = await authorize(client.client_id);
+    const code = await consent(account, request.requestId);
+    await expect(gravityOAuthProvider.challengeForAuthorizationCode(client, '!')).rejects.toThrow();
+    await expect(gravityOAuthProvider.challengeForAuthorizationCode(client, invalidToken(code))).rejects.toThrow();
+    expect((await exchange(client.client_id, '!', request.verifier)).status).toBe(400);
+    expect((await exchange(client.client_id, invalidToken(code), request.verifier)).status).toBe(400);
+    const issued = await exchange(client.client_id, code, request.verifier);
+    expect(issued.status).toBe(200);
+    const { access_token: access, refresh_token: refreshToken } = issued.body;
+    await expect(gravityOAuthProvider.verifyAccessToken('!')).rejects.toThrow();
+    await expect(gravityOAuthProvider.verifyAccessToken(invalidToken(access))).rejects.toThrow();
+    expect((await refresh(client.client_id, '!')).status).toBe(400);
+    expect((await refresh(client.client_id, invalidToken(refreshToken))).status).toBe(400);
+    expect((await call(access)).status).toBe(200);
+    expect((await refresh(client.client_id, refreshToken)).status).toBe(200);
+  });
+
+  it('revokes only credentials owned by the client, including rotated refresh tokens', async () => {
+    const { client, tokens } = await grant();
+    const otherClient = await register();
+    await gravityOAuthProvider.revokeToken(otherClient, { token: tokens.access_token });
+    await gravityOAuthProvider.revokeToken(client, { token: '!' });
+    await gravityOAuthProvider.revokeToken(client, { token: invalidToken(tokens.refresh_token) });
+    expect((await call(tokens.access_token)).status).toBe(200);
+
+    const rotated = await refresh(client.client_id, tokens.refresh_token);
+    expect(rotated.status).toBe(200);
+    await gravityOAuthProvider.revokeToken(client, { token: tokens.access_token });
+    expect((await call(rotated.body.access_token)).status).toBe(200);
+    await gravityOAuthProvider.revokeToken(client, { token: rotated.body.refresh_token });
+    expect((await call(rotated.body.access_token)).status).toBe(401);
+    expect((await refresh(client.client_id, rotated.body.refresh_token)).status).toBe(400);
+  });
+
+  it('revokes an access token and its refresh family', async () => {
+    const { client, tokens } = await grant();
+    await gravityOAuthProvider.revokeToken(client, { token: tokens.access_token });
+    expect((await call(tokens.access_token)).status).toBe(401);
+    expect((await refresh(client.client_id, tokens.refresh_token)).status).toBe(400);
   });
 
   it('rotates refresh tokens without extending the grant and revokes the family on replay', async () => {
