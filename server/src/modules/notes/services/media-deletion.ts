@@ -2,6 +2,9 @@ import { RustFS } from '../../../lib/rustfs.js';
 import { isNoteBodyFile, MetadataRepository, NotesRepository } from '../repositories.js';
 import { buildMediaReferenceIndex, type CleanupNote, parseMediaReferences } from './media-cleanup.js';
 import { withNoteReferenceLock, type NoteTransaction } from '../reference-lock.js';
+import { and, eq } from 'drizzle-orm';
+import { noteMediaDeletions } from '../schema.js';
+import { createMediaDeletionClaim, deleteClaimedMedia, getMediaDeletionClaim } from './media-claims.js';
 
 export class NoteMediaInUseError extends Error {
   constructor() {
@@ -33,7 +36,7 @@ export async function assertNoteAttachmentsUnshared(target: CleanupNote, tx: Not
 
 export async function deleteNoteMedia(noteId: string, projectId: string, filename: string) {
   if (isNoteBodyFile(filename)) throw new Error('Filename is reserved for note bodies');
-  return withNoteReferenceLock(async tx => {
+  const decision = await withNoteReferenceLock(async tx => {
     const target = await MetadataRepository.getNoteMetadata(noteId, tx);
     if (!target || target.projectId !== projectId) return null;
 
@@ -67,9 +70,13 @@ export async function deleteNoteMedia(noteId: string, projectId: string, filenam
     if (fresh.referenced.get(noteId)?.has(filename)) {
       return { deleted: false, blocked: true, remainingReferences: [] };
     }
-    await RustFS.deleteFile(target.bucketPath, filename, etag);
-    return { deleted: true, blocked: false, remainingReferences: [] };
+    const claimId = await createMediaDeletionClaim(noteId, target.bucketPath, filename, etag, tx);
+    if (!claimId) return { deleted: false, blocked: true, remainingReferences: [] };
+    return { deleted: true, blocked: false, remainingReferences: [], bucketPath: target.bucketPath, claimId };
   });
+  if (!decision || !('claimId' in decision)) return decision;
+  const deleted = await deleteClaimedMedia(decision.bucketPath!, filename, decision.claimId!);
+  return { deleted, blocked: !deleted, remainingReferences: [] };
 }
 
 // A save queued behind deletion must not publish a now-broken media URL. Check
@@ -85,10 +92,36 @@ export async function validateMediaReferences(body: string, tx: NoteTransaction)
     for (const [id, files] of parseMediaReferences(body)) {
       const source = await MetadataRepository.getNoteMetadata(id, tx);
       if (!source) throw new Error('Reference source no longer exists');
-      for (const filename of files) await RustFS.statFile(source.bucketPath, filename);
+      for (const filename of files) {
+        if (await getMediaDeletionClaim(source.bucketPath, filename, tx)) throw new Error('Media deletion claim exists');
+        await RustFS.statFile(source.bucketPath, filename);
+      }
     }
   } catch (cause) {
     // Never return foreign note IDs, filenames, or storage diagnostics.
     throw new MediaReferenceUnavailableError({ cause });
   }
+}
+
+export class MediaUploadBlockedError extends Error {
+  constructor() { super('This filename is reserved by a media deletion. Upload with another filename.'); }
+}
+
+/** Hold the publication boundary through PUT, then clear only a confirmed claim.
+ * An ambiguous DELETE can still arrive later, so its filename stays fenced.
+ */
+export async function uploadNoteMedia(
+  noteId: string, projectId: string, filename: string, stream: NodeJS.ReadableStream, contentLength?: number,
+) {
+  return withNoteReferenceLock(async tx => {
+    const note = await MetadataRepository.getNoteMetadata(noteId, tx);
+    if (!note || note.projectId !== projectId) return false;
+    const claim = await getMediaDeletionClaim(note.bucketPath, filename, tx);
+    if (claim && claim.status !== 'confirmed') throw new MediaUploadBlockedError();
+    await NotesRepository.saveAttachmentStream(note.bucketPath, filename, stream, contentLength);
+    if (claim) await tx.delete(noteMediaDeletions).where(and(
+      eq(noteMediaDeletions.bucketPath, note.bucketPath), eq(noteMediaDeletions.filename, filename),
+    ));
+    return true;
+  });
 }

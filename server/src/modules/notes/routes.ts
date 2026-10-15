@@ -5,7 +5,7 @@ import { getProjectIdFromRequest } from '../../lib/platform.js';
 import { authorizeProjectAccess } from '../workspaces/services/membership.js';
 import { createNote, deleteNote, getNote, listNotes, updateNote, searchNotes, cleanupNoteMedia } from './services/notes.js';
 import { isNoteBodyFile, MetadataRepository, NotesRepository } from './repositories.js';
-import { deleteNoteMedia, MediaReferenceUnavailableError, NoteMediaInUseError } from './services/media-deletion.js';
+import { deleteNoteMedia, MediaReferenceUnavailableError, MediaUploadBlockedError, NoteMediaInUseError, uploadNoteMedia } from './services/media-deletion.js';
 import { resolveRequestActorUserId } from '../auth/utils/request-auth.js';
 
 export function createNotesRouter() {
@@ -226,15 +226,16 @@ export function createNotesRouter() {
 
       const contentLength = Number(req.headers['content-length']);
 
-      const noteMeta = await MetadataRepository.getNoteMetadata(noteId);
-      if (!noteMeta || noteMeta.projectId !== projectId) {
-        res.status(404).json({ error: 'Note not found.' });
-        return;
-      }
-      
       try {
-        await NotesRepository.saveAttachmentStream(noteMeta.bucketPath, filename, req, contentLength);
+        if (!await uploadNoteMedia(noteId, projectId, filename, req, contentLength)) {
+          res.status(404).json({ error: 'Note not found.' });
+          return;
+        }
       } catch (uploadErr: any) {
+        if (uploadErr instanceof MediaUploadBlockedError) {
+          res.status(409).json({ error: uploadErr.message });
+          return;
+        }
         if (uploadErr.message === 'LIMIT_EXCEEDED') {
           res.status(413).json({ error: 'Payload Too Large. Stream exceeded maximum allowed limit.' });
           return;

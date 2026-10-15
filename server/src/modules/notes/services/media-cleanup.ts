@@ -1,6 +1,9 @@
 import MarkdownIt from 'markdown-it';
 import { isNoteBodyFile } from '../repositories.js';
 import { MAX_LISTED_FILES, MAX_LISTED_KEY_BYTES } from '../../../lib/object-list-limits.js';
+import { withNoteReferenceLock } from '../reference-lock.js';
+import { MetadataRepository } from '../repositories.js';
+import { createMediaDeletionClaim, deleteClaimedMedia } from './media-claims.js';
 
 export type CleanupNote = { id: string; bucketPath: string; bodyKey?: string | null };
 export type MediaVersion = { lastModified: Date; etag: string };
@@ -10,6 +13,8 @@ export type MediaCleanupDependencies = {
   listFiles: (bucket: string) => Promise<string[]>;
   statFile: (bucket: string, file: string) => Promise<MediaVersion>;
   deleteFile: (bucket: string, file: string, etag: string) => Promise<void>;
+  /** Inventory-only test seam; production always uses the transactional claim. */
+  claimOrphan?: (entry: { bucket: string; file: string; noteId: string }, etag: string) => Promise<string | null>;
 };
 export type CleanupOptions = { dryRun?: boolean; gracePeriodMs?: number };
 export const DEFAULT_MEDIA_GRACE_MS = 24 * 60 * 60 * 1000;
@@ -131,8 +136,36 @@ export async function cleanupMedia(deps: MediaCleanupDependencies, options: Clea
         deferred.push(entry);
         continue;
       }
-      // Refuse removal if another upload changed the content after HEAD.
-      await deps.deleteFile(entry.bucket, entry.file, version.etag);
+      // The final decision and durable claim share the publication lock. A
+      // save can no longer slip between the scan and the storage DELETE.
+      const claimId = deps.claimOrphan
+        ? await deps.claimOrphan(entry, version.etag)
+        : await withNoteReferenceLock(async tx => {
+          const locked = await buildMediaReferenceIndex({
+            listNotes: () => MetadataRepository.listNotesForMediaCleanup(tx),
+            getBody: deps.getBody,
+          });
+          if (!locked.notes.some(note => note.id === entry.noteId && note.bucketPath === entry.bucket)
+            || locked.referenced.get(entry.noteId)?.has(entry.file)) return null;
+          const current = await deps.statFile(entry.bucket, entry.file);
+          if (!current.etag || !Number.isFinite(current.lastModified?.getTime())) {
+            throw new Error(`Media cleanup blocked: missing object version for ${entry.bucket}/${entry.file}`);
+          }
+          // A same-content re-upload can have the same ETag. Its new
+          // LastModified still restarts the grace period.
+          if (current.etag !== version.etag || current.lastModified.getTime() !== version.lastModified.getTime()
+            || Date.now() - current.lastModified.getTime() < grace) return null;
+          return createMediaDeletionClaim(entry.noteId, entry.bucket, entry.file, version.etag, tx);
+        });
+      if (!claimId) {
+        deferred.push(entry);
+        continue;
+      }
+      if (deps.claimOrphan) await deps.deleteFile(entry.bucket, entry.file, version.etag);
+      else if (!await deleteClaimedMedia(entry.bucket, entry.file, claimId, deps.deleteFile)) {
+        deferred.push(entry);
+        continue;
+      }
       deleted.push(entry);
     }
   }
