@@ -6,6 +6,7 @@ import { db } from '../../../db/index.js';
 import { authUsers } from '../../../db/schema.js';
 import { RustFS } from '../../../lib/rustfs.js';
 import { noteMetadata } from '../../notes/schema.js';
+import { getWorkspaceMemberRole } from './membership.js';
 import { parseMediaReferences } from '../../notes/services/media-cleanup.js';
 import { projects, workspaceNoteExportEvents, workspaces } from '../schema.js';
 
@@ -119,6 +120,7 @@ export async function streamWorkspaceNoteExport(
   actorUserId: string,
   signal: AbortSignal,
 ) {
+  if (await getWorkspaceMemberRole(workspaceId, actorUserId) !== 'owner') return null;
   const startedAt = new Date();
   const eventId = randomUUID();
   const [workspace] = await db.select({ id: workspaces.id, key: workspaces.key, name: workspaces.name })

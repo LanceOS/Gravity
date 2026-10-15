@@ -25,7 +25,7 @@ export function useNote(projectId: string, noteId: string | null, { notesService
     enabled: !!noteId && !!projectId,
   });
 
-  const saveNote = useCallback(async (updates: { title?: string; body?: string }, baseVersion?: number, retry = false) => {
+  const saveNote = useCallback(async (updates: { title?: string; body?: string; visibility?: 'private' | 'shared' }, baseVersion?: number, retry = false) => {
     if (!noteId || !projectId || !noteQuery.data) throw new Error('No active note');
     return queue.save(baseVersion ?? noteQuery.data.version, async (version) => {
       const updated = await clientNotesService.updateNote(projectId, noteId, { ...updates, version });

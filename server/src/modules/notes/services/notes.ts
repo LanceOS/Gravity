@@ -7,8 +7,12 @@ import { RustFS } from '../../../lib/rustfs.js';
 import { cleanupMedia, type CleanupOptions, type MediaCleanupDependencies } from './media-cleanup.js';
 import { assertNoteAttachmentsUnshared, validateMediaReferences } from './media-deletion.js';
 import { noteExcerpt, noteSearchText } from '../search-text.js';
+import { authorizedNote, canAccessNote, type NoteActor } from './access.js';
 
 type NoteMetadata = NonNullable<Awaited<ReturnType<typeof MetadataRepository.getNoteMetadata>>>;
+
+// HTTP callers use the ForActor entry points. The unguarded operations below
+// are low-level storage primitives retained for recovery and service tests.
 
 export type NoteCleanupDependencies = MediaCleanupDependencies & {
   getMetadata: (id: string) => Promise<NoteMetadata | null>;
@@ -18,7 +22,8 @@ export async function createNote(
   projectId: string,
   userId: string,
   title: string,
-  body: string
+  body: string,
+  visibility: 'private' | 'shared' = 'private',
 ) {
   const noteUuid = randomUUID();
   const noteId = `note-${noteUuid}`;
@@ -32,7 +37,7 @@ export async function createNote(
   try {
     await NotesRepository.saveBody(bucketPath, body, bodyKey);
     metadata = await MetadataRepository.createNoteMetadata({
-      id: noteId, projectId, userId, title, excerpt, searchText, bucketPath, bodyKey,
+      id: noteId, projectId, userId, visibility, title, excerpt, searchText, bucketPath, bodyKey,
     }, tx => validateMediaReferences(body, tx));
   } catch (err) {
     await discardRevision(bodyKey);
@@ -43,12 +48,23 @@ export async function createNote(
   return { ...publicMetadata, body };
 }
 
+export async function createNoteForActor(
+  projectId: string, actor: NoteActor, title: string, body: string,
+  visibility: 'private' | 'shared' = 'private',
+) {
+  return createNote(projectId, actor.userId, title, body, visibility);
+}
+
 export async function getNote(noteId: string, projectId: string) {
   const metadata = await MetadataRepository.getNoteMetadata(noteId);
   if (!metadata || metadata.projectId !== projectId) {
     return null;
   }
 
+  return readNote(metadata);
+}
+
+async function readNote(metadata: NoteMetadata) {
   try {
     const body = await NotesRepository.getBody(metadata.bucketPath, metadata.bodyKey);
     const { searchText: _searchText, ...publicMetadata } = metadata;
@@ -62,11 +78,16 @@ export async function getNote(noteId: string, projectId: string) {
   }
 }
 
+export async function getNoteForActor(noteId: string, projectId: string, actor: NoteActor) {
+  const metadata = await authorizedNote(noteId, projectId, actor, 'read');
+  return metadata ? readNote(metadata) : null;
+}
+
 export async function updateNote(
   noteId: string,
   projectId: string,
   currentVersion: number,
-  updates: { title?: string; body?: string }
+  updates: { title?: string; body?: string; visibility?: 'private' | 'shared' }
 ) {
   const existing = await MetadataRepository.getNoteMetadata(noteId);
   if (!existing || existing.projectId !== projectId) {
@@ -92,7 +113,7 @@ export async function updateNote(
   try {
     if (bodyKey) await NotesRepository.saveBody(existing.bucketPath, body, bodyKey);
     updatedMeta = await MetadataRepository.updateNoteMetadata(noteId, currentVersion, {
-      title: updates.title, excerpt: newExcerpt, ...(searchText !== undefined ? { searchText } : {}), ...(bodyKey ? { bodyKey } : {}),
+      title: updates.title, visibility: updates.visibility, excerpt: newExcerpt, ...(searchText !== undefined ? { searchText } : {}), ...(bodyKey ? { bodyKey } : {}),
     }, updates.body !== undefined ? tx => validateMediaReferences(updates.body!, tx) : undefined);
   } catch (err: any) {
     if (bodyKey) await discardRevision(bodyKey);
@@ -105,10 +126,27 @@ export async function updateNote(
   return { ...publicMetadata, body };
 }
 
+export async function updateNoteForActor(
+  noteId: string, projectId: string, actor: NoteActor, currentVersion: number,
+  updates: { title?: string; body?: string; visibility?: 'private' | 'shared' },
+) {
+  const action = updates.visibility === undefined ? 'write' : 'manage';
+  if (!await authorizedNote(noteId, projectId, actor, action)) throw new Error('NOT_FOUND');
+  return updateNote(noteId, projectId, currentVersion, updates);
+}
+
 export async function deleteNote(noteId: string, projectId: string) {
+  return deleteNoteInternal(noteId, projectId);
+}
+
+export async function deleteNoteForActor(noteId: string, projectId: string, actor: NoteActor) {
+  return deleteNoteInternal(noteId, projectId, actor);
+}
+
+async function deleteNoteInternal(noteId: string, projectId: string, actor?: NoteActor) {
   const deleted = await withNoteReferenceLock(async tx => {
     const metadata = await MetadataRepository.getNoteMetadata(noteId, tx);
-    if (!metadata || metadata.projectId !== projectId) return null;
+    if (!metadata || metadata.projectId !== projectId || (actor && !canAccessNote(metadata, actor, 'manage'))) return null;
     await assertNoteAttachmentsUnshared(metadata, tx);
     await tx.insert(noteBucketCleanups).values({ bucketPath: metadata.bucketPath, noteId });
     await MetadataRepository.deleteNoteMetadata(noteId, tx);
@@ -130,8 +168,16 @@ export async function listNotes(projectId: string, userId: string, limit: number
   return await MetadataRepository.listNotesMetadata(projectId, userId, limit, offset, sortDirection);
 }
 
+export async function listNotesForActor(projectId: string, actor: NoteActor, limit: number = 50, offset: number = 0, sortDirection: 'desc' | 'asc' = 'desc') {
+  return listNotes(projectId, actor.userId, limit, offset, sortDirection);
+}
+
 export async function searchNotes(projectId: string, userId: string, query: string, limit: number = 50, offset: number = 0, sortDirection: 'desc' | 'asc' = 'desc') {
   return await MetadataRepository.searchNotesMetadata(projectId, userId, query, limit, offset, sortDirection);
+}
+
+export async function searchNotesForActor(projectId: string, actor: NoteActor, query: string, limit: number = 50, offset: number = 0, sortDirection: 'desc' | 'asc' = 'desc') {
+  return searchNotes(projectId, actor.userId, query, limit, offset, sortDirection);
 }
 
 export class NoteCleanupService {
@@ -150,8 +196,16 @@ export class NoteCleanupService {
   }
 
   async cleanupNoteMedia(noteId: string, projectId: string, options: CleanupOptions = {}) {
+    return this.cleanupNoteMediaInternal(noteId, projectId, options);
+  }
+
+  async cleanupNoteMediaForActor(noteId: string, projectId: string, actor: NoteActor, options: CleanupOptions = {}) {
+    return this.cleanupNoteMediaInternal(noteId, projectId, options, actor);
+  }
+
+  private async cleanupNoteMediaInternal(noteId: string, projectId: string, options: CleanupOptions, actor?: NoteActor) {
     const metadata = await this.dependencies.getMetadata(noteId);
-    if (!metadata || metadata.projectId !== projectId) throw new Error('NOT_FOUND');
+    if (!metadata || metadata.projectId !== projectId || (actor && !canAccessNote(metadata, actor, 'manage'))) throw new Error('NOT_FOUND');
     const result = await cleanupMedia(this.dependencies, options, metadata);
     return {
       cleanedFiles: result.deleted.map(entry => entry.file),
@@ -170,6 +224,10 @@ export function createNoteCleanupService(dependencies?: Partial<NoteCleanupDepen
 
 export async function cleanupNoteMedia(noteId: string, projectId: string, options: CleanupOptions = {}) {
   return noteCleanupService.cleanupNoteMedia(noteId, projectId, options);
+}
+
+export async function cleanupNoteMediaForActor(noteId: string, projectId: string, actor: NoteActor, options: CleanupOptions = {}) {
+  return noteCleanupService.cleanupNoteMediaForActor(noteId, projectId, actor, options);
 }
 
 // Never delete on an ambiguous DB failure alone: the transaction may have

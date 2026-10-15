@@ -17,6 +17,7 @@ export interface NotesListOptions {
 export interface NoteUpdatePayload {
   title?: string;
   body?: string;
+  visibility?: 'private' | 'shared';
   version: number;
 }
 
@@ -41,6 +42,7 @@ function isNoteMetadata(value: unknown): value is NoteMetadata {
   return isString(candidate.id)
     && isString(candidate.projectId)
     && isString(candidate.userId)
+    && (candidate.visibility === 'private' || candidate.visibility === 'shared')
     && isString(candidate.title)
     && isNumber(candidate.version)
     && isString(candidate.createdAt)

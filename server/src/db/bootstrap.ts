@@ -925,6 +925,9 @@ async function bootstrapDatabase() {
 
   await pool.query(`
     ALTER TABLE note_metadata ADD COLUMN IF NOT EXISTS body_key TEXT NOT NULL DEFAULT 'body.md';
+    ALTER TABLE note_metadata ADD COLUMN IF NOT EXISTS visibility TEXT NOT NULL DEFAULT 'private';
+    CREATE INDEX IF NOT EXISTS note_metadata_project_visibility_updated_at_idx
+      ON note_metadata (project_id, visibility, updated_at);
     CREATE TABLE IF NOT EXISTS note_body_revisions (
       body_key TEXT PRIMARY KEY,
       bucket_path TEXT NOT NULL,

@@ -58,6 +58,7 @@ describe('workspace note audit export', () => {
       excerpt: 'Complete body', bucketPath, bodyKey: '.revisions/rev1.md', version: 3,
       createdAt: new Date('2026-09-01T00:00:00Z'), updatedAt: new Date('2026-09-03T00:00:00Z'),
     });
+    expect((await db.select({ visibility: noteMetadata.visibility }).from(noteMetadata).where(eq(noteMetadata.id, noteId)))[0]?.visibility).toBe('private');
 
     const denied = await memberApi.get(`/api/v1/workspaces/${workspace.id}/export/notes`);
     expect(denied.status).toBe(403);
