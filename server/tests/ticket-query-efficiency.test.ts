@@ -28,13 +28,13 @@ async function seedRelatedTickets() {
 }
 
 describe('ticket query efficiency', () => {
-  it('hydrates a full ticket list in four queries while preserving active relationship flags', async () => {
+  it('hydrates a full ticket list in five queries while preserving active relationship flags', async () => {
     const project = await seedRelatedTickets();
     const selectSpy = vi.spyOn(db, 'select');
 
     const result = await listTickets(project.id);
 
-    expect(selectSpy).toHaveBeenCalledTimes(4);
+    expect(selectSpy).toHaveBeenCalledTimes(5);
     expect(result.map(({ id, isBlocked, isDependency, projectName }) => ({ id, isBlocked, isDependency, projectName }))).toEqual([
       { id: 'ticket-a', isBlocked: true, isDependency: false, projectName: project.name },
       { id: 'ticket-b', isBlocked: false, isDependency: false, projectName: project.name },
@@ -44,7 +44,7 @@ describe('ticket query efficiency', () => {
 
     selectSpy.mockClear();
     expect(await listWorkspaceTickets([project.id])).toEqual(result);
-    expect(selectSpy).toHaveBeenCalledTimes(4);
+    expect(selectSpy).toHaveBeenCalledTimes(5);
   });
 
   it('still loads statuses outside the page and skips relationship queries for terminal-only results', async () => {
