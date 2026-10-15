@@ -24,6 +24,7 @@ import { ErrorBoundary } from '../../../components/ErrorBoundary';
 import { WorkspacePageContextMenu } from '../components/WorkspacePageContextMenu';
 import { apiClient } from '../../../utils/apiClient';
 import { formatTicketTimelineDate } from '../../tickets/utils/ticketDateFormatter';
+import { BulkTicketTriage } from '../../tickets/components/BulkTicketTriage';
 import '../styles/WorkspacePage.css';
 
 const NoteEditor = lazy(() => import('../../notes/components/NoteEditor').then(({ NoteEditor }) => ({ default: NoteEditor })));
@@ -110,6 +111,7 @@ function getTicketProjectName(ticket: Ticket, projectById: Record<string, Projec
 }
 
 export function WorkspacePage({
+  workspaceId,
   pathname,
   isTicketDetailRoute = false,
   activeContext = 'issues',
@@ -148,6 +150,30 @@ export function WorkspacePage({
   const [notesSort, setNotesSort] = useState<'desc' | 'asc'>('desc');
   const labels = useMemo(() => labelItems ?? domainItems ?? [], [labelItems, domainItems]);
   const filteredTickets = useMemo(() => profileComputation('WorkspacePage:filterTickets', () => filterTickets(tickets, filters)), [tickets, filters]);
+  const selectionScope = JSON.stringify([workspaceId, filters]);
+  const [selection, setSelection] = useState<{ scope: string; ids: string[] }>({ scope: selectionScope, ids: [] });
+  const [visibleTicketIds, setVisibleTicketIds] = useState<string[]>([]);
+  const onVisibleTicketsChange = useCallback((ids: string[]) => {
+    setVisibleTicketIds((previous) => previous.length === ids.length && previous.every((id, index) => id === ids[index]) ? previous : ids);
+    const visible = new Set(ids);
+    setSelection((previous) => {
+      if (previous.scope !== selectionScope) return previous;
+      const retained = previous.ids.filter((id) => visible.has(id));
+      return retained.length === previous.ids.length ? previous : { ...previous, ids: retained };
+    });
+  }, [selectionScope]);
+  const visibleTicketIdSet = useMemo(() => new Set(visibleTicketIds), [visibleTicketIds]);
+  const visibleTickets = useMemo(() => filteredTickets.filter((ticket) => visibleTicketIdSet.has(ticket.id)), [filteredTickets, visibleTicketIdSet]);
+  const selectedTicketIds = useMemo(() => new Set(selection.scope === selectionScope ? selection.ids.filter((id) => visibleTicketIdSet.has(id)) : []), [selection, selectionScope, visibleTicketIdSet]);
+  const selectedTickets = useMemo(() => visibleTickets.filter((ticket) => selectedTicketIds.has(ticket.id)), [visibleTickets, selectedTicketIds]);
+  const toggleTicketSelection = useCallback((ticket: Ticket) => {
+    setSelection((previous) => {
+      const ids = previous.scope === selectionScope ? previous.ids.filter((id) => visibleTicketIdSet.has(id)) : [];
+      return { scope: selectionScope, ids: ids.includes(ticket.id) ? ids.filter((id) => id !== ticket.id) : ids.length < 100 ? [...ids, ticket.id] : ids };
+    });
+  }, [selectionScope, visibleTicketIdSet]);
+  const selectVisibleTickets = useCallback(() => setSelection({ scope: selectionScope, ids: visibleTicketIds.slice(0, 100) }), [selectionScope, visibleTicketIds]);
+  const clearTicketSelection = useCallback(() => setSelection({ scope: selectionScope, ids: [] }), [selectionScope]);
   const hasFiltersApplied = useMemo(() => hasActiveTicketFilters(filters), [filters]);
   const headerTitle = useMemo(
     () => getWorkspaceHeaderTitle(filters, currentUser, projects, labels, cycles),
@@ -413,6 +439,18 @@ export function WorkspacePage({
                     {({ reset }) => (
                       <ErrorBoundary onReset={reset}>
                         <div className="workspace-page__tickets-stage">
+                          {(activeView === 'list' || activeView === 'board') && <BulkTicketTriage
+                            key={selectionScope}
+                            workspaceId={workspaceId}
+                            isTeamWorkspace={isTeamWorkspace}
+                            visibleTickets={visibleTickets}
+                            selectedTickets={selectedTickets}
+                            projects={projects}
+                            users={users}
+                            labels={labels}
+                            onSelectVisible={selectVisibleTickets}
+                            onClear={clearTicketSelection}
+                          />}
                           <div
                             className={`workspace-page__tickets-loading-layer ${
                               shouldShowTicketsLoading ? 'workspace-page__tickets-loading-layer--visible' : ''
@@ -471,6 +509,9 @@ export function WorkspacePage({
                               userAvatarById={userAvatarById}
                               onMoveTicket={async (ticketId, updates) => { await onUpdateTicket(ticketId, updates, { immediate: true }); }}
                               onSelectTicket={onSelectTicket}
+                              selectedTicketIds={selectedTicketIds}
+                              onToggleTicketSelection={toggleTicketSelection}
+                              onVisibleTicketsChange={onVisibleTicketsChange}
                               onOpenCreateTicket={onOpenCreateTicket}
                               onLoadMore={onLoadMoreTickets}
                               hasMoreRows={hasMoreTickets}
@@ -486,6 +527,9 @@ export function WorkspacePage({
                               userAvatarById={userAvatarById}
                               projectById={showProjectBadges ? projectById : undefined}
                               onSelectTicket={onSelectTicket}
+                              selectedTicketIds={selectedTicketIds}
+                              onToggleTicketSelection={toggleTicketSelection}
+                              onVisibleTicketsChange={onVisibleTicketsChange}
                               onLoadMore={onLoadMoreTickets}
                               hasMoreRows={hasMoreTickets}
                               isLoadingMoreRows={isLoadingMoreTickets}

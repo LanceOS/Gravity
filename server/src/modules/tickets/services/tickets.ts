@@ -998,36 +998,35 @@ export async function getTicketDetailsByKey(ticketKey: string) {
   return row ? getTicketDetailsFromRow(row) : null;
 }
 
-// Bound both IN-list sizes and concurrent detail fan-out. Each detail itself
-// issues several parallel queries, so keep this deliberately conservative.
+// Bound IN-list sizes when preparing follow-up realtime invalidations.
 const CLEANUP_BATCH_SIZE = 100;
-const CLEANUP_HYDRATION_CONCURRENCY = 2;
 
-export async function getRelationshipCleanupSnapshots(
+export async function getRelationshipCleanupEventTargets(
   affectedTickets: TicketRelationshipCleanupEffect['affectedTickets'],
 ) {
-  const snapshots = [];
+  const targets = [];
   for (let offset = 0; offset < affectedTickets.length; offset += CLEANUP_BATCH_SIZE) {
     const batch = affectedTickets.slice(offset, offset + CLEANUP_BATCH_SIZE);
-    const rows = await db.select().from(tickets).where(inArray(tickets.id, batch.map(({ id }) => id)));
+    const rows = await db.select({ id: tickets.id, projectId: tickets.projectId, key: tickets.key })
+      .from(tickets).where(inArray(tickets.id, batch.map(({ id }) => id)));
     const scopes = await getProjectScopes([...new Set(batch.map(({ projectId }) => projectId))]);
-    const flags = await getTicketRelationshipFlags(rows);
     const rowsById = new Map(rows.map((row) => [row.id, row]));
-    for (let start = 0; start < batch.length; start += CLEANUP_HYDRATION_CONCURRENCY) {
-      snapshots.push(...await Promise.all(batch.slice(start, start + CLEANUP_HYDRATION_CONCURRENCY).map(async ({ id, projectId }) => {
-        const scope = scopes.get(projectId);
-        if (!scope) return null;
-        const row = rowsById.get(id);
-        return {
-          projectId,
-          ticketId: id,
-          workspaceId: scope.workspaceId,
-          ticket: row?.projectId === projectId ? await getTicketDetailsFromRow(row, scope, flags) : null,
-        };
-      })));
+    for (const { id, projectId } of batch) {
+      const scope = scopes.get(projectId);
+      if (!scope) {
+        targets.push(null);
+        continue;
+      }
+      const row = rowsById.get(id);
+      targets.push({
+        projectId,
+        ticketId: id,
+        workspaceId: scope.workspaceId,
+        ticketKey: row?.projectId === projectId ? row.key : null,
+      });
     }
   }
-  return snapshots;
+  return targets;
 }
 
 export async function createTicketRecord(input: {
@@ -1115,10 +1114,13 @@ export async function createTicketRecord(input: {
   return mapTicket(result.ticketRow, result.createdLabels);
 }
 
-async function getTicketRelationshipCleanupEffect(ticketId: string): Promise<TicketRelationshipCleanupEffect> {
+async function getTicketRelationshipCleanupEffect(
+  tx: Pick<typeof db, 'select'>,
+  ticketId: string,
+): Promise<TicketRelationshipCleanupEffect> {
   const affectedTickets = new Map<string, { id: string; projectId: string }>();
 
-  const rows = await db
+  const rows = await tx
     .select({
       ticketId: ticketRelationships.ticketId,
       blockedTicketId: ticketRelationships.blockedTicketId,
@@ -1137,7 +1139,7 @@ async function getTicketRelationshipCleanupEffect(ticketId: string): Promise<Tic
   }
 
   const relatedTickets = relatedTicketIds.size > 0
-    ? await db
+    ? await tx
         .select({
           id: tickets.id,
           projectId: tickets.projectId,
@@ -1177,6 +1179,8 @@ export async function updateTicketRecordWithEffects(
     projectId: string;
   }>,
   projectId?: string,
+  expectedUpdatedAt?: Date,
+  authorizedWorkspaceId?: string,
 ): Promise<TicketUpdateEffects | null> {
   const existingRows = await db
     .select()
@@ -1191,6 +1195,9 @@ export async function updateTicketRecordWithEffects(
   const sourceProject = await getProjectScope(existingTicket.projectId);
   if (!sourceProject) {
     throw new Error(`Project ${existingTicket.projectId} is missing.`);
+  }
+  if (authorizedWorkspaceId && sourceProject.workspaceId !== authorizedWorkspaceId) {
+    throw new Error('TICKET_MOVE_CROSS_WORKSPACE');
   }
 
   const requestedProjectId = typeof updates.projectId === 'string' ? updates.projectId.trim() : '';
@@ -1217,9 +1224,6 @@ export async function updateTicketRecordWithEffects(
     : existingTicket.status;
   const shouldClearRelationships = updates.status !== undefined
     && isTerminalTicketStatus(nextStatus);
-  const relationshipCleanup = shouldClearRelationships
-    ? await getTicketRelationshipCleanupEffect(ticketId)
-    : { removedRelationCount: 0, affectedTickets: [] };
 
   const sanitizedDescription = updates.description !== undefined
     ? sanitizeEditorContentForPersistence(updates.description as string, {
@@ -1260,12 +1264,37 @@ export async function updateTicketRecordWithEffects(
       .where(and(eq(tickets.id, ticketId), eq(tickets.projectId, sourceProject.id))).limit(1);
     // Another move may have completed between the initial lookup and acquiring the project lock.
     if (!currentTicket) return null;
+    if (expectedUpdatedAt && currentTicket.updatedAt.getTime() !== expectedUpdatedAt.getTime()) return null;
+    if (expectedUpdatedAt) {
+      payload.updatedAt = new Date(Math.max(payload.updatedAt.getTime(), currentTicket.updatedAt.getTime() + 1));
+    }
     if (nextAssigneeId !== undefined || isProjectMove) {
       await assertAssigneeInProjectScope(tx, targetProject, nextAssigneeId !== undefined ? nextAssigneeId : currentTicket.assigneeId);
     }
     await assertTicketRelationships(tx, targetProject, ticketId,
       nextCycleId !== undefined ? nextCycleId : currentTicket.cycleId,
       nextParentId !== undefined ? nextParentId : currentTicket.parentId);
+
+    const shouldUpdateLabels = updates.labelIds !== undefined || projectLabelScopeChanged || teamChanged;
+    const labelIdsForTicket = nextLabelIds ?? [];
+    const resolvedLabels = shouldUpdateLabels && labelIdsForTicket.length > 0
+      ? await tx.select({ ...labelSelectFields }).from(labels).where(
+          targetProject.hierarchyMode === 'flat'
+            ? and(eq(labels.projectId, targetProject.id), inArray(labels.id, labelIdsForTicket))
+            : and(eq(labels.teamId, targetProject.teamId), isNull(labels.projectId), inArray(labels.id, labelIdsForTicket)),
+        )
+      : [];
+    if (shouldUpdateLabels && labelIdsForTicket.length > 0 && resolvedLabels.length !== labelIdsForTicket.length) {
+      throw new Error(targetProject.hierarchyMode === 'flat'
+        ? 'One or more labels were not found for this project.'
+        : 'One or more labels were not found for this team.');
+    }
+
+    // Relation writers take the project lock too. Read the affected endpoints
+    // after acquiring it, so newly added relations are included in the refresh.
+    const relationshipCleanup = shouldClearRelationships
+      ? await getTicketRelationshipCleanupEffect(tx, ticketId)
+      : { removedRelationCount: 0, affectedTickets: [] };
 
     const rows = await tx
       .update(tickets)
@@ -1306,27 +1335,7 @@ export async function updateTicketRecordWithEffects(
       await tx.delete(ticketRelationships).where(eq(ticketRelationships.blockedTicketId, ticketId));
     }
 
-    if (updates.labelIds !== undefined || projectLabelScopeChanged || teamChanged) {
-      const labelIdsForTicket = nextLabelIds ?? [];
-      const resolvedLabels = labelIdsForTicket.length > 0
-        ? await tx
-            .select({
-              ...labelSelectFields,
-            })
-            .from(labels)
-            .where(
-              targetProject.hierarchyMode === 'flat'
-                ? and(eq(labels.projectId, targetProject.id), inArray(labels.id, labelIdsForTicket))
-                : and(eq(labels.teamId, targetProject.teamId), isNull(labels.projectId), inArray(labels.id, labelIdsForTicket)),
-            )
-        : [];
-
-      if (labelIdsForTicket.length > 0 && resolvedLabels.length !== labelIdsForTicket.length) {
-        throw new Error(targetProject.hierarchyMode === 'flat'
-          ? 'One or more labels were not found for this project.'
-          : 'One or more labels were not found for this team.');
-      }
-
+    if (shouldUpdateLabels) {
       await tx.delete(ticketLabels).where(eq(ticketLabels.ticketId, ticketId));
       if (resolvedLabels.length > 0) {
         await tx.insert(ticketLabels).values(
@@ -1343,7 +1352,7 @@ export async function updateTicketRecordWithEffects(
       .innerJoin(labels, eq(labels.id, ticketLabels.labelId))
       .where(eq(ticketLabels.ticketId, ticketId));
 
-    return { ticket: rows[0], labels: updatedLabels, hierarchyChange: { affectedTickets: [...hierarchyAffected.values()] } };
+    return { ticket: rows[0], labels: updatedLabels, relationshipCleanup, hierarchyChange: { affectedTickets: [...hierarchyAffected.values()] } };
   });
 
   if (!result) {
@@ -1353,7 +1362,7 @@ export async function updateTicketRecordWithEffects(
   const { blockedIds, dependencyIds } = await getTicketRelationshipFlags([result.ticket]);
   return {
     ticket: mapTicket(result.ticket, result.labels, blockedIds.has(ticketId), dependencyIds.has(ticketId)),
-    relationshipCleanup,
+    relationshipCleanup: result.relationshipCleanup,
     hierarchyChange: result.hierarchyChange,
   };
 }

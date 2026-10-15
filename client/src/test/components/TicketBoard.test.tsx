@@ -161,6 +161,19 @@ function renderTicketBoard(overrides: Partial<Parameters<typeof TicketBoard>[0]>
 }
 
 describe('TicketBoard', () => {
+  it('offers keyboard ticket selection and reports the shown cards', async () => {
+    const user = userEvent.setup();
+    const onToggleTicketSelection = vi.fn();
+    const onVisibleTicketsChange = vi.fn();
+    const { props } = renderTicketBoard({ onToggleTicketSelection, onVisibleTicketsChange });
+    const checkbox = screen.getByRole('checkbox', { name: 'Select GRA-1: Fix sync errors' });
+    checkbox.focus();
+    await user.keyboard(' ');
+    expect(onToggleTicketSelection).toHaveBeenCalledWith(backlogTicket);
+    expect(props.onSelectTicket).not.toHaveBeenCalled();
+    expect(onVisibleTicketsChange).toHaveBeenLastCalledWith(['ticket-1', 'ticket-2']);
+  });
+
   it('opens the create flow for a column', async () => {
     const user = userEvent.setup();
     const { props } = renderTicketBoard();

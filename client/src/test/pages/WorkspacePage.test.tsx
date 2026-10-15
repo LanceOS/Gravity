@@ -3,10 +3,15 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { useEffect } from 'react';
 import { WorkspacePage } from '../../pages/WorkspacePage/WorkspacePage.tsx';
 import type { Cycle, Domain, Project, Ticket } from '../../context/TicketContextContext';
 type TicketListMockProps = {
   filteredCount: number;
+  groupedTickets: Record<string, Ticket[]>;
+  onVisibleTicketsChange?: (ids: string[]) => void;
+  onToggleTicketSelection?: (ticket: Ticket) => void;
+  selectedTicketIds?: ReadonlySet<string>;
 };
 
 type TicketDetailMockProps = {
@@ -52,9 +57,13 @@ vi.mock('../../modules/tickets', async () => {
           Clear board filters
         </button>
       ) : null,
-    TicketList: ({ filteredCount }: TicketListMockProps) => (
-      <div>{`TicketList ${filteredCount}`}</div>
-    ),
+    TicketList: ({ filteredCount, groupedTickets, onVisibleTicketsChange, onToggleTicketSelection, selectedTicketIds }: TicketListMockProps) => {
+      const shown = Object.values(groupedTickets).flat();
+      useEffect(() => onVisibleTicketsChange?.(Object.values(groupedTickets).flat().map((item) => item.id)), [groupedTickets, onVisibleTicketsChange]);
+      return <div>{`TicketList ${filteredCount}`}{shown.map((item) => <input key={item.id} type="checkbox"
+        aria-label={`Select ${item.key}`} checked={selectedTicketIds?.has(item.id) ?? false}
+        onChange={() => onToggleTicketSelection?.(item)} />)}</div>;
+    },
     TicketDetail: ({ activeTicket, subtasks, completedSubtasks, subtaskProgressPercent }: TicketDetailMockProps) => (
       <div>{`TicketDetail ${activeTicket.title} ${subtasks.length} ${completedSubtasks} ${Math.round(subtaskProgressPercent)}`}</div>
     ),
@@ -195,19 +204,38 @@ function renderWorkspacePage(overrides: Partial<Parameters<typeof WorkspacePage>
 
   const props = { ...baseProps, ...overrides };
 
-  return {
-    ...render(
+  const renderPage = (pageProps: typeof props) => (
       <QueryClientProvider client={queryClient}>
         <MemoryRouter initialEntries={['/workspaces/workspace-1/projects/project-1/tickets']}>
-          <WorkspacePage {...props} />
+          <WorkspacePage {...pageProps} />
         </MemoryRouter>
       </QueryClientProvider>
-    ),
+  );
+  const view = render(renderPage(props));
+
+  return {
+    ...view,
     props,
+    rerenderPage: (updates: Partial<typeof props>) => view.rerender(renderPage({ ...props, ...updates })),
   };
 }
 
 describe('WorkspacePage', () => {
+  it('drops ticket selection when filters or workspace change', async () => {
+    const user = userEvent.setup();
+    const { rerenderPage } = renderWorkspacePage({ workspaceId: 'workspace-1', activeView: 'list', tickets: [ticket, doneTicket] });
+    await user.click(await screen.findByRole('checkbox', { name: 'Select GRA-1' }));
+    expect(screen.getByText('1 selected')).toBeInTheDocument();
+
+    rerenderPage({ filters: { search: '', priority: '', status: 'done', projectId: '', labels: [], cycleId: '', assigneeId: '' } });
+    expect(screen.getByText('0 selected')).toBeInTheDocument();
+    await user.click(await screen.findByRole('checkbox', { name: 'Select GRA-2' }));
+    expect(screen.getByText('1 selected')).toBeInTheDocument();
+
+    rerenderPage({ workspaceId: 'workspace-2' });
+    expect(screen.getByText('0 selected')).toBeInTheDocument();
+  });
+
   it('renders the empty state when the workspace has no projects', async () => {
     const user = userEvent.setup();
     const { props } = renderWorkspacePage({ projects: [], tickets: [] });

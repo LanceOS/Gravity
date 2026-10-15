@@ -1,5 +1,6 @@
-import { and, asc, eq, inArray, isNull } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, or } from 'drizzle-orm';
 import { type Request, type Response, Router } from 'express';
+import { z } from 'zod';
 import { db } from '../../db/index.js';
 import { cycles, labels, projects, teams, ticketLabels, tickets, workspaceSettings } from '../../db/schema.js';
 import { broadcastToWorkspace } from '../../realtime.js';
@@ -11,7 +12,7 @@ import {
   normalizeIsoDate,
 } from '../../lib/platform.js';
 import { audit } from '../../lib/logger.js';
-import { authorizeProjectAccess, authorizeTeamAccess, getProjectTeamId } from '../workspaces/services/membership.js';
+import { authorizeProjectAccess, authorizeTeamAccess, authorizeWorkspaceAccess, getProjectTeamId } from '../workspaces/services/membership.js';
 import {
   addCommentRecord,
   createTicketRecord,
@@ -23,7 +24,7 @@ import {
   hasTicketDependencyRelation,
   hasCircularDependency,
   getTicketDetails,
-  getRelationshipCleanupSnapshots,
+  getRelationshipCleanupEventTargets,
   listComments,
   listTicketBlockers,
   listTicketDependencies,
@@ -64,6 +65,21 @@ const labelSelectFields = {
   description: labels.description,
   sortOrder: labels.sortOrder,
 } as const;
+
+const bulkTriageSchema = z.strictObject({
+  workspaceId: z.string().min(1),
+  tickets: z.array(z.strictObject({
+    id: z.string().min(1),
+    projectId: z.string().min(1),
+    updatedAt: z.iso.datetime(),
+  })).min(1).max(100),
+  action: z.discriminatedUnion('type', [
+    z.strictObject({ type: z.literal('status'), value: z.enum(['backlog', 'todo', 'in_progress', 'in_review', 'done', 'canceled']) }),
+    z.strictObject({ type: z.literal('priority'), value: z.enum(['no_priority', 'low', 'medium', 'high', 'urgent']) }),
+    z.strictObject({ type: z.literal('assignee'), value: z.string().min(1).nullable() }),
+    z.strictObject({ type: z.enum(['add_label', 'remove_label']), value: z.string().min(1) }),
+  ]),
+});
 
 function mapCycle(cycle: typeof cycles.$inferSelect) {
   return {
@@ -263,27 +279,21 @@ export function createTicketsRouter() {
       return;
     }
 
-    const affectedTicketSnapshots = await getRelationshipCleanupSnapshots(relationshipCleanup.affectedTickets);
+    const affectedTicketSnapshots = await getRelationshipCleanupEventTargets(relationshipCleanup.affectedTickets);
 
     for (const snapshot of affectedTicketSnapshots) {
       if (!snapshot) {
         continue;
       }
 
-      if (snapshot.ticket) {
-        // Deliberately omit actorUserId so the originating client processes
-        // follow-up ticket refreshes for other tickets affected by cleanup.
-        emitWorkspaceEvent(snapshot.workspaceId, 'tickets-updated', {
-          projectId: snapshot.projectId,
-          ticketId: snapshot.ticketId,
-          ticket: snapshot.ticket,
-        });
-        continue;
-      }
-
+      // The related ticket's updatedAt is unchanged, so tell clients to
+      // refetch instead of sending a snapshot rejected by their revision guard.
+      // Omitting actorUserId lets the originating client refresh as well.
       emitWorkspaceEvent(snapshot.workspaceId, 'tickets-updated', {
         projectId: snapshot.projectId,
         ticketId: snapshot.ticketId,
+        ...(snapshot.ticketKey ? { ticketKey: snapshot.ticketKey } : {}),
+        relationshipCleanup: true,
       });
     }
   }
@@ -451,6 +461,87 @@ export function createTicketsRouter() {
         res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load ticket.' });
       }
     });
+  });
+
+  router.post('/tickets/bulk-triage', async (req, res) => {
+    const parsed = bulkTriageSchema.safeParse(req.body);
+    if (!parsed.success || new Set(parsed.data.tickets.map((ticket) => ticket.id)).size !== parsed.data.tickets.length) {
+      res.status(400).json({ error: 'Provide a valid action and 1–100 distinct ticket snapshots.' });
+      return;
+    }
+    const { workspaceId, tickets: selectedTickets, action } = parsed.data;
+    const workspaceAuth = await authorizeWorkspaceAccess(req, workspaceId);
+    if (!workspaceAuth.allowed) {
+      res.status(workspaceAuth.status).json({ error: workspaceAuth.error });
+      return;
+    }
+
+    const actionLabel = (action.type === 'add_label' || action.type === 'remove_label')
+      ? (await db.select({ id: labels.id, projectId: labels.projectId, teamId: labels.teamId })
+          .from(labels).where(eq(labels.id, action.value)).limit(1))[0]
+      : null;
+
+    const results: Array<{ id: string; success: boolean; ticket?: Awaited<ReturnType<typeof getTicketById>>; error?: string }> = [];
+    for (const selected of selectedTickets) {
+      try {
+        const current = await getTicketById(selected.id);
+        // Never trust the client snapshot as a source of project or workspace authority.
+        if (!current || current.projectId !== selected.projectId) {
+          results.push({ id: selected.id, success: false, error: 'Ticket changed or is no longer available.' });
+          continue;
+        }
+        const projectAuth = await authorizeProjectAccess(req, current.projectId);
+        if (!projectAuth.allowed || projectAuth.workspaceId !== workspaceId) {
+          results.push({ id: selected.id, success: false, error: 'Ticket is not available in this workspace.' });
+          continue;
+        }
+        if (action.type === 'add_label' || action.type === 'remove_label') {
+          const scope = await getProjectScope(current.projectId);
+          const labelAllowed = scope?.workspaceId === workspaceId && actionLabel && (
+            scope.hierarchyMode === 'flat'
+              ? actionLabel.projectId === current.projectId
+              : actionLabel.projectId === null && actionLabel.teamId === scope.teamId
+          );
+          if (!labelAllowed) {
+            results.push({ id: selected.id, success: false, error: 'Label is not available for this project or team.' });
+            continue;
+          }
+        }
+        const expectedUpdatedAt = new Date(selected.updatedAt);
+        if (new Date(current.updatedAt).getTime() !== expectedUpdatedAt.getTime()) {
+          results.push({ id: selected.id, success: false, error: 'Ticket changed. Refresh and retry.' });
+          continue;
+        }
+
+        const updates = action.type === 'status' ? { status: action.value }
+          : action.type === 'priority' ? { priority: action.value }
+            : action.type === 'assignee' ? { assigneeId: action.value }
+              : { labelIds: action.type === 'add_label'
+                ? [...new Set([...(current.labelIds ?? []), action.value])]
+                : (current.labelIds ?? []).filter((id) => id !== action.value) };
+        const update = await updateTicketRecordWithEffects(selected.id, updates, selected.projectId, expectedUpdatedAt, workspaceId);
+        if (!update) {
+          results.push({ id: selected.id, success: false, error: 'Ticket changed. Refresh and retry.' });
+          continue;
+        }
+        try {
+          emitWorkspaceEvent(workspaceId, 'tickets-updated', { projectId: selected.projectId, ticket: update.ticket }, projectAuth.userId);
+          await emitRelationshipCleanupEvents(update.relationshipCleanup);
+        } catch {
+          try { audit('tickets.bulk_realtime_failed', { workspaceId, ticketId: selected.id }); } catch { /* best effort */ }
+        }
+        results.push({ id: selected.id, success: true, ticket: update.ticket });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : '';
+        results.push({ id: selected.id, success: false, error: message === 'TICKET_MOVE_CROSS_WORKSPACE'
+          ? 'Ticket is not available in this workspace.'
+          : message === TICKET_ASSIGNEE_SCOPE_VIOLATION
+          ? 'Assignee is not eligible for this project.'
+          : message.includes('labels were not found') ? 'Label is not available for this project or team.'
+            : 'Ticket could not be updated. Refresh and retry.' });
+      }
+    }
+    res.json({ results });
   });
 
   router.patch('/tickets/:ticketId', async (req, res) => {
@@ -636,9 +727,29 @@ export function createTicketsRouter() {
     try {
       const projectId = typeof req.query.projectId === 'string' ? req.query.projectId : getProjectIdFromRequest(req);
       const teamId = typeof req.query.teamId === 'string' ? req.query.teamId : undefined;
+      const workspaceId = typeof req.query.workspaceId === 'string' ? req.query.workspaceId : undefined;
+
+      if (workspaceId) {
+        const auth = await authorizeWorkspaceAccess(req, workspaceId);
+        if (!auth.allowed) {
+          res.status(auth.status).json({ error: auth.error });
+          return;
+        }
+        const rows = await db.select(labelSelectFields).from(labels)
+          .innerJoin(teams, eq(labels.teamId, teams.id))
+          .innerJoin(workspaceSettings, eq(workspaceSettings.workspaceId, teams.workspaceId))
+          .leftJoin(projects, eq(labels.projectId, projects.id))
+          .where(and(eq(teams.workspaceId, workspaceId), or(
+            and(eq(workspaceSettings.hierarchyMode, 'teams'), isNull(labels.projectId)),
+            and(eq(workspaceSettings.hierarchyMode, 'flat'), eq(projects.workspaceId, workspaceId)),
+          )))
+          .orderBy(asc(labels.createdAt));
+        res.json(rows);
+        return;
+      }
 
       if (!teamId && !projectId) {
-        res.status(400).json({ error: 'Either teamId or projectId is required, or project not found.' });
+        res.status(400).json({ error: 'A workspace, team, or project ID is required.' });
         return;
       }
 

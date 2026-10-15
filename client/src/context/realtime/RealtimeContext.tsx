@@ -191,6 +191,22 @@ export function useRealtimeContextValue(_options: RealtimeContextValueArgs): Rea
               break;
 
             case 'tickets-updated':
+              if (messageData.relationshipCleanup === true) {
+                if (projectId) {
+                  void queryClient.invalidateQueries({ queryKey: queryKeys.tickets(projectId) });
+                  invalidateAggregateTicketQueries(queryClient, projectId);
+                }
+                if (eventTicketId) {
+                  void queryClient.invalidateQueries({ queryKey: queryKeys.ticketDetail(eventTicketId) });
+                }
+                const relatedKey = event.ticketKey || cachedTicket?.key;
+                if (relatedKey) {
+                  void queryClient.invalidateQueries({ queryKey: ['tickets', 'detail', relatedKey] });
+                  void queryClient.invalidateQueries({ queryKey: ['tickets', 'relations', relatedKey] });
+                  void queryClient.invalidateQueries({ queryKey: ['ticketByKey', relatedKey] });
+                }
+                break;
+              }
               if (payloadTicket) {
                 upsertTicketFromSse(queryClient, payloadTicket);
                 if (projectId) {

@@ -243,6 +243,33 @@ describe('RealtimeContext', () => {
     expect(fetchTicket).toHaveBeenCalledOnce();
   });
 
+  it('refetches related tickets when dependency cleanup leaves their revision unchanged', async () => {
+    const queryClient = createQueryClient();
+    const blocked = { ...baseTicket, isBlocked: true };
+    queryClient.setQueryData(queryKeys.ticketDetail(blocked.id), blocked);
+    queryClient.setQueryData(queryKeys.tickets(blocked.projectId), [blocked]);
+    const fetchTicket = vi.fn().mockResolvedValue({ ...blocked, isBlocked: false });
+    const invalidate = vi.spyOn(queryClient, 'invalidateQueries');
+    function Detail() {
+      const { data } = useQuery<Ticket>({ queryKey: queryKeys.ticketDetail(blocked.id), queryFn: fetchTicket, staleTime: Infinity });
+      return <div data-testid="blocker-state">{data?.isBlocked ? 'blocked' : 'clear'}</div>;
+    }
+    vi.stubGlobal('EventSource', class {});
+    const view = renderWithProviders(queryClient, <Detail />);
+    await waitFor(() => expect(currentProject).toBeDefined());
+    await act(async () => { currentProject!.setActiveProjectId('project-1'); });
+    await waitFor(() => expect(currentRealtime.workspaceId).toBe('workspace-1'));
+    expect(view.getByTestId('blocker-state').textContent).toBe('blocked');
+
+    serviceRegistry.get('workspace-1')!.emitMessage({
+      type: 'tickets-updated', projectId: blocked.projectId, ticketId: blocked.id, ticketKey: blocked.key,
+      data: { projectId: blocked.projectId, ticketId: blocked.id, ticketKey: blocked.key, relationshipCleanup: true },
+    });
+    await waitFor(() => expect(view.getByTestId('blocker-state').textContent).toBe('clear'));
+    expect(fetchTicket).toHaveBeenCalledOnce();
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.tickets(blocked.projectId) });
+  });
+
   it('updates ticket caches from SSE events including the same user in another client', async () => {
     const queryClient = createQueryClient();
     queryClient.setQueryData(queryKeys.tickets('project-1'), [] as Ticket[]);
