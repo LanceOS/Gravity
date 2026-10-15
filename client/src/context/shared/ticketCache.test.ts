@@ -139,7 +139,6 @@ describe('ticket cache helpers', () => {
 
     expect(invalidateSpy).toHaveBeenCalledWith({
       queryKey: queryKeys.tickets('project-1'),
-      exact: true,
     });
     expect(invalidateSpy).toHaveBeenCalledWith({
       queryKey: queryKeys.ticketDetail('ticket-1'),
@@ -232,7 +231,6 @@ describe('ticket cache helpers', () => {
 
     expect(invalidateSpy).toHaveBeenCalledWith({
       queryKey: queryKeys.tickets('project-1'),
-      exact: true,
     });
     expect(invalidateSpy).toHaveBeenCalledWith({
       queryKey: queryKeys.ticketDetail('ticket-1'),

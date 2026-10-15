@@ -542,10 +542,13 @@ export class ChatService {
         .innerJoin(teams, and(eq(teams.id, projects.teamId), eq(teams.workspaceId, projects.workspaceId)))
         .where(and(inArray(projects.id, projectIds), eq(projects.workspaceId, workspaceId), eq(projectMembers.userId, userId)));
       if (rows.length !== projectIds.length) throw new Error('Invalid navigation scope.');
+      const projectsById = new Map(rows.map((row) => [row.id, row]));
+      const selectedTeamIds = new Set<string>();
       for (const id of projectIds) {
-        const project = rows.find((row) => row.id === id)!;
+        const project = projectsById.get(id)!;
         selectedProjects.push({ id: project.id, name: project.name, key: project.key });
-        if (!selectedTeams.some((team) => team.id === project.teamId)) {
+        if (!selectedTeamIds.has(project.teamId)) {
+          selectedTeamIds.add(project.teamId);
           selectedTeams.push({ id: project.teamId, name: project.teamName });
         }
       }
@@ -555,9 +558,14 @@ export class ChatService {
       const rows = await db.select({ id: teams.id, name: teams.name }).from(teams)
         .where(and(inArray(teams.id, teamIds), eq(teams.workspaceId, workspaceId)));
       if (rows.length !== teamIds.length) throw new Error('Invalid navigation scope.');
+      const teamsById = new Map(rows.map((row) => [row.id, row]));
+      const selectedTeamIds = new Set(selectedTeams.map((team) => team.id));
       for (const id of teamIds) {
-        const team = rows.find((row) => row.id === id)!;
-        if (!selectedTeams.some((selected) => selected.id === team.id)) selectedTeams.push(team);
+        const team = teamsById.get(id)!;
+        if (!selectedTeamIds.has(team.id)) {
+          selectedTeamIds.add(team.id);
+          selectedTeams.push(team);
+        }
       }
     }
     return { projects: selectedProjects, teams: selectedTeams };

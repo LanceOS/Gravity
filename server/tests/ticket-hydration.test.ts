@@ -5,7 +5,7 @@ import { comments, labels, ticketLabels, ticketRelationships, tickets, workspace
 import { getDefaultTeamId } from '../src/modules/workspaces/utils/default-team.js';
 import * as realtime from '../src/realtime.js';
 import { createAuthenticatedApi, seedCycle, seedTicket, seedWorkspaceFixture } from './helpers/test-helpers.js';
-import { getRelationshipCleanupEventTargets, getTicketDetails, getTicketDetailsByKey } from '../src/modules/tickets/services/tickets.js';
+import { getRelationshipCleanupDetails, getRelationshipCleanupEventTargets, getTicketDetails, getTicketDetailsByKey, listTickets } from '../src/modules/tickets/services/tickets.js';
 
 // Count actual SQL calls, and hold each for a turn so unconstrained Promise.all
 // fan-out is observable even with the in-memory adapter's immediate responses.
@@ -92,6 +92,103 @@ describe('ticket hydration query regressions', () => {
     expect(meter.peak()).toBe(1);
     console.info(JSON.stringify({ affected: count, queries: meter.sql.length, peakInFlight: meter.peak(), simulatedPoolWaits: meter.waits(), simulatedPoolWaitMs: meter.waitMs() }));
   }, 120_000);
+
+  it('bounds MCP cleanup detail hydration while preserving event order', async () => {
+    const { project } = await seedWorkspaceFixture();
+    const affected = Array.from({ length: 12 }, (_, index) => ({ id: `mcp-${index}`, projectId: project.id }));
+    await db.insert(tickets).values(affected.map(({ id }, index) => ({
+      id, key: `GRV-${index + 1}`, title: `MCP ${index}`, projectId: project.id,
+    })));
+    const meter = measureQueries();
+    const details = await getRelationshipCleanupDetails(affected);
+    meter.stop();
+    expect(details.map(({ ticket }) => ticket.id)).toEqual(affected.map(({ id }) => id));
+    expect(details.every(({ scope }) => scope.id === project.id)).toBe(true);
+    expect(meter.peak()).toBeLessThanOrEqual(12);
+  });
+
+  it('uses a cursor without skipping tickets deleted before the next page', async () => {
+    const api = await createAuthenticatedApi({ name: 'Owner', email: 'cursor@example.com', role: 'owner' });
+    const { project } = await seedWorkspaceFixture({ owner: {
+      id: api.user.id, name: api.user.name, email: api.user.email, role: 'owner', avatarUrl: api.user.avatar,
+    } });
+    for (let index = 0; index < 4; index++) {
+      await seedTicket(project.id, { id: `cursor-${index}`, key: `GRV-${index + 1}` });
+    }
+    const first = await api.get('/api/v1/tickets?pagination=cursor&limit=2').set('x-project-id', project.id);
+    expect(first.status, first.body.error).toBe(200);
+    expect(first.body.tickets.map((ticket: { id: string }) => ticket.id)).toEqual(['cursor-0', 'cursor-1']);
+    expect(first.body.nextCursor).toBeTypeOf('string');
+    const wrongFilter = await api.get(`/api/v1/tickets?pagination=cursor&limit=2&status=done&cursor=${encodeURIComponent(first.body.nextCursor)}`)
+      .set('x-project-id', project.id);
+    expect(wrongFilter.status).toBe(400);
+    await db.delete(tickets).where(eq(tickets.id, 'cursor-0'));
+    const second = await api.get(`/api/v1/tickets?pagination=cursor&limit=2&cursor=${encodeURIComponent(first.body.nextCursor)}`)
+      .set('x-project-id', project.id);
+    expect(second.status).toBe(200);
+    expect(second.body.tickets.map((ticket: { id: string }) => ticket.id)).toEqual(['cursor-2', 'cursor-3']);
+    expect(second.body.nextCursor).toBeNull();
+  });
+
+  it('paginates project tickets after filtering and sorting the full project', async () => {
+    const api = await createAuthenticatedApi({ name: 'Owner', email: 'project-pages@example.com', role: 'owner' });
+    const { project, workspace } = await seedWorkspaceFixture({ owner: {
+      id: api.user.id, name: api.user.name, email: api.user.email, role: 'owner', avatarUrl: api.user.avatar,
+    } });
+    await seedTicket(project.id, { id: 'project-low', key: 'GRV-1', title: 'Search match one', status: 'todo', priority: 'low' });
+    await seedTicket(project.id, { id: 'project-urgent', key: 'GRV-2', title: 'Search match two', status: 'todo', priority: 'urgent' });
+    await seedTicket(project.id, { id: 'project-done', key: 'GRV-3', title: 'Search match three', status: 'done', priority: 'urgent' });
+    await db.insert(labels).values({ id: 'project-page-label', projectId: project.id, name: 'Alpha', color: '#abcdef', teamId: getDefaultTeamId(workspace.id) });
+    await db.insert(ticketLabels).values({ ticketId: 'project-low', labelId: 'project-page-label' });
+    const first = await api.get('/api/v1/tickets?pagination=page&limit=1&offset=0&status=todo&search=search&listSort=newest_urgent')
+      .set('x-project-id', project.id);
+    expect(first.status, first.body.error).toBe(200);
+    expect(first.body.tickets.map((ticket: { id: string }) => ticket.id)).toEqual(['project-urgent']);
+    expect(first.body.nextOffset).toBe(1);
+    expect(first.body.counts.activeProjectIssues).toBe(2);
+    const second = await api.get('/api/v1/tickets?pagination=page&limit=1&offset=1&status=todo&search=search&listSort=newest_urgent')
+      .set('x-project-id', project.id);
+    expect(second.status).toBe(200);
+    expect(second.body.tickets.map((ticket: { id: string }) => ticket.id)).toEqual(['project-low']);
+    expect(second.body.nextOffset).toBeNull();
+  });
+
+  it('pushes label ordering and the page limit into one database query', async () => {
+    const queries: string[] = [];
+    const spy = vi.spyOn(pool, 'query').mockImplementation((async (...args: any[]) => {
+      queries.push(typeof args[0] === 'string' ? args[0] : args[0].text);
+      return { rows: [], rowCount: 0 } as any;
+    }) as any);
+    try {
+      expect(await listTickets('project-1', { listSort: 'label', limit: 2, offset: 0 })).toEqual([]);
+    } finally {
+      spy.mockRestore();
+    }
+    expect(queries).toHaveLength(1);
+    expect(queries[0]).toContain('order by case when (select');
+    expect(queries[0]).toMatch(/limit\s+\$\d+/i);
+  });
+
+  it('hides database query details from failed ticket-list responses', async () => {
+    const api = await createAuthenticatedApi({ name: 'Owner', email: 'ticket-error@example.com', role: 'owner' });
+    const { project } = await seedWorkspaceFixture({ owner: {
+      id: api.user.id, name: api.user.name, email: api.user.email, role: 'owner', avatarUrl: api.user.avatar,
+    } });
+    const original = pool.query.bind(pool);
+    const spy = vi.spyOn(pool, 'query').mockImplementation((async (...args: any[]) => {
+      const statement = typeof args[0] === 'string' ? args[0] : args[0].text;
+      if (statement.includes('from "tickets"')) throw new Error('Failed query: internal_schema.secret_table');
+      return (original as any)(...args);
+    }) as any);
+    try {
+      const response = await api.get('/api/v1/tickets?pagination=page&listSort=created').set('x-project-id', project.id);
+      expect(response.status).toBe(500);
+      expect(response.body).toEqual({ error: 'Failed to load tickets.' });
+      expect(JSON.stringify(response.body)).not.toContain('internal_schema');
+    } finally {
+      spy.mockRestore();
+    }
+  });
 
   it('emits follow-up invalidations without an actor after closing a ticket', async () => {
     const api = await createAuthenticatedApi({ name: 'Owner', email: 'cleanup@example.com', role: 'owner' });

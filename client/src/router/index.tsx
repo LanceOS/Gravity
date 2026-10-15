@@ -51,12 +51,16 @@ function appShellElement() {
   return projectElement(<AppShellPage />);
 }
 
-function workspaceShellElement() {
-  return projectElement(
-    <WorkspaceTicketProviders>
+function WorkspaceShellWithProviders() {
+  return (
+    <WorkspaceTicketProviders fetchProjectTickets={false}>
       <WorkspaceShellPage />
     </WorkspaceTicketProviders>
   );
+}
+
+function workspaceShellElement() {
+  return projectElement(<WorkspaceShellWithProviders />);
 }
 
 const appShellPaths = ['/', '/workspaces'];

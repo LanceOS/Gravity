@@ -99,13 +99,13 @@ export const ProjectContextProviders: FC<{ children: ReactNode }> = ({ children 
   );
 };
 
-export const WorkspaceTicketStateProviders: FC<{ children: ReactNode }> = ({ children }) => {
+export const WorkspaceTicketStateProviders: FC<{ children: ReactNode; fetchProjectTickets?: boolean }> = ({ children, fetchProjectTickets }) => {
   const { currentUser } = useAuth();
 
   return (
     <TicketFiltersProvider>
       <UserDirectoryProvider>
-        <TicketListProvider currentUser={currentUser}>{children}</TicketListProvider>
+        <TicketListProvider currentUser={currentUser} fetchProjectTickets={fetchProjectTickets}>{children}</TicketListProvider>
       </UserDirectoryProvider>
     </TicketFiltersProvider>
   );
@@ -139,9 +139,9 @@ export const WorkspaceTicketRealtimeProviders: FC<{ children: ReactNode }> = ({ 
   );
 };
 
-export const WorkspaceTicketProviders: FC<{ children: ReactNode }> = ({ children }) => {
+export const WorkspaceTicketProviders: FC<{ children: ReactNode; fetchProjectTickets?: boolean }> = ({ children, fetchProjectTickets }) => {
   return (
-    <WorkspaceTicketStateProviders>
+    <WorkspaceTicketStateProviders fetchProjectTickets={fetchProjectTickets}>
       <WorkspaceTicketMetadataProviders>
         <WorkspaceTicketRealtimeProviders>{children}</WorkspaceTicketRealtimeProviders>
       </WorkspaceTicketMetadataProviders>

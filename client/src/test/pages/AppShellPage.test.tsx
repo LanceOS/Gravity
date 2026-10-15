@@ -871,15 +871,22 @@ function mockAggregateApiResponses() {
     }
 
     if (parsedUrl.pathname === '/api/v1/tickets') {
+      if (parsedUrl.searchParams.get('pagination') === 'page') {
+        return Promise.resolve(jsonResponse({ tickets: mocks.useTicketListContext()?.tickets ?? [], nextOffset: null }));
+      }
       const teamId = parsedUrl.searchParams.get('teamId');
       const workspaceId = parsedUrl.searchParams.get('workspaceId');
 
       if (teamId === 'team-1') {
-        return Promise.resolve(jsonResponse(teamAggregateTickets));
+        return Promise.resolve(jsonResponse(parsedUrl.searchParams.get('pagination') === 'cursor'
+          ? { tickets: teamAggregateTickets, nextCursor: null }
+          : teamAggregateTickets));
       }
 
       if (workspaceId === 'workspace-1') {
-        return Promise.resolve(jsonResponse(workspaceAggregateTickets));
+        return Promise.resolve(jsonResponse(parsedUrl.searchParams.get('pagination') === 'cursor'
+          ? { tickets: workspaceAggregateTickets, nextCursor: null }
+          : workspaceAggregateTickets));
       }
     }
 
@@ -908,11 +915,20 @@ describe('AppShellPage', () => {
     delete (document as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any).modelContext;
     window.localStorage.clear();
     sharedQueryClient.clear();
-    mocks.fetch.mockImplementation((input: string | URL | Request) =>
-      Promise.resolve(jsonResponse(String(input).endsWith('/mcp')
+    mocks.fetch.mockImplementation((input: string | URL | Request) => {
+      const url = new URL(String(input), 'http://localhost');
+      if (url.pathname === '/api/v1/tickets' && url.searchParams.get('pagination') === 'page') {
+        return Promise.resolve(jsonResponse({ tickets: mocks.useTicketListContext()?.tickets ?? [], nextOffset: null }));
+      }
+      if (url.pathname.startsWith('/api/v1/tickets/key/')) {
+        const key = decodeURIComponent(url.pathname.split('/').at(-1) ?? '').toUpperCase();
+        const ticket = mocks.useTicketListContext()?.tickets?.find((candidate: { key: string }) => candidate.key.toUpperCase() === key);
+        return Promise.resolve(jsonResponse(ticket ?? null));
+      }
+      return Promise.resolve(jsonResponse(String(input).endsWith('/mcp')
         ? { jsonrpc: '2.0', result: { tools: [] } }
-        : { success: true, lastActiveAt: '2026-05-26T10:00:00.000Z' }))
-    );
+        : { success: true, lastActiveAt: '2026-05-26T10:00:00.000Z' }));
+    });
     vi.stubGlobal('fetch', mocks.fetch);
   });
 
@@ -985,6 +1001,44 @@ describe('AppShellPage', () => {
     expect(JSON.parse(screen.getByTestId('chat-navigation').textContent!)).toEqual({
       workspaceId: 'workspace-1', projectIds, teamIds,
     });
+  });
+
+  it('does not display a ticket from another project in a project detail URL', async () => {
+    renderAppShell({
+      tickets: buildUseTickets({ projects: aggregateProjects, tickets: teamAggregateTickets }),
+      initialEntries: ['/workspaces/workspace-1/projects/project-1/tickets/API-1'],
+    });
+    await waitFor(() => expect(mocks.fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/v1/tickets/key/API-1'), expect.anything(),
+    ));
+    expect(screen.queryByRole('button', { name: 'Delete active ticket' })).not.toBeInTheDocument();
+  });
+
+  it('does not display a ticket when the project belongs to another team than the URL', async () => {
+    renderAppShell({
+      tickets: buildUseTickets({ projects: aggregateProjects, tickets: workspaceAggregateTickets }),
+      initialEntries: ['/workspaces/workspace-1/teams/team-1/projects/project-3/tickets/DSN-1'],
+    });
+    await waitFor(() => expect(mocks.fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/v1/tickets/key/DSN-1'), expect.anything(),
+    ));
+    expect(screen.queryByRole('button', { name: 'Delete active ticket' })).not.toBeInTheDocument();
+  });
+
+  it('requests project pages with active filters and list ordering', async () => {
+    renderAppShell({
+      tickets: buildUseTickets({ activeView: 'list', filters: {
+        search: 'release', priority: 'high', status: 'todo', projectId: 'project-1', labels: [], labelMode: 'any', cycleId: '', assigneeId: '',
+      } }),
+      initialEntries: ['/workspaces/workspace-1/projects/project-1/tickets'],
+    });
+    await waitFor(() => expect(mocks.fetch.mock.calls.some(([input]) => {
+      const url = new URL(String(input), 'http://localhost');
+      return url.pathname === '/api/v1/tickets' && url.searchParams.get('pagination') === 'page'
+        && url.searchParams.get('projectId') === 'project-1' && url.searchParams.get('search') === 'release'
+        && url.searchParams.get('priority') === 'high' && url.searchParams.get('status') === 'todo'
+        && url.searchParams.get('listSort') === 'newest_urgent';
+    })).toBe(true));
   });
 
   it('renders the auth screen when no current user is available', () => {
@@ -1368,6 +1422,10 @@ describe('AppShellPage', () => {
         ? new URL(inputUrl)
         : new URL(inputUrl, 'http://localhost');
 
+      if (parsedUrl.pathname === '/api/v1/tickets' && parsedUrl.searchParams.get('pagination') === 'page') {
+        return Promise.resolve(jsonResponse({ tickets: mocks.useTicketListContext()?.tickets ?? [], nextOffset: null }));
+      }
+
       if (parsedUrl.pathname === '/api/v1/workspaces/workspace-1/sidebar') {
         return Promise.resolve(jsonResponse({ hierarchyMode: 'workspace', teams: [] }));
       }
@@ -1683,13 +1741,6 @@ describe('AppShellPage', () => {
       },
     });
     const getQueriesData = vi.spyOn(queryClient, 'getQueriesData');
-    const getQueryData = vi.spyOn(queryClient, 'getQueryData');
-    const hasTicketQueryProjectId = (queryKey: unknown, projectId: string) => {
-      if (!Array.isArray(queryKey) || queryKey[0] !== 'tickets' || typeof queryKey[1] !== 'object' || !queryKey[1]) {
-        return false;
-      }
-      return (queryKey[1] as { projectId?: string }).projectId === projectId;
-    };
 
     queryClient.setQueryData(queryKeys.tickets('project-1'), [
       {
@@ -1834,15 +1885,6 @@ describe('AppShellPage', () => {
         return Array.isArray(queryKey) && (queryKey[0] === 'tickets' || queryKey[0] === 'labels');
       })
     ).toBe(false);
-    expect(
-      getQueryData.mock.calls.some(([queryKey]) => hasTicketQueryProjectId(queryKey, 'other-project'))
-    ).toBe(false);
-    expect(
-      getQueryData.mock.calls.some(([queryKey]) => hasTicketQueryProjectId(queryKey, 'project-1'))
-    ).toBe(true);
-    expect(
-      getQueryData.mock.calls.some(([queryKey]) => hasTicketQueryProjectId(queryKey, 'project-2'))
-    ).toBe(true);
   });
 
   it('recomputes project sidebar counts when per-project ticket cache entries change', async () => {
@@ -1969,6 +2011,10 @@ describe('AppShellPage', () => {
       const parsedUrl = inputUrl.startsWith('http')
         ? new URL(inputUrl)
         : new URL(inputUrl, 'http://localhost');
+
+      if (parsedUrl.pathname === '/api/v1/tickets' && parsedUrl.searchParams.get('pagination') === 'page') {
+        return Promise.resolve(jsonResponse({ tickets: mocks.useTicketListContext()?.tickets ?? [], nextOffset: null }));
+      }
 
       if (parsedUrl.pathname === '/api/v1/workspaces/workspace-1/sidebar') {
         return Promise.resolve(jsonResponse({

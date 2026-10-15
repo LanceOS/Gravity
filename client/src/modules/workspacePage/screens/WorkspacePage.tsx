@@ -49,6 +49,7 @@ interface WorkspacePageProps {
   domains?: Label[];
   filters: TicketFilters;
   listSort: TicketListSort;
+  ticketsInServerOrder?: boolean;
   projects: Project[];
   projectsLoading?: boolean;
   tickets: Ticket[];
@@ -127,6 +128,7 @@ export function WorkspacePage({
   domains: domainItems,
   filters,
   listSort,
+  ticketsInServerOrder = false,
   projects,
   projectsLoading = false,
   tickets,
@@ -205,7 +207,7 @@ export function WorkspacePage({
       return groupTicketsByStatus(filteredTickets);
     }
 
-    if (listSort === 'created') {
+    if (listSort === 'created' || ticketsInServerOrder) {
       return groupTicketsByStatus(filteredTickets);
     }
 
@@ -219,7 +221,7 @@ export function WorkspacePage({
     }
 
     return groupedBySorted;
-  }), [filteredTickets, isListView, isTimelineView, labelById, listSort]);
+  }), [filteredTickets, isListView, isTimelineView, labelById, listSort, ticketsInServerOrder]);
   const timelineEvents = useMemo(
     () => {
       if (!isTimelineView) {

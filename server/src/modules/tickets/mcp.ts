@@ -29,11 +29,13 @@ import {
   updateTicketRecord,
   updateTicketRecordWithEffects,
   getProjectScope,
+  getRelationshipCleanupDetails,
   lockTicketProjectScopes,
   COMMENT_BODY_EMPTY_AFTER_SANITIZATION,
   TICKET_ASSIGNEE_SCOPE_VIOLATION,
 } from './services/tickets.js';
 import { ToolExecutionContext, ToolHandler } from '../mcp/tool-handlers/types.js';
+import { decodeTicketCursor, encodeTicketCursor } from './services/ticket-cursor.js';
 import { JsonSchema, McpToolDefinition } from '../mcp/types.js';
 
 function readLabelArray(value: unknown, field: string, required = false): string[] | undefined {
@@ -221,17 +223,11 @@ export class TicketTools {
     })).digest('hex');
     let after: { createdAt: string; id: string } | undefined;
     if (search && args.cursor !== undefined) {
-      try {
-        if (typeof args.cursor !== 'string' || args.cursor.length > 1024 || !/^[A-Za-z0-9_-]+$/.test(args.cursor)) throw new Error();
-        const decoded = JSON.parse(Buffer.from(args.cursor, 'base64url').toString('utf8'));
-        if (decoded?.version !== 1 || decoded.fingerprint !== fingerprint ||
-            typeof decoded.id !== 'string' || !decoded.id ||
-            typeof decoded.createdAt !== 'string' ||
-            decoded.createdAt.length > 64 || !Number.isFinite(Date.parse(decoded.createdAt))) throw new Error();
-        after = { createdAt: decoded.createdAt, id: decoded.id };
-      } catch {
+      const position = decodeTicketCursor(args.cursor, fingerprint);
+      if (!position) {
         throw new McpToolValidationError('Invalid ticket search cursor. Restart without a cursor and keep the same workspace, filters and order between pages. Legacy offset cursors are no longer supported.');
       }
+      after = position;
     }
     const serviceFilters = search ? { ...filters, offset: undefined, order: order as 'asc' | 'desc', after } : filters;
 
@@ -257,9 +253,9 @@ export class TicketTools {
     const last = page[page.length - 1];
     return {
       tickets: page,
-      nextCursor: rows.length > limit ? Buffer.from(JSON.stringify({
-        version: 1, fingerprint, createdAt: last[ticketSearchCreatedAt], id: last.id,
-      })).toString('base64url') : null,
+      nextCursor: rows.length > limit
+        ? encodeTicketCursor({ createdAt: last[ticketSearchCreatedAt], id: last.id }, fingerprint)
+        : null,
       scope: { workspaceId: context.workspaceId, projectId: args.projectId ?? null, teamId: args.teamId ?? null },
     };
   }
@@ -515,26 +511,10 @@ export class TicketTools {
       ...updateResult.hierarchyChange.affectedTickets,
     ].map(affected => [affected.id, affected])).values()];
     if (affectedTickets.length > 0) {
-      const relatedTicketEvents = await Promise.all(
-        affectedTickets.map(async ({ id, projectId }) => {
-          const [relatedTicket, relatedScope] = await Promise.all([
-            getTicketDetails(id, projectId),
-            getProjectScope(projectId),
-          ]);
-
-          if (!relatedTicket || !relatedScope || relatedScope.workspaceId !== context.workspaceId) {
-            return null;
-          }
-
-          return {
-            scope: relatedScope,
-            ticket: relatedTicket,
-          };
-        }),
-      );
+      const relatedTicketEvents = await getRelationshipCleanupDetails(affectedTickets);
 
       for (const event of relatedTicketEvents) {
-        if (!event) {
+        if (event.scope.workspaceId !== context.workspaceId) {
           continue;
         }
 

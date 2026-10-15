@@ -1,4 +1,5 @@
 import { and, asc, eq, inArray, isNull, or } from 'drizzle-orm';
+import { createHash } from 'node:crypto';
 import { type Request, type Response, Router } from 'express';
 import { z } from 'zod';
 import { db } from '../../db/index.js';
@@ -10,7 +11,12 @@ import {
   WorkspaceCacheInvalidationReason,
   invalidateWorkspaceCache,
 } from '../../lib/platform.js';
-import { audit } from '../../lib/logger.js';
+import { audit, error as logError } from '../../lib/logger.js';
+import { createRateLimiter } from '../../lib/rateLimit.js';
+import { createRedisRateLimiter } from '../../lib/rateLimitRedis.js';
+import { getRequestSourceIp } from '../../lib/request-ip.js';
+import { env } from '../../env.js';
+import { resolveRequestActorUserId } from '../auth/utils/request-auth.js';
 import { authorizeProjectAccess, authorizeTeamAccess, authorizeWorkspaceAccess, getProjectTeamId } from '../workspaces/services/membership.js';
 import {
   addCommentRecord,
@@ -24,6 +30,8 @@ import {
   hasCircularDependency,
   getTicketDetails,
   getRelationshipCleanupEventTargets,
+  getProjectTicketCounts,
+  ticketSearchCreatedAt,
   listComments,
   listTicketBlockers,
   listTicketDependencies,
@@ -44,6 +52,12 @@ import {
 } from './services/scope-strategies.js';
 import { CycleError, createCycleRecord, createCycleSchema, deleteCycleRecord, editCycleRecord, editCycleSchema, getCycleRecord, mapCycle } from './services/cycles.js';
 import { getCycleProgress } from './services/cycle-progress.js';
+import { decodeTicketCursor, encodeTicketCursor } from './services/ticket-cursor.js';
+
+const listTicketsLimiter = (env.redisEnabled ? createRedisRateLimiter : createRateLimiter)({
+  namespace: 'tickets.list', failurePolicy: 'closed', windowMs: 60_000, max: 60,
+  keyFn: async (req) => `tickets:${await resolveRequestActorUserId(req) ?? getRequestSourceIp(req) ?? 'unknown'}`,
+});
 
 function mapLabel(label: typeof labels.$inferSelect) {
   return {
@@ -321,7 +335,7 @@ export function createTicketsRouter() {
     };
   }
 
-  router.get('/tickets', async (req, res) => {
+  router.get('/tickets', listTicketsLimiter, async (req, res) => {
     const projectId = typeof req.query.projectId === 'string' ? req.query.projectId : getProjectIdFromRequest(req);
     const teamId = typeof req.query.teamId === 'string' ? req.query.teamId : undefined;
     const workspaceId = typeof req.query.workspaceId === 'string' ? req.query.workspaceId : undefined;
@@ -345,8 +359,32 @@ export function createTicketsRouter() {
     }
 
     try {
+      const cursorPagination = req.query.pagination === 'cursor';
+      const pagePagination = req.query.pagination === 'page' && !!projectId;
       const queryLimit = parseIntQueryParam(req.query.limit);
       const queryOffset = parseIntQueryParam(req.query.offset);
+      const invalidSearch = typeof req.query.search === 'string' && req.query.search.length > 256;
+      const invalidOffset = queryOffset !== undefined && (!Number.isSafeInteger(queryOffset) || queryOffset < 0);
+      if (pagePagination && (invalidSearch || invalidOffset)) {
+        res.status(400).json({ error: 'Invalid ticket page parameters.' });
+        return;
+      }
+      const cursorFingerprint = createHash('sha256').update(JSON.stringify({
+        projectId, teamId, workspaceId,
+        status: req.query.status, priority: req.query.priority,
+        assigneeId: req.query.assigneeId, cycleId: req.query.cycleId,
+        labels: req.query.labels, labelMode: req.query.labelMode,
+      })).digest('hex');
+      let after: { createdAt: string; id: string } | undefined;
+      if (cursorPagination && req.query.cursor !== undefined) {
+        const position = decodeTicketCursor(req.query.cursor, cursorFingerprint);
+        if (!position) {
+          res.status(400).json({ error: 'Invalid ticket cursor.' });
+          return;
+        }
+        after = position;
+      }
+      const pageSize = Math.min(Math.max(queryLimit ?? 120, 1), 120);
 
       const ticketList = await strategy.execute({
         status: typeof req.query.status === 'string' ? req.query.status : undefined,
@@ -355,12 +393,38 @@ export function createTicketsRouter() {
         cycleId: typeof req.query.cycleId === 'string' ? req.query.cycleId : undefined,
         labels: typeof req.query.labels === 'string' ? req.query.labels.split(',').filter(Boolean) : undefined,
         labelMode: (req.query.labelMode === 'all' || req.query.labelMode === 'any') ? req.query.labelMode : undefined,
-        limit: queryLimit,
-        offset: queryOffset,
+        query: pagePagination && typeof req.query.search === 'string' ? req.query.search : undefined,
+        listSort: pagePagination && typeof req.query.listSort === 'string' && ['created', 'label', 'newest', 'newest_urgent', 'oldest', 'priority_desc', 'priority_asc', 'updated_desc', 'updated_asc'].includes(req.query.listSort)
+          ? req.query.listSort as 'created' | 'label' | 'newest' | 'newest_urgent' | 'oldest' | 'priority_desc' | 'priority_asc' | 'updated_desc' | 'updated_asc' : undefined,
+        limit: cursorPagination || pagePagination ? pageSize + 1 : queryLimit,
+        offset: cursorPagination ? undefined : queryOffset,
+        after,
       });
-      res.json(ticketList);
+      if (cursorPagination) {
+        const hasMore = ticketList.length > pageSize;
+        const page = ticketList.slice(0, pageSize);
+        const last = page.at(-1);
+        const nextCursor = hasMore && last
+          ? encodeTicketCursor({ createdAt: last[ticketSearchCreatedAt], id: last.id }, cursorFingerprint)
+          : null;
+        res.json({ tickets: page, nextCursor });
+      } else if (pagePagination) {
+        const offset = Math.max(queryOffset ?? 0, 0);
+        const counts = offset === 0 ? await getProjectTicketCounts(projectId, auth.userId) : undefined;
+        res.json({ tickets: ticketList.slice(0, pageSize), nextOffset: ticketList.length > pageSize ? offset + pageSize : null, counts });
+      } else {
+        res.json(ticketList);
+      }
     } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load tickets.' });
+      const causeCode = error && typeof error === 'object' && 'cause' in error
+        && error.cause && typeof error.cause === 'object' && 'code' in error.cause && typeof error.cause.code === 'string'
+        ? error.cause.code : undefined;
+      logError('Failed to load tickets', {
+        projectId, teamId, workspaceId,
+        errorName: error instanceof Error ? error.name : typeof error,
+        causeCode,
+      });
+      res.status(500).json({ error: 'Failed to load tickets.' });
     }
   });
 

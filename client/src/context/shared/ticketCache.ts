@@ -242,6 +242,10 @@ export function invalidateAggregateTicketQueries(
     return;
   }
 
+  // Project pages depend on server-side filters and ordering, so mutations must
+  // reload them even when the changed ticket was outside the loaded pages.
+  queryClient.invalidateQueries({ queryKey: queryKeys.tickets(projectId) });
+
   const projectQueries = queryClient.getQueriesData<Project[]>({ queryKey: ['projects'] });
   let metadata: TicketAggregateProjectMetadata | undefined;
 
@@ -589,7 +593,7 @@ export function invalidateTicketCaches(
   };
 
   if (resolvedProjectId) {
-    queryClient.invalidateQueries({ queryKey: queryKeys.tickets(resolvedProjectId), exact: true });
+    queryClient.invalidateQueries({ queryKey: queryKeys.tickets(resolvedProjectId) });
   }
 
   queryClient.invalidateQueries({ queryKey: queryKeys.ticketDetail(ticketId), exact: true });

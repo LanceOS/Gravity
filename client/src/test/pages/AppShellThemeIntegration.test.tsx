@@ -495,6 +495,14 @@ function renderAppShell(options: { hierarchyMode?: 'flat' | 'teams'; path?: stri
   );
 }
 
+function withTicketPageResponse(url: string, fallback: unknown): unknown {
+  const requestUrl = new URL(url, 'http://localhost');
+  if (requestUrl.pathname !== '/api/v1/tickets') return fallback;
+  if (requestUrl.searchParams.get('pagination') === 'page') return { tickets: [], nextOffset: null };
+  if (requestUrl.searchParams.get('pagination') === 'cursor') return { tickets: [], nextCursor: null };
+  return fallback;
+}
+
 describe('AppShellPage theme integration', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -511,15 +519,15 @@ describe('AppShellPage theme integration', () => {
 
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValue(
+      vi.fn((url: string) => Promise.resolve(
         new Response(
-          JSON.stringify({ success: true, lastActiveAt: '2026-05-25T12:00:00.000Z' }),
+          JSON.stringify(withTicketPageResponse(url, { success: true, lastActiveAt: '2026-05-25T12:00:00.000Z' })),
           {
             status: 200,
             headers: { 'Content-Type': 'application/json' },
           }
         )
-      )
+      ))
     );
   });
 
@@ -536,7 +544,7 @@ describe('AppShellPage theme integration', () => {
       { id: 'team-2', name: 'Second team', projects: [{ id: 'project-2', name: 'Second project', key: 'TWO' }], labels: [], cycles: [] },
     ] };
     vi.stubGlobal('fetch', vi.fn((url: string) => Promise.resolve(new Response(JSON.stringify(
-      url.endsWith('/sidebar') ? sidebar : [],
+      withTicketPageResponse(url, url.endsWith('/sidebar') ? sidebar : []),
     ), { status: 200, headers: { 'Content-Type': 'application/json' } }))));
     const { container } = renderAppShell({ hierarchyMode, path: `/workspaces/workspace-1${routeSuffix}` });
     await waitFor(() => expect(screen.getAllByText('First project').length).toBeGreaterThan(0));

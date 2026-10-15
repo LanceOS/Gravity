@@ -68,7 +68,7 @@ describe('Sub-ticket navigation E2E', () => {
       expect(document.querySelector('.ticket-detail')).toBeTruthy();
     });
     const detailContainer = document.querySelector('.ticket-detail')!;
-    const matches = within(detailContainer).getAllByText(childTicket.title);
+    const matches = await within(detailContainer).findAllByText(childTicket.title);
     const clickableMatch = matches.find((el) => el.closest('.clickable')) || matches[0];
     expect(clickableMatch).toBeTruthy();
     await user.click(clickableMatch as Element);
