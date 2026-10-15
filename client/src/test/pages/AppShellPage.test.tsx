@@ -1014,6 +1014,17 @@ describe('AppShellPage', () => {
     expect(screen.queryByRole('button', { name: 'Delete active ticket' })).not.toBeInTheDocument();
   });
 
+  it('does not display a ticket when the project belongs to another team than the URL', async () => {
+    renderAppShell({
+      tickets: buildUseTickets({ projects: aggregateProjects, tickets: workspaceAggregateTickets }),
+      initialEntries: ['/workspaces/workspace-1/teams/team-1/projects/project-3/tickets/DSN-1'],
+    });
+    await waitFor(() => expect(mocks.fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/v1/tickets/key/DSN-1'), expect.anything(),
+    ));
+    expect(screen.queryByRole('button', { name: 'Delete active ticket' })).not.toBeInTheDocument();
+  });
+
   it('requests project pages with active filters and list ordering', async () => {
     renderAppShell({
       tickets: buildUseTickets({ activeView: 'list', filters: {

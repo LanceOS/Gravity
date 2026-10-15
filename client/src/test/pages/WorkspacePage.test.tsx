@@ -502,6 +502,17 @@ describe('WorkspacePage', () => {
     });
   });
 
+  it('preserves the database order of paged project list rows', () => {
+    const older = { ...ticket, id: 'ticket-older', key: 'GRA-10', createdAt: '2026-04-01T10:00:00.000Z' };
+    const newer = { ...ticket, id: 'ticket-newer', key: 'GRA-11', createdAt: '2026-05-01T10:00:00.000Z' };
+    renderWorkspacePage({
+      activeView: 'list', listSort: 'newest', ticketsInServerOrder: true, tickets: [older, newer],
+    });
+    expect(screen.getAllByRole('checkbox').map((input) => input.getAttribute('aria-label'))).toEqual([
+      'Select GRA-10', 'Select GRA-11',
+    ]);
+  });
+
   it('allows sorting notes through context menu in notes view', async () => {
     const user = userEvent.setup();
     renderWorkspacePage({

@@ -32,6 +32,7 @@ interface WorkspaceIssueSurfaceProps {
   labels: Label[];
   filters: TicketFilters;
   listSort: TicketListSort;
+  ticketsInServerOrder?: boolean;
   projects: Project[];
   projectsLoading: boolean;
   tickets: Ticket[];
@@ -89,6 +90,7 @@ export function WorkspaceIssueSurface({
   labels,
   filters,
   listSort,
+  ticketsInServerOrder,
   projects,
   projectsLoading,
   tickets,
@@ -221,6 +223,7 @@ export function WorkspaceIssueSurface({
           labels={labels}
           filters={filters}
           listSort={listSort}
+          ticketsInServerOrder={ticketsInServerOrder}
           projects={projects}
           projectsLoading={projectsLoading}
           tickets={tickets}

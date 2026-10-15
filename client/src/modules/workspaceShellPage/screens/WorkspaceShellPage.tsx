@@ -158,7 +158,10 @@ export function WorkspaceShellPage() {
   } = route;
   const shouldUseAggregateTicketPagination = isWorkspaceAllTasksPath || isTeamAggregatePath;
   const isAggregateDetailRoute = shouldUseAggregateTicketPagination && !!route.ticketKey;
-  const scopedProjectId = shouldUseAggregateTicketPagination ? '' : (projectIdParam || activeProjectId);
+  const routeProject = projectIdParam ? projectById.get(projectIdParam) : undefined;
+  const routeProjectMatchesScope = !projectIdParam || (routeProject?.workspaceId === route.workspaceId
+    && (!teamIdParam || routeProject?.teamId === teamIdParam));
+  const scopedProjectId = shouldUseAggregateTicketPagination || !routeProjectMatchesScope ? '' : (projectIdParam || activeProjectId);
   const {
     workspaces,
     loading: workspacesLoading,
@@ -335,18 +338,22 @@ export function WorkspaceShellPage() {
     staleTime: CACHE_CONFIGS.ticketDetail.staleTime,
     gcTime: CACHE_CONFIGS.ticketDetail.gcTime,
   });
+  const routeTicketMatchesScope = !!routeTicket && routeProjectMatchesScope
+    && activeWorkspaceProjectIds.has(routeTicket.projectId)
+    && (!projectIdParam || routeTicket.projectId === projectIdParam)
+    && (!teamIdParam || projectById.get(routeTicket.projectId)?.teamId === teamIdParam);
 
   const { data: routeParentTicket, isLoading: routeParentTicketLoading } = useQuery<Ticket | null>({
     queryKey: queryKeys.ticketDetail(routeTicket?.parentId || ''),
     queryFn: () => apiClient.get<Ticket>(`/tickets/${routeTicket?.parentId}`, { projectId: routeTicket?.projectId }),
-    enabled: !!route.ticketKey && !!routeTicket?.parentId && !!currentUser,
+    enabled: !!route.ticketKey && routeTicketMatchesScope && !!routeTicket?.parentId && !!currentUser,
     staleTime: CACHE_CONFIGS.ticketDetail.staleTime,
     gcTime: CACHE_CONFIGS.ticketDetail.gcTime,
   });
 
   const routeAggregateDetailTickets = useMemo(
-    () => routeTicket ? [routeParentTicket, routeTicket].filter((ticket): ticket is Ticket => !!ticket) : [],
-    [routeParentTicket, routeTicket]
+    () => routeTicketMatchesScope ? [routeParentTicket, routeTicket].filter((ticket): ticket is Ticket => !!ticket) : [],
+    [routeParentTicket, routeTicket, routeTicketMatchesScope]
   );
 
   const workspaceAggregateTickets = useMemo(
@@ -622,7 +629,7 @@ export function WorkspaceShellPage() {
           ? isAggregateDetailRoute
             ? routeAggregateDetailTickets
             : teamAggregateTickets
-          : route.ticketKey && routeTicket && routeTicket.projectId === projectIdParam && activeWorkspaceProjectIds.has(routeTicket.projectId)
+          : route.ticketKey && routeTicketMatchesScope
             ? [...new Map([...tickets.filter((ticket) => ticket.projectId === routeTicket.projectId), ...routeAggregateDetailTickets]
               .map((ticket) => [ticket.id, ticket])).values()]
             : route.ticketKey ? [] : scopedProjectId ? pagedProjectTickets : tickets,
@@ -635,8 +642,7 @@ export function WorkspaceShellPage() {
       workspaceAggregateTickets,
       routeAggregateDetailTickets,
       route.ticketKey,
-      routeTicket,
-      projectIdParam,
+      routeTicketMatchesScope,
       scopedProjectId,
       activeWorkspaceProjectIds,
       pagedProjectTickets,
@@ -1277,6 +1283,7 @@ export function WorkspaceShellPage() {
               labels={scopedLabels}
               filters={scopedFilters}
               listSort={listSort}
+              ticketsInServerOrder={!!scopedProjectId && !route.ticketKey && activeContext === 'issues'}
               projects={scopedProjects}
               projectsLoading={loading}
               tickets={scopedTickets}
