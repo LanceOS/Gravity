@@ -9,7 +9,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:production-devtools": "npm run build && node --test scripts/react-query-devtools-production.test.mjs",
+    "test:production-devtools": "npm run build -- --sourcemap hidden && node --test scripts/react-query-devtools-production.test.mjs",
     "test:watch": "vitest",
     "test:e2e": "vitest run -c E2E/vitest.config.ts",
     "test:oauth-proxy": "node --test scripts/oauth-proxy.test.mjs",

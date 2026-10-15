@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import App from '../App';
 
@@ -16,6 +16,11 @@ describe('App development tools', () => {
 
     render(<App />);
 
-    expect(await screen.findByTitle('Query Cache DevTools')).toBeInTheDocument();
+    const toggle = await screen.findByTitle('Query Cache DevTools', {}, { timeout: 4000 });
+    expect(toggle).toBeInTheDocument();
+    expect(screen.queryByText('Gravity Cache DevTools')).not.toBeInTheDocument();
+
+    fireEvent.click(toggle);
+    expect(screen.getByText('Gravity Cache DevTools')).toBeInTheDocument();
   });
 });
