@@ -43,6 +43,7 @@ import {
   WorkspaceScopeStrategy,
 } from './services/scope-strategies.js';
 import { CycleError, createCycleRecord, createCycleSchema, deleteCycleRecord, editCycleRecord, editCycleSchema, getCycleRecord, mapCycle } from './services/cycles.js';
+import { getCycleProgress } from './services/cycle-progress.js';
 
 function mapLabel(label: typeof labels.$inferSelect) {
   return {
@@ -1163,6 +1164,23 @@ export function createTicketsRouter() {
       res.json(mapCycle(cycle));
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load cycle.' });
+    }
+  });
+
+  router.get('/cycles/:cycleId/progress', async (req, res) => {
+    try {
+      const cycle = await getCycleRecord(normalizeRouteParam(req.params.cycleId));
+      if (!cycle) { res.status(404).json({ error: 'Cycle not found.' }); return; }
+      const auth = await authorizeTeamAccess(req, cycle.teamId);
+      if (!auth.allowed) { res.status(auth.status).json({ error: auth.error }); return; }
+      if (req.query.teamId && req.query.teamId !== cycle.teamId) {
+        res.status(404).json({ error: 'Cycle not found in this team.' }); return;
+      }
+      const progress = await getCycleProgress(cycle.id, cycle.teamId);
+      if (!progress) { res.status(404).json({ error: 'Cycle not found in this team.' }); return; }
+      res.json(progress);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load cycle progress.' });
     }
   });
 

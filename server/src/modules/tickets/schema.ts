@@ -1,4 +1,4 @@
-import { bigint, index, pgTable, primaryKey, jsonb, text, timestamp, check, type AnyPgColumn } from 'drizzle-orm/pg-core';
+import { bigint, bigserial, index, integer, pgTable, primaryKey, jsonb, text, timestamp, check, type AnyPgColumn } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 import { cycles } from '../workspaces/schema.js';
 
@@ -29,6 +29,29 @@ export const tickets = pgTable('tickets', {
   assigneeIdIdx: index('tickets_assignee_id_idx').on(table.assigneeId),
   cycleIdIdx: index('tickets_cycle_id_idx').on(table.cycleId),
   parentIdIdx: index('tickets_parent_id_idx').on(table.parentId),
+}));
+
+// An exit has null status. Ticket IDs intentionally have no FK: deleted tickets
+// must remain in the cycle's historical count until their recorded exit.
+export const cycleProgressEvents = pgTable('cycle_progress_events', {
+  id: bigserial('id', { mode: 'number' }).primaryKey(),
+  cycleId: text('cycle_id').notNull().references(() => cycles.id, { onDelete: 'cascade' }),
+  ticketId: text('ticket_id').notNull(),
+  status: text('status'),
+  deltaTotal: integer('delta_total').notNull(),
+  deltaCompleted: integer('delta_completed').notNull(),
+  recordedAt: timestamp('recorded_at', { withTimezone: true }).notNull(),
+}, (table) => ({
+  cycleTimeIdx: index('cycle_progress_events_cycle_time_idx').on(table.cycleId, table.recordedAt, table.id),
+}));
+
+export const cycleProgressDailyDeltas = pgTable('cycle_progress_daily_deltas', {
+  cycleId: text('cycle_id').notNull().references(() => cycles.id, { onDelete: 'cascade' }),
+  day: text('day').notNull(), // YYYY-MM-DD in UTC
+  deltaTotal: integer('delta_total').notNull(),
+  deltaCompleted: integer('delta_completed').notNull(),
+}, (table) => ({
+  pk: primaryKey({ columns: [table.cycleId, table.day] }),
 }));
 
 export const ticketRelationships = pgTable('ticket_relationships', {

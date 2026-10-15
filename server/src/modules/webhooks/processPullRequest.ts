@@ -3,6 +3,7 @@ import { db } from '../../db/index.js';
 import { comments, githubDeliveries, githubPullRequests, projects, teams, ticketPullRequests, ticketRelationships, tickets } from '../../db/schema.js';
 import { createId } from '../../lib/platform.js';
 import { sanitizeGitHubLogin } from '../../lib/webhookSignature.js';
+import { recordCycleProgressTransitions } from '../tickets/services/cycle-progress.js';
 
 export const GITHUB_AUTOMATION_ACTOR = 'system:webhook';
 export const SUPPORTED_PR_ACTIONS = new Set(['opened', 'reopened', 'review_requested', 'ready_for_review', 'closed']);
@@ -201,6 +202,11 @@ export async function processPullRequestEvent(input: PullRequestEvent): Promise<
       const nextStatus = reconciliation ? 'done' : terminal ? ticket.status : open.length
         ? (open.some(link => link.phase === 'in_review') ? 'in_review' : 'in_progress')
         : merged.length ? 'done' : ticket.status;
+      await recordCycleProgressTransitions(tx, [{
+        ticketId: ticket.id,
+        before: { cycleId: ticket.cycleId, status: ticket.status },
+        after: { cycleId: ticket.cycleId, status: nextStatus },
+      }]);
       await tx.update(tickets).set({
         status: nextStatus, prStatus: summary.status, prUrl: summary.prUrl,
         updatedAt: new Date(Math.max(Date.now(), ticket.updatedAt.getTime() + 1)),

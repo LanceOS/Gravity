@@ -171,6 +171,7 @@ export const cycles = pgTable('cycles', {
   endDate: timestamp('end_date', { withTimezone: true }).notNull(),
   completed: boolean('completed').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  progressTrackedAt: timestamp('progress_tracked_at', { withTimezone: true }),
 }, (table) => ({
   teamIdIdx: index('cycles_team_id_idx').on(table.teamId),
 }));
