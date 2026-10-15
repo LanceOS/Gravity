@@ -151,6 +151,11 @@ describe('ticket hydration query regressions', () => {
     expect(second.status).toBe(200);
     expect(second.body.tickets.map((ticket: { id: string }) => ticket.id)).toEqual(['project-low']);
     expect(second.body.nextOffset).toBeNull();
+    await db.update(tickets).set({ branchName: 'branch-only-match' }).where(eq(tickets.id, 'project-low'));
+    const withoutSort = await api.get('/api/v1/tickets?pagination=page&status=todo,done&priority=low,urgent&search=branchonlymatch')
+      .set('x-project-id', project.id);
+    expect(withoutSort.status, withoutSort.body.error).toBe(200);
+    expect(withoutSort.body.tickets.map((ticket: { id: string }) => ticket.id)).toEqual(['project-low']);
   });
 
   it('pushes label ordering and the page limit into one database query', async () => {

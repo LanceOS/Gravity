@@ -5,7 +5,7 @@ import { queryKeys, CACHE_CONFIGS } from '../../utils/queryClient';
 import { useActiveProject } from '../project/ActiveProjectContext';
 import { useProjectContext } from '../project/ProjectContext';
 import { useAuth } from '../auth/AuthContext';
-import { patchTicketLabelAssignment, patchTicketInAllCaches, invalidateTicketCaches } from '../shared';
+import { patchTicketLabelAssignment, patchTicketInAllCaches, invalidateAggregateTicketQueries, invalidateTicketCaches } from '../shared';
 import { toast } from '@library';
 import { TicketFiltersContext } from '../filters/TicketFiltersContext';
 import type { LabelContextType } from './LabelContext.types';
@@ -92,6 +92,22 @@ export const LabelProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     [findLabelQueryKey, queryClient]
   );
 
+  const invalidateTicketsForLabel = useCallback((label?: Pick<Label, 'projectId' | 'teamId'>) => {
+    queryClient.invalidateQueries({ queryKey: ['ticketByKey'] });
+    queryClient.invalidateQueries({ queryKey: queryKeys.ticketDetails() });
+    queryClient.invalidateQueries({ queryKey: ['tickets', 'detail'] });
+    const affectedProjectIds = label?.projectId
+      ? [label.projectId]
+      : label?.teamId
+        ? projects.filter((project) => project.teamId === label.teamId).map((project) => project.id)
+        : projects.map((project) => project.id);
+    for (const projectId of affectedProjectIds) invalidateAggregateTicketQueries(queryClient, projectId);
+    if (!label) {
+      queryClient.invalidateQueries({ queryKey: ['workspaceTickets'] });
+      queryClient.invalidateQueries({ queryKey: ['teamTickets'] });
+    }
+  }, [projects, queryClient]);
+
   const resolveTicketProjectId = useCallback(
     (ticketId: string) => {
       return queryClient.getQueryData<Ticket>(queryKeys.ticketDetail(ticketId))?.projectId || activeProjectIdRef.current;
@@ -175,6 +191,7 @@ export const LabelProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       toast.show('Label saved.', 'success');
       void queryClient.invalidateQueries({ queryKey: ['workspaceLabels'] });
       invalidateLabelQueries(id, updatedLabel?.projectId);
+      invalidateTicketsForLabel(updatedLabel);
       return updatedLabel;
     },
     onError: (_error, _variables, context: { previousLabelProjectId?: string | null } | undefined) => {
@@ -201,11 +218,12 @@ export const LabelProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     },
     onMutate: async (id) => {
       const cachedLabel = labelById.get(id);
-      return { projectId: cachedLabel?.projectId };
+      return { label: cachedLabel };
     },
-    onSuccess: (_result, id, context: { projectId?: string | null } | undefined) => {
+    onSuccess: (_result, id, context: { label?: Label } | undefined) => {
       void queryClient.invalidateQueries({ queryKey: ['workspaceLabels'] });
-      invalidateLabelQueries(id, context?.projectId);
+      invalidateLabelQueries(id, context?.label?.projectId);
+      invalidateTicketsForLabel(context?.label);
     },
   });
 

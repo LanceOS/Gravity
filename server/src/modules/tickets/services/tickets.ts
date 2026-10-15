@@ -56,6 +56,7 @@ export type TicketFilters = {
   offset?: number;
   order?: 'asc' | 'desc';
   listSort?: 'created' | 'label' | 'newest' | 'newest_urgent' | 'oldest' | 'priority_desc' | 'priority_asc' | 'updated_desc' | 'updated_asc';
+  projectPage?: boolean;
   after?: { createdAt: string; id: string };
 };
 
@@ -191,7 +192,7 @@ function buildTicketFilterConditions(projectIds: string[], filters: TicketFilter
     )!);
   }
   if (filters.teamId) conditions.push(eq(projects.teamId, filters.teamId));
-  if (filters.listSort && filters.query) {
+  if (filters.projectPage && filters.query) {
     const term = filters.query.trim().toLowerCase();
     const token = term.replace(/[^a-z0-9]+/g, '');
     const fields = [tickets.title, tickets.key, tickets.description, tickets.branchName];
@@ -210,10 +211,10 @@ function buildTicketFilterConditions(projectIds: string[], filters: TicketFilter
   if (filters.updatedAfter) conditions.push(gte(tickets.updatedAt, filters.updatedAfter));
   if (filters.updatedBefore) conditions.push(lte(tickets.updatedAt, filters.updatedBefore));
 
-  if (filters.status) conditions.push(filters.listSort
+  if (filters.status) conditions.push(filters.projectPage
     ? inArray(tickets.status, filters.status.split(',').map((value) => canonicalizeStatus(value.trim())))
     : eq(tickets.status, canonicalizeStatus(filters.status)));
-  if (filters.priority) conditions.push(filters.listSort
+  if (filters.priority) conditions.push(filters.projectPage
     ? inArray(tickets.priority, filters.priority.split(',').map((value) => canonicalizePriority(value.trim())))
     : eq(tickets.priority, canonicalizePriority(filters.priority)));
   if (filters.assigneeId) {

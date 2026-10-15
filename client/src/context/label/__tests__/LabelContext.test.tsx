@@ -65,7 +65,7 @@ function renderWithProvider(ui: React.ReactNode, activeProjectId: string, projec
 }
 
 function ContextProbe() {
-  const { labels, globalLabels, labelsByProject, createLabel, assignLabelToTicket } = useLabels();
+  const { labels, globalLabels, labelsByProject, createLabel, updateLabel, deleteLabel, assignLabelToTicket } = useLabels();
 
   return (
     <div>
@@ -79,6 +79,8 @@ function ContextProbe() {
         Create Label
       </button>
       <button data-testid="create-team-label-btn" onClick={() => createLabel({ name: 'Team bug', teamId: 'team-2' })}>Create team label</button>
+      <button data-testid="update-team-label-btn" onClick={() => updateLabel('team-label', { name: 'Renamed' })}>Update team label</button>
+      <button data-testid="delete-team-label-btn" onClick={() => deleteLabel('team-label')}>Delete team label</button>
       <button 
         data-testid="assign-label-btn" 
         onClick={() => assignLabelToTicket('ticket-1', 'label-1')}
@@ -175,6 +177,29 @@ describe('LabelContext', () => {
     await waitFor(() => expect(invalidate).toHaveBeenCalledWith({ queryKey: ['teamLabels', 'team-2'] }));
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ['labels', { projectId: 'project-2' }], exact: true });
     expect(invalidate).not.toHaveBeenCalledWith({ queryKey: ['labels', { projectId: 'project-1' }], exact: true });
+  });
+
+  it.each(['update', 'delete'] as const)('refreshes affected ticket pages after a team label %s', async (action) => {
+    const invalidate = vi.spyOn(QueryClient.prototype, 'invalidateQueries');
+    vi.mocked(useAuth).mockReturnValue({ currentUser: { id: 'user-1' } } as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any);
+    const teamLabel = { id: 'team-label', teamId: 'team-2', projectId: null, name: 'Team label' };
+    const fetchMock = vi.fn((_url, init) => Promise.resolve(jsonResponse(
+      init?.method === 'PUT' ? { ...teamLabel, name: 'Renamed' }
+        : init?.method === 'DELETE' ? { success: true } : [teamLabel],
+    )));
+    vi.stubGlobal('fetch', fetchMock);
+    renderWithProvider(<ContextProbe />, 'project-2', [
+      { id: 'project-1', teamId: 'team-1' }, { id: 'project-2', teamId: 'team-2' },
+    ]);
+    await waitFor(() => expect(screen.getByTestId('label-count')).toHaveTextContent('1'));
+    fireEvent.click(screen.getByTestId(action === 'update' ? 'update-team-label-btn' : 'delete-team-label-btn'));
+    await waitFor(() => expect(invalidate).toHaveBeenCalledWith({ queryKey: ['tickets', { projectId: 'project-2' }] }));
+    expect(invalidate).not.toHaveBeenCalledWith({ queryKey: ['tickets', { projectId: 'project-1' }] });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['ticketByKey'] });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['ticket-detail'] });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['tickets', 'detail'] });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['workspaceTickets'] });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['teamTickets'] });
   });
 
 });
