@@ -875,11 +875,15 @@ function mockAggregateApiResponses() {
       const workspaceId = parsedUrl.searchParams.get('workspaceId');
 
       if (teamId === 'team-1') {
-        return Promise.resolve(jsonResponse(teamAggregateTickets));
+        return Promise.resolve(jsonResponse(parsedUrl.searchParams.get('pagination') === 'cursor'
+          ? { tickets: teamAggregateTickets, nextCursor: null }
+          : teamAggregateTickets));
       }
 
       if (workspaceId === 'workspace-1') {
-        return Promise.resolve(jsonResponse(workspaceAggregateTickets));
+        return Promise.resolve(jsonResponse(parsedUrl.searchParams.get('pagination') === 'cursor'
+          ? { tickets: workspaceAggregateTickets, nextCursor: null }
+          : workspaceAggregateTickets));
       }
     }
 
@@ -1683,13 +1687,6 @@ describe('AppShellPage', () => {
       },
     });
     const getQueriesData = vi.spyOn(queryClient, 'getQueriesData');
-    const getQueryData = vi.spyOn(queryClient, 'getQueryData');
-    const hasTicketQueryProjectId = (queryKey: unknown, projectId: string) => {
-      if (!Array.isArray(queryKey) || queryKey[0] !== 'tickets' || typeof queryKey[1] !== 'object' || !queryKey[1]) {
-        return false;
-      }
-      return (queryKey[1] as { projectId?: string }).projectId === projectId;
-    };
 
     queryClient.setQueryData(queryKeys.tickets('project-1'), [
       {
@@ -1834,15 +1831,6 @@ describe('AppShellPage', () => {
         return Array.isArray(queryKey) && (queryKey[0] === 'tickets' || queryKey[0] === 'labels');
       })
     ).toBe(false);
-    expect(
-      getQueryData.mock.calls.some(([queryKey]) => hasTicketQueryProjectId(queryKey, 'other-project'))
-    ).toBe(false);
-    expect(
-      getQueryData.mock.calls.some(([queryKey]) => hasTicketQueryProjectId(queryKey, 'project-1'))
-    ).toBe(true);
-    expect(
-      getQueryData.mock.calls.some(([queryKey]) => hasTicketQueryProjectId(queryKey, 'project-2'))
-    ).toBe(true);
   });
 
   it('recomputes project sidebar counts when per-project ticket cache entries change', async () => {

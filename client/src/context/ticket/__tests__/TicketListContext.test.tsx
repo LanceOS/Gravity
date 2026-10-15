@@ -139,15 +139,17 @@ function Probe() {
 function Harness({
   queryClient,
   currentUser: harnessCurrentUser,
+  fetchProjectTickets,
 }: {
   queryClient: QueryClient;
   currentUser: typeof currentUser | null;
+  fetchProjectTickets?: boolean;
 }) {
   return (
     <QueryClientProvider client={queryClient}>
       <ActiveProjectProvider>
         <TicketFiltersProvider>
-          <TicketListProvider currentUser={harnessCurrentUser}>
+          <TicketListProvider currentUser={harnessCurrentUser} fetchProjectTickets={fetchProjectTickets}>
             <Probe />
           </TicketListProvider>
         </TicketFiltersProvider>
@@ -492,6 +494,16 @@ describe('TicketListContext', () => {
     });
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+  it('does not fetch a project list for aggregate routes', async () => {
+    const queryClient = createQueryClient();
+    const fetchMock = vi.fn(() => Promise.resolve(jsonResponse(projectOneTickets)));
+    vi.stubGlobal('fetch', fetchMock);
+    render(<Harness queryClient={queryClient} currentUser={currentUser} fetchProjectTickets={false} />);
+    await waitFor(() => expect(currentProject).toBeDefined());
+    await act(async () => currentProject!.setActiveProjectId('project-1'));
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(currentValue.tickets).toEqual([]);
   });
 });
 

@@ -562,6 +562,13 @@ function responseForTicketKey(ticketKey: string) {
   return serializeTicket(ticket);
 }
 
+function serializeTicketDetail(ticket: MockTicket) {
+  return {
+    ...serializeTicket(ticket),
+    subtasks: dbState.tickets.filter((candidate) => candidate.parentId === ticket.id).map(serializeTicket),
+  };
+}
+
 function getProjectTicketKeyPrefix(projectId: string) {
   return getProjectById(projectId)?.key ?? 'GRV';
 }
@@ -1870,7 +1877,7 @@ globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) =>
     if (!ticket) {
       return jsonResponse(404, { error: 'Ticket not found' });
     }
-    return jsonResponse(200, serializeTicket(ticket));
+    return jsonResponse(200, serializeTicketDetail(ticket));
   }
 
   if (ticketByIdMatch && method === 'PATCH') {

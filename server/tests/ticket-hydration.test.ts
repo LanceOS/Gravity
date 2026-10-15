@@ -5,7 +5,7 @@ import { comments, labels, ticketLabels, ticketRelationships, tickets, workspace
 import { getDefaultTeamId } from '../src/modules/workspaces/utils/default-team.js';
 import * as realtime from '../src/realtime.js';
 import { createAuthenticatedApi, seedCycle, seedTicket, seedWorkspaceFixture } from './helpers/test-helpers.js';
-import { getRelationshipCleanupEventTargets, getTicketDetails, getTicketDetailsByKey } from '../src/modules/tickets/services/tickets.js';
+import { getRelationshipCleanupDetails, getRelationshipCleanupEventTargets, getTicketDetails, getTicketDetailsByKey } from '../src/modules/tickets/services/tickets.js';
 
 // Count actual SQL calls, and hold each for a turn so unconstrained Promise.all
 // fan-out is observable even with the in-memory adapter's immediate responses.
@@ -92,6 +92,43 @@ describe('ticket hydration query regressions', () => {
     expect(meter.peak()).toBe(1);
     console.info(JSON.stringify({ affected: count, queries: meter.sql.length, peakInFlight: meter.peak(), simulatedPoolWaits: meter.waits(), simulatedPoolWaitMs: meter.waitMs() }));
   }, 120_000);
+
+  it('bounds MCP cleanup detail hydration while preserving event order', async () => {
+    const { project } = await seedWorkspaceFixture();
+    const affected = Array.from({ length: 12 }, (_, index) => ({ id: `mcp-${index}`, projectId: project.id }));
+    await db.insert(tickets).values(affected.map(({ id }, index) => ({
+      id, key: `GRV-${index + 1}`, title: `MCP ${index}`, projectId: project.id,
+    })));
+    const meter = measureQueries();
+    const details = await getRelationshipCleanupDetails(affected);
+    meter.stop();
+    expect(details.map(({ ticket }) => ticket.id)).toEqual(affected.map(({ id }) => id));
+    expect(details.every(({ scope }) => scope.id === project.id)).toBe(true);
+    expect(meter.peak()).toBeLessThanOrEqual(12);
+  });
+
+  it('uses a cursor without skipping tickets deleted before the next page', async () => {
+    const api = await createAuthenticatedApi({ name: 'Owner', email: 'cursor@example.com', role: 'owner' });
+    const { project } = await seedWorkspaceFixture({ owner: {
+      id: api.user.id, name: api.user.name, email: api.user.email, role: 'owner', avatarUrl: api.user.avatar,
+    } });
+    for (let index = 0; index < 4; index++) {
+      await seedTicket(project.id, { id: `cursor-${index}`, key: `GRV-${index + 1}` });
+    }
+    const first = await api.get('/api/v1/tickets?pagination=cursor&limit=2').set('x-project-id', project.id);
+    expect(first.status).toBe(200);
+    expect(first.body.tickets.map((ticket: { id: string }) => ticket.id)).toEqual(['cursor-0', 'cursor-1']);
+    expect(first.body.nextCursor).toBeTypeOf('string');
+    const wrongFilter = await api.get(`/api/v1/tickets?pagination=cursor&limit=2&status=done&cursor=${encodeURIComponent(first.body.nextCursor)}`)
+      .set('x-project-id', project.id);
+    expect(wrongFilter.status).toBe(400);
+    await db.delete(tickets).where(eq(tickets.id, 'cursor-0'));
+    const second = await api.get(`/api/v1/tickets?pagination=cursor&limit=2&cursor=${encodeURIComponent(first.body.nextCursor)}`)
+      .set('x-project-id', project.id);
+    expect(second.status).toBe(200);
+    expect(second.body.tickets.map((ticket: { id: string }) => ticket.id)).toEqual(['cursor-2', 'cursor-3']);
+    expect(second.body.nextCursor).toBeNull();
+  });
 
   it('emits follow-up invalidations without an actor after closing a ticket', async () => {
     const api = await createAuthenticatedApi({ name: 'Owner', email: 'cleanup@example.com', role: 'owner' });

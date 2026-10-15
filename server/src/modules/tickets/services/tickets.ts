@@ -1032,6 +1032,33 @@ export async function getRelationshipCleanupEventTargets(
   return targets;
 }
 
+/** Hydrate MCP cleanup events without issuing a burst of detail queries. */
+export async function getRelationshipCleanupDetails(
+  affectedTickets: TicketRelationshipCleanupEffect['affectedTickets'],
+) {
+  const details: Array<{ scope: ProjectScope; ticket: NonNullable<Awaited<ReturnType<typeof getTicketDetailsFromRow>>> }> = [];
+  for (let offset = 0; offset < affectedTickets.length; offset += CLEANUP_BATCH_SIZE) {
+    const batch = affectedTickets.slice(offset, offset + CLEANUP_BATCH_SIZE);
+    const [rows, scopes] = await Promise.all([
+      db.select().from(tickets).where(inArray(tickets.id, batch.map(({ id }) => id))),
+      getProjectScopes([...new Set(batch.map(({ projectId }) => projectId))]),
+    ]);
+    const rowsById = new Map(rows.map((row) => [row.id, row]));
+    // Preserve event order while keeping at most two detail hydrations in flight.
+    for (let index = 0; index < batch.length; index += 2) {
+      const hydrated = await Promise.all(batch.slice(index, index + 2).map(async ({ id, projectId }) => {
+        const row = rowsById.get(id);
+        const scope = scopes.get(projectId);
+        if (!row || row.projectId !== projectId || !scope) return null;
+        const ticket = await getTicketDetailsFromRow(row, scope);
+        return ticket ? { scope, ticket } : null;
+      }));
+      for (const result of hydrated) if (result) details.push(result);
+    }
+  }
+  return details;
+}
+
 export async function createTicketRecord(input: {
   title: string;
   description?: string;

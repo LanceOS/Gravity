@@ -30,6 +30,7 @@ export const useTicketList = useTicketListContext;
 
 export function useTicketListContextValue({
   currentUser,
+  fetchProjectTickets = true,
 }: TicketListContextValueArgs): TicketListContextType {
   const { activeProjectId } = useActiveProject();
   const { filters } = useTicketFilters();
@@ -45,7 +46,7 @@ export function useTicketListContextValue({
       const data = await apiClient.get<Ticket[]>(`/tickets`, { projectId: activeProjectId });
       return data;
     },
-    enabled: !!activeProjectId && isProjectScopeAligned && !!currentUser,
+    enabled: fetchProjectTickets && !!activeProjectId && isProjectScopeAligned && !!currentUser,
     ...CACHE_CONFIGS.ticketsList,
   });
 
@@ -59,8 +60,8 @@ export function useTicketListContextValue({
     setPrevious({ userId: currentUserId, tickets: ticketsQuery.data });
   }
   const tickets = useMemo(
-    () => hasUserChanged ? [] : ticketsQuery.data ?? previous.tickets ?? [],
-    [hasUserChanged, ticketsQuery.data, previous.tickets],
+    () => hasUserChanged || !fetchProjectTickets ? [] : ticketsQuery.data ?? previous.tickets ?? [],
+    [fetchProjectTickets, hasUserChanged, ticketsQuery.data, previous.tickets],
   );
 
   const ticketMap = useMemo(() => createTicketMap(tickets), [tickets]);
@@ -93,9 +94,10 @@ export function useTicketListContextValue({
 
 export function TicketListProvider({
   currentUser,
+  fetchProjectTickets,
   children,
 }: TicketListProviderProps) {
-  const value = useTicketListContextValue({ currentUser });
+  const value = useTicketListContextValue({ currentUser, fetchProjectTickets });
   const activeTicketContextValue = useMemo(() => ({
     activeTicket: value.activeTicket,
     setActiveTicket: value.setActiveTicket,

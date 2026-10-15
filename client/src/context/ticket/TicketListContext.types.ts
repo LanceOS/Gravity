@@ -13,6 +13,7 @@ export interface TicketListContextType {
 
 export interface TicketListContextValueArgs {
   currentUser: User | null;
+  fetchProjectTickets?: boolean;
 }
 
 export interface TicketListProviderProps extends TicketListContextValueArgs {

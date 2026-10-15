@@ -1,4 +1,5 @@
 import { and, asc, eq, inArray, isNull, or } from 'drizzle-orm';
+import { createHash } from 'node:crypto';
 import { type Request, type Response, Router } from 'express';
 import { z } from 'zod';
 import { db } from '../../db/index.js';
@@ -24,6 +25,7 @@ import {
   hasCircularDependency,
   getTicketDetails,
   getRelationshipCleanupEventTargets,
+  ticketSearchCreatedAt,
   listComments,
   listTicketBlockers,
   listTicketDependencies,
@@ -44,6 +46,7 @@ import {
 } from './services/scope-strategies.js';
 import { CycleError, createCycleRecord, createCycleSchema, deleteCycleRecord, editCycleRecord, editCycleSchema, getCycleRecord, mapCycle } from './services/cycles.js';
 import { getCycleProgress } from './services/cycle-progress.js';
+import { decodeTicketCursor, encodeTicketCursor } from './services/ticket-cursor.js';
 
 function mapLabel(label: typeof labels.$inferSelect) {
   return {
@@ -345,8 +348,25 @@ export function createTicketsRouter() {
     }
 
     try {
+      const cursorPagination = req.query.pagination === 'cursor';
       const queryLimit = parseIntQueryParam(req.query.limit);
       const queryOffset = parseIntQueryParam(req.query.offset);
+      const cursorFingerprint = createHash('sha256').update(JSON.stringify({
+        projectId, teamId, workspaceId,
+        status: req.query.status, priority: req.query.priority,
+        assigneeId: req.query.assigneeId, cycleId: req.query.cycleId,
+        labels: req.query.labels, labelMode: req.query.labelMode,
+      })).digest('hex');
+      let after: { createdAt: string; id: string } | undefined;
+      if (cursorPagination && req.query.cursor !== undefined) {
+        const position = decodeTicketCursor(req.query.cursor, cursorFingerprint);
+        if (!position) {
+          res.status(400).json({ error: 'Invalid ticket cursor.' });
+          return;
+        }
+        after = position;
+      }
+      const pageSize = Math.min(Math.max(queryLimit ?? 120, 1), 120);
 
       const ticketList = await strategy.execute({
         status: typeof req.query.status === 'string' ? req.query.status : undefined,
@@ -355,10 +375,21 @@ export function createTicketsRouter() {
         cycleId: typeof req.query.cycleId === 'string' ? req.query.cycleId : undefined,
         labels: typeof req.query.labels === 'string' ? req.query.labels.split(',').filter(Boolean) : undefined,
         labelMode: (req.query.labelMode === 'all' || req.query.labelMode === 'any') ? req.query.labelMode : undefined,
-        limit: queryLimit,
-        offset: queryOffset,
+        limit: cursorPagination ? pageSize + 1 : queryLimit,
+        offset: cursorPagination ? undefined : queryOffset,
+        after,
       });
-      res.json(ticketList);
+      if (cursorPagination) {
+        const hasMore = ticketList.length > pageSize;
+        const page = ticketList.slice(0, pageSize);
+        const last = page.at(-1);
+        const nextCursor = hasMore && last
+          ? encodeTicketCursor({ createdAt: last[ticketSearchCreatedAt], id: last.id }, cursorFingerprint)
+          : null;
+        res.json({ tickets: page, nextCursor });
+      } else {
+        res.json(ticketList);
+      }
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load tickets.' });
     }

@@ -72,6 +72,7 @@ interface WorkspaceMember {
 }
 
 const AGGREGATE_TICKETS_PAGE_SIZE = 120;
+type TicketPage = { tickets: Ticket[]; nextCursor: string | null };
 
 export function WorkspaceShellPage() {
   const { currentUser, loading: authLoading, signOut } = useAuth();
@@ -254,22 +255,20 @@ export function WorkspaceShellPage() {
     isFetchingNextPage: workspaceAggregateIsFetchingNextPage,
     isLoading: workspaceAggregateTicketsLoading,
     isFetching: workspaceAggregateTicketsFetching,
-  } = useInfiniteQuery<Ticket[]>({
+  } = useInfiniteQuery<TicketPage>({
     queryKey: ['workspaceTickets', activeWorkspaceId, aggregateQueryParams, 'paged'],
-    queryFn: ({ pageParam = 0 }) =>
-      apiClient.get<Ticket[]>('/tickets', {
+    queryFn: ({ pageParam }) =>
+      apiClient.get<TicketPage>('/tickets', {
         params: {
           workspaceId: activeWorkspaceId,
           ...aggregateQueryParams,
+          pagination: 'cursor',
           limit: `${AGGREGATE_TICKETS_PAGE_SIZE}`,
-          offset: `${pageParam}`,
+          cursor: pageParam as string | undefined,
         },
       }),
-    getNextPageParam: (lastPage, allPages) =>
-      lastPage.length < AGGREGATE_TICKETS_PAGE_SIZE
-        ? undefined
-        : allPages.length * AGGREGATE_TICKETS_PAGE_SIZE,
-    initialPageParam: 0,
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+    initialPageParam: undefined as string | undefined,
     enabled: isWorkspaceAllTasksPath && !isAggregateDetailRoute && !!activeWorkspaceId && !!currentUser,
     staleTime: CACHE_CONFIGS.ticketsList.staleTime,
     gcTime: CACHE_CONFIGS.ticketsList.gcTime,
@@ -282,58 +281,52 @@ export function WorkspaceShellPage() {
     isFetchingNextPage: teamAggregateIsFetchingNextPage,
     isLoading: teamAggregateTicketsLoading,
     isFetching: teamAggregateTicketsFetching,
-  } = useInfiniteQuery<Ticket[]>({
+  } = useInfiniteQuery<TicketPage>({
     queryKey: ['teamTickets', route.teamIdParam, aggregateQueryParams, 'paged'],
-    queryFn: ({ pageParam = 0 }) =>
-      apiClient.get<Ticket[]>('/tickets', {
+    queryFn: ({ pageParam }) =>
+      apiClient.get<TicketPage>('/tickets', {
         params: {
           teamId: route.teamIdParam,
           ...aggregateQueryParams,
+          pagination: 'cursor',
           limit: `${AGGREGATE_TICKETS_PAGE_SIZE}`,
-          offset: `${pageParam}`,
+          cursor: pageParam as string | undefined,
         },
       }),
-    getNextPageParam: (lastPage, allPages) =>
-      lastPage.length < AGGREGATE_TICKETS_PAGE_SIZE
-        ? undefined
-        : allPages.length * AGGREGATE_TICKETS_PAGE_SIZE,
-    initialPageParam: 0,
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+    initialPageParam: undefined as string | undefined,
     enabled: isTeamAggregatePath && !isAggregateDetailRoute && !!route.teamIdParam && !!currentUser,
     staleTime: CACHE_CONFIGS.ticketsList.staleTime,
     gcTime: CACHE_CONFIGS.ticketsList.gcTime,
   });
 
-  const { data: routeAggregateTicket, isLoading: routeAggregateTicketLoading } = useQuery<Ticket | null>({
+  const { data: routeTicket, isLoading: routeTicketLoading } = useQuery<Ticket | null>({
     queryKey: ['ticketByKey', route.ticketKey],
     queryFn: () => apiClient.get<Ticket | null>(`/tickets/key/${route.ticketKey}`),
-    enabled: isAggregateDetailRoute && !!route.ticketKey && !!currentUser,
+    enabled: !!route.ticketKey && !!currentUser,
     staleTime: CACHE_CONFIGS.ticketDetail.staleTime,
     gcTime: CACHE_CONFIGS.ticketDetail.gcTime,
   });
 
-  const { data: routeAggregateProjectTickets = [], isLoading: routeAggregateProjectTicketsLoading } = useQuery<Ticket[]>({
-    queryKey: queryKeys.tickets(routeAggregateTicket?.projectId || ''),
-    queryFn: () => apiClient.get<Ticket[]>('/tickets', {
-      projectId: routeAggregateTicket?.projectId,
-    }),
-    enabled: isAggregateDetailRoute && !!routeAggregateTicket?.projectId && !!currentUser,
-    staleTime: CACHE_CONFIGS.ticketsList.staleTime,
-    gcTime: CACHE_CONFIGS.ticketsList.gcTime,
+  const { data: routeParentTicket, isLoading: routeParentTicketLoading } = useQuery<Ticket | null>({
+    queryKey: queryKeys.ticketDetail(routeTicket?.parentId || ''),
+    queryFn: () => apiClient.get<Ticket>(`/tickets/${routeTicket?.parentId}`, { projectId: routeTicket?.projectId }),
+    enabled: !!route.ticketKey && !!routeTicket?.parentId && !!currentUser,
+    staleTime: CACHE_CONFIGS.ticketDetail.staleTime,
+    gcTime: CACHE_CONFIGS.ticketDetail.gcTime,
   });
 
   const routeAggregateDetailTickets = useMemo(
-    () => (routeAggregateTicket && routeAggregateProjectTickets.length === 0
-      ? [routeAggregateTicket]
-      : routeAggregateProjectTickets),
-    [routeAggregateTicket, routeAggregateProjectTickets]
+    () => routeTicket ? [routeParentTicket, routeTicket].filter((ticket): ticket is Ticket => !!ticket) : [],
+    [routeParentTicket, routeTicket]
   );
 
   const workspaceAggregateTickets = useMemo(
-    () => workspaceAggregatePages?.pages.flat() || [],
+    () => workspaceAggregatePages?.pages.flatMap((page) => page.tickets) || [],
     [workspaceAggregatePages?.pages]
   );
   const teamAggregateTickets = useMemo(
-    () => teamAggregatePages?.pages.flat() || [],
+    () => teamAggregatePages?.pages.flatMap((page) => page.tickets) || [],
     [teamAggregatePages?.pages]
   );
 
@@ -377,26 +370,24 @@ export function WorkspaceShellPage() {
   const ticketsByProjectIdFromQueries = useMemo(() => {
     const map = new Map<string, Ticket[]>();
     activeWorkspaceProjects.forEach((project, idx) => {
-      queryClient.getQueryData(queryKeys.tickets(project.id));
       const data = projectTicketsQueries[idx]?.data;
       if (Array.isArray(data)) {
         map.set(project.id, data);
       }
     });
     return map;
-  }, [activeWorkspaceProjects, projectTicketsQueries, queryClient]);
+  }, [activeWorkspaceProjects, projectTicketsQueries]);
 
   const labelsByProjectIdFromQueries = useMemo(() => {
     const map = new Map<string, Label[]>();
     activeWorkspaceProjects.forEach((project, idx) => {
-      queryClient.getQueryData(queryKeys.labels(project.id));
       const data = projectLabelsQueries[idx]?.data;
       if (Array.isArray(data)) {
         map.set(project.id, data);
       }
     });
     return map;
-  }, [activeWorkspaceProjects, projectLabelsQueries, queryClient]);
+  }, [activeWorkspaceProjects, projectLabelsQueries]);
 
   const labelsByProject = useMemo(() => {
     const cachedLabelsByProject = new Map<string, Label[]>();
@@ -422,13 +413,19 @@ export function WorkspaceShellPage() {
     }
 
     for (const team of sidebarTree?.teams ?? []) {
+      const labelsForProject = new Map<string, Label[]>();
+      for (const label of team.labels ?? []) {
+        if (!label.projectId || !activeWorkspaceProjectIds.has(label.projectId)) continue;
+        const projectLabels = labelsForProject.get(label.projectId) ?? [];
+        projectLabels.push(label);
+        labelsForProject.set(label.projectId, projectLabels);
+      }
       for (const project of team.projects ?? []) {
         if (!activeWorkspaceProjectIds.has(project.id)) {
           continue;
         }
 
-        const projectLabels = team.labels ?? [];
-        appendProjectLabels(project.id, projectLabels.filter((label) => label.projectId === project.id));
+        appendProjectLabels(project.id, labelsForProject.get(project.id) ?? []);
       }
     }
 
@@ -481,11 +478,11 @@ export function WorkspaceShellPage() {
         return false;
       }
 
-      if (shouldUseAggregateTicketPagination) {
-        if (isAggregateDetailRoute) {
-          return routeAggregateTicketLoading || routeAggregateProjectTicketsLoading;
-        }
+      if (route.ticketKey) {
+        return routeTicketLoading || routeParentTicketLoading;
+      }
 
+      if (shouldUseAggregateTicketPagination) {
         if (isWorkspaceAllTasksPath) {
           return workspaceAggregateTicketsLoading || workspaceAggregateTicketsFetching;
         }
@@ -504,8 +501,9 @@ export function WorkspaceShellPage() {
       isAggregateDetailRoute,
       isTeamAggregatePath,
       isWorkspaceAllTasksPath,
-      routeAggregateProjectTicketsLoading,
-      routeAggregateTicketLoading,
+      routeTicketLoading,
+      routeParentTicketLoading,
+      route.ticketKey,
       scopedProjectTicketsFetching,
       shouldUseAggregateTicketPagination,
       teamAggregateTicketsFetching,
@@ -592,7 +590,10 @@ export function WorkspaceShellPage() {
           ? isAggregateDetailRoute
             ? routeAggregateDetailTickets
             : teamAggregateTickets
-          : tickets,
+          : route.ticketKey && routeTicket
+            ? [...new Map([...tickets.filter((ticket) => ticket.projectId === routeTicket.projectId), ...routeAggregateDetailTickets]
+              .map((ticket) => [ticket.id, ticket])).values()]
+            : tickets,
     [
       isAggregateDetailRoute,
       isTeamAggregatePath,
@@ -601,6 +602,8 @@ export function WorkspaceShellPage() {
       tickets,
       workspaceAggregateTickets,
       routeAggregateDetailTickets,
+      route.ticketKey,
+      routeTicket,
     ]
   );
   const sharedLinkFallbackRoute = `${pathname}${searchParams.toString() ? `?${searchParams.toString()}` : ''}`;

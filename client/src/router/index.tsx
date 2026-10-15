@@ -1,4 +1,4 @@
-import { createBrowserRouter, Navigate, useParams } from 'react-router-dom';
+import { createBrowserRouter, Navigate, useLocation, useParams } from 'react-router-dom';
 import { lazy, Suspense } from 'react';
 import type { ReactNode } from 'react';
 import {
@@ -51,12 +51,22 @@ function appShellElement() {
   return projectElement(<AppShellPage />);
 }
 
-function workspaceShellElement() {
-  return projectElement(
-    <WorkspaceTicketProviders>
+function WorkspaceShellWithProviders() {
+  const { workspaceId, teamId, projectId, ticketKey } = useParams();
+  const { pathname } = useLocation();
+  const isWorkspaceAggregate = !!workspaceId && (
+    pathname === `/workspaces/${workspaceId}/all` || pathname === `/workspaces/${workspaceId}/all/`
+  );
+  const isTeamAggregate = !!teamId && !projectId;
+  return (
+    <WorkspaceTicketProviders fetchProjectTickets={!isWorkspaceAggregate && !isTeamAggregate && !ticketKey}>
       <WorkspaceShellPage />
     </WorkspaceTicketProviders>
   );
+}
+
+function workspaceShellElement() {
+  return projectElement(<WorkspaceShellWithProviders />);
 }
 
 const appShellPaths = ['/', '/workspaces'];
