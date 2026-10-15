@@ -97,17 +97,8 @@ log_success "$ENGINE daemon is running and accessible."
 # 5. Env file checks (only needed for 'up')
 if [[ "$ACTION" == "up" ]]; then
   if [ ! -f ".env" ]; then
-    log_warn "No .env file found in root. Checking for .env.example..."
-    if [ -f "server/.env.example" ]; then
-      cp server/.env.example .env
-      log_success "Created .env from server/.env.example. Please review its settings."
-    elif [ -f "docker/.env.example" ]; then
-      cp docker/.env.example .env
-      log_success "Created .env from docker/.env.example. Please review its settings."
-    else
-      log_error "Could not find any .env or .env.example file. Please create a .env file."
-      exit 1
-    fi
+    log_error "Create root .env from .env.example and set the required secrets before starting Compose."
+    exit 1
   else
     log_success ".env configuration file detected."
   fi

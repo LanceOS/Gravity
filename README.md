@@ -4,6 +4,15 @@ Quick instructions for running the app in development with a live-reloading fron
 
 ## Dev (compose with Vite HMR)
 
+Before running Compose, copy `.env.example` to `.env` in the repository root.
+Set `GRAVITY_POSTGRES_PASSWORD`, `GRAVITY_REDIS_PASSWORD`,
+`BETTER_AUTH_SECRET`, and `NODE_IDENTITY_MASTER_KEY` to four independent
+nonempty secrets (for example, run `openssl rand -hex 32` four times). Both
+Compose variants build their internal connection URLs from these values. See
+[deployment configuration](docs/deployment-configuration.md)
+for the remaining startup settings and production requirements. Compose rejects
+blank required secrets before starting services.
+
 Podman (recommended):
 
 ```bash
@@ -97,6 +106,9 @@ Run the repo's local CI flow from the project root with:
 ```
 
 This delegates to the maintained CI driver in `scripts/local-ci.sh`, which installs dependencies, runs the client and server test suites, builds both apps, and performs a compose-based smoke check.
+On a fresh checkout it creates a private, disposable `.env` with independent
+test secrets for the Compose smoke check and removes it on exit. An existing
+`.env` is left untouched.
 
 Before deployment, run `npm --workspace=server run check-env` and follow
 [deployment configuration](docs/deployment-configuration.md) for required secrets,
