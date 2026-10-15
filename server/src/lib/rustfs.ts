@@ -161,19 +161,27 @@ export class RustFS {
   /**
    * Retrieves a file from the specified bucket path.
    */
-  static async readFile(bucketPath: string, filename: string): Promise<Buffer> {
+  static async readFile(bucketPath: string, filename: string, signal?: AbortSignal): Promise<Buffer> {
     const key = `${bucketPath}/${filename}`;
     const command = new GetObjectCommand({
       Bucket: env.rustfsBucket,
       Key: key,
     });
     try {
-      const response = await s3Client.send(command);
+      const response = await s3Client.send(command, { abortSignal: signal });
       if (!response.Body) {
         throw new Error(`File ${key} not found or empty`);
       }
-      const arrayBuffer = await response.Body.transformToByteArray();
-      return Buffer.from(arrayBuffer);
+      const body = response.Body as typeof response.Body & { destroy?: (error?: Error) => void };
+      const onAbort = () => body.destroy?.(new Error('Storage read cancelled'));
+      signal?.addEventListener('abort', onAbort, { once: true });
+      try {
+        if (signal?.aborted) onAbort();
+        const arrayBuffer = await body.transformToByteArray();
+        return Buffer.from(arrayBuffer);
+      } finally {
+        signal?.removeEventListener('abort', onAbort);
+      }
     } catch (err: any) {
       if (err.name === 'NoSuchKey' || err.name === 'NotFound') {
         const error = new Error(`ENOENT: no such file or directory, open '${key}'`);
@@ -187,7 +195,7 @@ export class RustFS {
   /**
    * Retrieves a file from the specified bucket path as a stream.
    */
-  static async streamFile(bucketPath: string, filename: string, etag?: string): Promise<NodeJS.ReadableStream> {
+  static async streamFile(bucketPath: string, filename: string, etag?: string, signal?: AbortSignal): Promise<NodeJS.ReadableStream> {
     const key = `${bucketPath}/${filename}`;
     const command = new GetObjectCommand({
       Bucket: env.rustfsBucket,
@@ -195,7 +203,7 @@ export class RustFS {
       IfMatch: etag,
     });
     try {
-      const response = await s3Client.send(command);
+      const response = await s3Client.send(command, { abortSignal: signal });
       if (!response.Body) {
         throw new Error(`File ${key} not found or empty`);
       }
@@ -213,16 +221,16 @@ export class RustFS {
   /**
    * Retrieves a file from the specified bucket path as a string (utf-8).
    */
-  static async readFileUtf8(bucketPath: string, filename: string): Promise<string> {
-    const buffer = await this.readFile(bucketPath, filename);
+  static async readFileUtf8(bucketPath: string, filename: string, signal?: AbortSignal): Promise<string> {
+    const buffer = await this.readFile(bucketPath, filename, signal);
     return buffer.toString('utf-8');
   }
 
   /**
    * Reads the upload time and version used by fail-safe media cleanup.
    */
-  static async statFile(bucketPath: string, filename: string) {
-    const result = await s3Client.send(new HeadObjectCommand({ Bucket: env.rustfsBucket, Key: `${bucketPath}/${filename}` }));
+  static async statFile(bucketPath: string, filename: string, signal?: AbortSignal) {
+    const result = await s3Client.send(new HeadObjectCommand({ Bucket: env.rustfsBucket, Key: `${bucketPath}/${filename}` }), { abortSignal: signal });
     if (!result.LastModified || !result.ETag) throw new Error(`Missing object version: ${bucketPath}/${filename}`);
     return { lastModified: result.LastModified, etag: result.ETag };
   }

@@ -420,7 +420,7 @@ export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWork
       const picker = (window as Window & { showSaveFilePicker?: (options: { suggestedName: string }) => Promise<FileHandle> }).showSaveFilePicker;
       // Open the picker during the click's user activation. Supported browsers
       // then write response chunks directly to disk without buffering the file.
-      const handle = picker ? await picker({ suggestedName: `gravity-${activeWorkspaceId}-notes-${new Date().toISOString().slice(0, 10)}.jsonl` }) : null;
+      const handle = picker ? await picker.call(window, { suggestedName: `gravity-${activeWorkspaceId}-notes-${new Date().toISOString().slice(0, 10)}.jsonl` }) : null;
       const abort = new AbortController();
       noteExportAbortRef.current = abort;
       try {
@@ -448,8 +448,12 @@ export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWork
             await writable.close();
             return manifest;
           } catch (error) {
-            await writable.abort();
+            abort.abort();
+            void reader.cancel(error).catch(() => undefined);
+            try { await writable.abort(); } catch { /* Preserve the original download failure. */ }
             throw error;
+          } finally {
+            reader.releaseLock();
           }
         } else {
           const blob = await response.blob();
@@ -467,6 +471,9 @@ export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWork
           window.URL.revokeObjectURL(url);
           return manifest;
         }
+      } catch (error) {
+        abort.abort();
+        throw error;
       } finally {
         noteExportAbortRef.current = null;
       }

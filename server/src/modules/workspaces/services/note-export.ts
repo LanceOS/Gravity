@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
+import type { Readable } from 'node:stream';
 import type { Response } from 'express';
 import { and, asc, eq, gt, lte, sql } from 'drizzle-orm';
 import { db } from '../../../db/index.js';
@@ -27,6 +28,14 @@ function isMissing(error: unknown) {
   );
 }
 
+function isChanged(error: unknown) {
+  return error instanceof Error && (
+    error.name === 'PreconditionFailed'
+    || ('statusCode' in error && error.statusCode === 412)
+    || ('$metadata' in error && (error.$metadata as { httpStatusCode?: number })?.httpStatusCode === 412)
+  );
+}
+
 async function writeRecord(res: Response, record: unknown, signal: AbortSignal) {
   if (signal.aborted) throw new Error('Export cancelled');
   if (res.write(`${JSON.stringify(record)}\n`)) return;
@@ -45,6 +54,33 @@ async function writeRecord(res: Response, record: unknown, signal: AbortSignal) 
     res.once('close', onClose);
     res.once('error', onError);
     signal.addEventListener('abort', onAbort, { once: true });
+    if (signal.aborted) onAbort();
+    else if (res.destroyed) onClose();
+  });
+}
+
+async function finishResponse(res: Response, signal: AbortSignal) {
+  if (signal.aborted) throw new Error('Export cancelled');
+  await new Promise<void>((resolve, reject) => {
+    const cleanup = () => {
+      res.off('finish', onFinish);
+      res.off('close', onClose);
+      res.off('error', onError);
+      signal.removeEventListener('abort', onAbort);
+    };
+    const onFinish = () => { cleanup(); resolve(); };
+    const onClose = () => {
+      cleanup();
+      if (res.writableFinished) resolve();
+      else reject(new Error('Export connection closed before completion'));
+    };
+    const onError = (error: Error) => { cleanup(); reject(error); };
+    const onAbort = () => { cleanup(); reject(new Error('Export cancelled')); };
+    res.once('finish', onFinish);
+    res.once('close', onClose);
+    res.once('error', onError);
+    signal.addEventListener('abort', onAbort, { once: true });
+    try { res.end(); } catch (error) { cleanup(); reject(error); }
   });
 }
 
@@ -89,14 +125,11 @@ export async function streamWorkspaceNoteExport(
     .from(workspaces).where(eq(workspaces.id, workspaceId)).limit(1);
   if (!workspace) return null;
 
-  const [countRow] = await db.select({ count: sql<string>`count(*)` }).from(noteMetadata)
-    .innerJoin(projects, eq(projects.id, noteMetadata.projectId))
-    .where(and(eq(projects.workspaceId, workspaceId), lte(noteMetadata.createdAt, startedAt)));
-  const expectedNoteCount = Number(countRow?.count ?? 0);
   await db.insert(workspaceNoteExportEvents).values({
     id: eventId, workspaceId, actorUserId, status: 'started', startedAt,
   });
 
+  let expectedNoteCount = 0;
   let noteCount = 0;
   let attachmentCount = 0;
   let diagnosticCount = 0;
@@ -105,6 +138,10 @@ export async function streamWorkspaceNoteExport(
     await writeRecord(res, { type: 'diagnostic', ...entry }, signal);
   };
   try {
+    const [countRow] = await db.select({ count: sql<string>`count(*)` }).from(noteMetadata)
+      .innerJoin(projects, eq(projects.id, noteMetadata.projectId))
+      .where(and(eq(projects.workspaceId, workspaceId), lte(noteMetadata.createdAt, startedAt)));
+    expectedNoteCount = Number(countRow?.count ?? 0);
     await writeRecord(res, {
       type: 'header', format: 'gravity_workspace_notes', version: 1,
       generatedAt: startedAt.toISOString(), generatedBy: actorUserId, workspace,
@@ -124,16 +161,17 @@ export async function streamWorkspaceNoteExport(
         let body: string | null = null;
         try {
           // Revision keys are immutable. Legacy body.md is checked for in-flight changes.
-          const before = note.bodyKey === 'body.md' ? await RustFS.statFile(note.bucketPath, note.bodyKey) : null;
-          body = await RustFS.readFileUtf8(note.bucketPath, note.bodyKey);
+          const before = note.bodyKey === 'body.md' ? await RustFS.statFile(note.bucketPath, note.bodyKey, signal) : null;
+          body = await RustFS.readFileUtf8(note.bucketPath, note.bodyKey, signal);
           if (before) {
-            const after = await RustFS.statFile(note.bucketPath, note.bodyKey);
+            const after = await RustFS.statFile(note.bucketPath, note.bodyKey, signal);
             if (before.etag !== after.etag) {
               body = null;
               await diagnostic({ noteId: note.id, object: 'body', reason: 'changed' });
             }
           }
         } catch (error) {
+          if (signal.aborted) throw error;
           await diagnostic({ noteId: note.id, object: 'body', reason: isMissing(error) ? 'missing' : 'unavailable' });
         }
 
@@ -163,22 +201,30 @@ export async function streamWorkspaceNoteExport(
           for (const filename of filenames) {
             let stream: NodeJS.ReadableStream | null = null;
             try {
-              const version = await RustFS.statFile(target.bucketPath, filename);
-              stream = await RustFS.streamFile(target.bucketPath, filename, version.etag);
+              const version = await RustFS.statFile(target.bucketPath, filename, signal);
+              stream = await RustFS.streamFile(target.bucketPath, filename, version.etag, signal);
+              const readable = stream as Readable;
+              const onAbort = () => readable.destroy(new Error('Export cancelled'));
+              signal.addEventListener('abort', onAbort, { once: true });
               const hash = createHash('sha256');
               let bytes = 0;
               let sequence = 0;
-              for await (const raw of stream as AsyncIterable<Buffer>) {
-                const buffer = Buffer.isBuffer(raw) ? raw : Buffer.from(raw);
-                for (let offset = 0; offset < buffer.length; offset += CHUNK_BYTES) {
-                  const chunk = buffer.subarray(offset, offset + CHUNK_BYTES);
-                  hash.update(chunk);
-                  bytes += chunk.length;
-                  await writeRecord(res, {
-                    type: 'attachment_chunk', sourceNoteId: note.id, noteId: targetNoteId,
-                    filename, sequence: sequence++, base64: chunk.toString('base64'),
-                  }, signal);
+              try {
+                if (signal.aborted) onAbort();
+                for await (const raw of readable) {
+                  const buffer = Buffer.isBuffer(raw) ? raw : Buffer.from(raw);
+                  for (let offset = 0; offset < buffer.length; offset += CHUNK_BYTES) {
+                    const chunk = buffer.subarray(offset, offset + CHUNK_BYTES);
+                    hash.update(chunk);
+                    bytes += chunk.length;
+                    await writeRecord(res, {
+                      type: 'attachment_chunk', sourceNoteId: note.id, noteId: targetNoteId,
+                      filename, sequence: sequence++, base64: chunk.toString('base64'),
+                    }, signal);
+                  }
                 }
+              } finally {
+                signal.removeEventListener('abort', onAbort);
               }
               await writeRecord(res, {
                 type: 'attachment_end', sourceNoteId: note.id, noteId: targetNoteId,
@@ -187,7 +233,7 @@ export async function streamWorkspaceNoteExport(
               attachmentCount++;
             } catch (error) {
               if (signal.aborted) throw error;
-              await diagnostic({ noteId: targetNoteId, filename, object: 'attachment', reason: isMissing(error) ? 'missing' : 'unavailable' });
+              await diagnostic({ noteId: targetNoteId, filename, object: 'attachment', reason: isMissing(error) ? 'missing' : isChanged(error) ? 'changed' : 'unavailable' });
             } finally {
               (stream as { destroy?: () => void } | null)?.destroy?.();
             }
@@ -201,11 +247,11 @@ export async function streamWorkspaceNoteExport(
       await diagnostic({ noteId: '', object: 'reference', reason: 'changed' });
     }
     const complete = diagnosticCount === 0;
+    await writeRecord(res, { type: 'manifest', complete, expectedNoteCount, noteCount, attachmentCount, diagnosticCount }, signal);
+    await finishResponse(res, signal);
     await db.update(workspaceNoteExportEvents).set({
       status: complete ? 'completed' : 'incomplete', finishedAt: new Date(), noteCount, attachmentCount, diagnosticCount,
     }).where(eq(workspaceNoteExportEvents.id, eventId));
-    await writeRecord(res, { type: 'manifest', complete, expectedNoteCount, noteCount, attachmentCount, diagnosticCount }, signal);
-    res.end();
   } catch (error) {
     await db.update(workspaceNoteExportEvents).set({
       status: signal.aborted ? 'cancelled' : 'failed', finishedAt: new Date(), noteCount, attachmentCount,

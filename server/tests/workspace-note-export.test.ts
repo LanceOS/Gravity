@@ -1,13 +1,31 @@
 import { createHash } from 'node:crypto';
 import { Readable } from 'node:stream';
+import { PassThrough } from 'node:stream';
+import { EventEmitter } from 'node:events';
+import type { Response as ExpressResponse } from 'express';
 import { describe, expect, it, vi } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { db } from '../src/db/index.js';
 import { noteMetadata, workspaceMembers, workspaceNoteExportEvents } from '../src/db/schema.js';
 import { RustFS } from '../src/lib/rustfs.js';
+import { streamWorkspaceNoteExport } from '../src/modules/workspaces/services/note-export.js';
 import { createAuthenticatedApi, seedWorkspaceFixture } from './helpers/test-helpers.js';
 
 type RecordLine = Record<string, any>;
+
+class ExportResponseStub extends EventEmitter {
+  writableFinished = false;
+  ended = false;
+  records: string[] = [];
+  failManifest = false;
+  write(chunk: string) {
+    if (this.failManifest && chunk.includes('"type":"manifest"')) throw new Error('manifest write failed');
+    this.records.push(chunk);
+    return true;
+  }
+  end() { this.ended = true; }
+  finish() { this.writableFinished = true; this.emit('finish'); }
+}
 
 async function exportLines(agent: Awaited<ReturnType<typeof createAuthenticatedApi>>, workspaceId: string) {
   const response = await agent.get(`/api/v1/workspaces/${workspaceId}/export/notes`)
@@ -66,6 +84,31 @@ describe('workspace note audit export', () => {
     expect(events[0]).toMatchObject({ actorUserId: ownerApi.user.id, status: 'completed', noteCount: 1, attachmentCount: 1 });
   });
 
+  it('never follows a media reference into another workspace', async () => {
+    const ownerApi = await createAuthenticatedApi({ email: 'note-export-boundary@example.com', role: 'owner' });
+    const first = await seedWorkspaceFixture({ owner: { id: ownerApi.user.id, email: ownerApi.user.email } });
+    const second = await seedWorkspaceFixture({
+      owner: { id: ownerApi.user.id, email: ownerApi.user.email },
+      workspace: { id: 'other-workspace', key: 'OTH', workspaceKey: 'WS-OTH-123456' },
+      project: { id: 'other-project', key: 'OTH', inviteCode: 'INV-OTH-0001ABCD' },
+    });
+    const sourceBucket = RustFS.getBucketPath(first.project.id, ownerApi.user.id, 'source');
+    const targetBucket = RustFS.getBucketPath(second.project.id, ownerApi.user.id, 'target');
+    await RustFS.saveFile(sourceBucket, '.revisions/body.md', '![secret](/api/v1/notes/note-target/media/secret.bin)');
+    await RustFS.saveFile(targetBucket, 'secret.bin', Buffer.from('outside workspace'));
+    await db.insert(noteMetadata).values([
+      { id: 'note-source', projectId: first.project.id, userId: ownerApi.user.id,
+        title: 'Source', bucketPath: sourceBucket, bodyKey: '.revisions/body.md' },
+      { id: 'note-target', projectId: second.project.id, userId: ownerApi.user.id,
+        title: 'Target', bucketPath: targetBucket, bodyKey: '.revisions/body.md' },
+    ]);
+    const { lines } = await exportLines(ownerApi, first.workspace.id);
+    expect(lines.filter(line => line.type === 'note')).toHaveLength(1);
+    expect(lines.some(line => line.type === 'attachment_chunk')).toBe(false);
+    expect(lines).toContainEqual(expect.objectContaining({ type: 'diagnostic', object: 'reference', reason: 'outside_workspace' }));
+    expect(lines.at(-1)).toMatchObject({ type: 'manifest', complete: false, attachmentCount: 0 });
+  });
+
   it('reports missing bodies and referenced objects in the manifest and audit event', async () => {
     const ownerApi = await createAuthenticatedApi({ email: 'note-export-failure@example.com', role: 'owner' });
     const { workspace, project } = await seedWorkspaceFixture({ owner: { id: ownerApi.user.id, email: ownerApi.user.email } });
@@ -112,6 +155,25 @@ describe('workspace note audit export', () => {
     }
   });
 
+  it('labels an attachment changed between HEAD and GET as changed', async () => {
+    const ownerApi = await createAuthenticatedApi({ email: 'note-export-changed@example.com', role: 'owner' });
+    const { workspace, project } = await seedWorkspaceFixture({ owner: { id: ownerApi.user.id, email: ownerApi.user.email } });
+    const noteId = 'note-changed-media';
+    const bucketPath = RustFS.getBucketPath(project.id, ownerApi.user.id, noteId);
+    await RustFS.saveFile(bucketPath, '.revisions/body.md', `![file](/api/v1/notes/${noteId}/media/file.bin)`);
+    await db.insert(noteMetadata).values({ id: noteId, projectId: project.id, userId: ownerApi.user.id,
+      title: 'Changed media', bucketPath, bodyKey: '.revisions/body.md' });
+    const changed = Object.assign(new Error('precondition failed'), { name: 'PreconditionFailed', $metadata: { httpStatusCode: 412 } });
+    const streamSpy = vi.spyOn(RustFS, 'streamFile').mockRejectedValueOnce(changed);
+    try {
+      const { lines } = await exportLines(ownerApi, workspace.id);
+      expect(lines).toContainEqual(expect.objectContaining({ type: 'diagnostic', object: 'attachment', reason: 'changed' }));
+      expect(lines.at(-1)).toMatchObject({ type: 'manifest', complete: false, attachmentCount: 0 });
+    } finally {
+      streamSpy.mockRestore();
+    }
+  });
+
   it('continues across metadata batches without dropping notes', async () => {
     const ownerApi = await createAuthenticatedApi({ email: 'note-export-batches@example.com', role: 'owner' });
     const { workspace, project } = await seedWorkspaceFixture({ owner: { id: ownerApi.user.id, email: ownerApi.user.email } });
@@ -127,5 +189,59 @@ describe('workspace note audit export', () => {
     const { lines } = await exportLines(ownerApi, workspace.id);
     expect(lines.filter(line => line.type === 'note')).toHaveLength(101);
     expect(lines.at(-1)).toMatchObject({ type: 'manifest', complete: true, expectedNoteCount: 101, noteCount: 101 });
+  });
+
+  it('stops a stalled attachment stream promptly when cancelled', async () => {
+    const ownerApi = await createAuthenticatedApi({ email: 'note-export-cancel@example.com', role: 'owner' });
+    const { workspace, project } = await seedWorkspaceFixture({ owner: { id: ownerApi.user.id, email: ownerApi.user.email } });
+    const noteId = 'note-cancel';
+    const bucketPath = RustFS.getBucketPath(project.id, ownerApi.user.id, noteId);
+    await RustFS.saveFile(bucketPath, '.revisions/body.md', `![file](/api/v1/notes/${noteId}/media/file.bin)`);
+    await db.insert(noteMetadata).values({ id: noteId, projectId: project.id, userId: ownerApi.user.id,
+      title: 'Stalled attachment', bucketPath, bodyKey: '.revisions/body.md' });
+    const stalled = new PassThrough();
+    const streamSpy = vi.spyOn(RustFS, 'streamFile').mockResolvedValueOnce(stalled);
+    const controller = new AbortController();
+    const response = new ExportResponseStub();
+    try {
+      const running = streamWorkspaceNoteExport(response as unknown as ExpressResponse, workspace.id, ownerApi.user.id, controller.signal);
+      await vi.waitFor(() => expect(streamSpy).toHaveBeenCalledOnce());
+      controller.abort();
+      await expect(running).rejects.toThrow();
+      expect(stalled.destroyed).toBe(true);
+      const [event] = await db.select().from(workspaceNoteExportEvents).where(eq(workspaceNoteExportEvents.workspaceId, workspace.id));
+      expect(event.status).toBe('cancelled');
+    } finally {
+      streamSpy.mockRestore();
+    }
+  });
+
+  it('records completion only after response finish and records a failed final manifest write', async () => {
+    const ownerApi = await createAuthenticatedApi({ email: 'note-export-finish@example.com', role: 'owner' });
+    const { workspace } = await seedWorkspaceFixture({ owner: { id: ownerApi.user.id, email: ownerApi.user.email } });
+    const response = new ExportResponseStub();
+    const running = streamWorkspaceNoteExport(response as unknown as ExpressResponse, workspace.id, ownerApi.user.id, new AbortController().signal);
+    await vi.waitFor(() => expect(response.ended).toBe(true));
+    let [event] = await db.select().from(workspaceNoteExportEvents).where(eq(workspaceNoteExportEvents.workspaceId, workspace.id));
+    expect(event.status).toBe('started');
+    response.finish();
+    await running;
+    [event] = await db.select().from(workspaceNoteExportEvents).where(eq(workspaceNoteExportEvents.workspaceId, workspace.id));
+    expect(event.status).toBe('completed');
+
+    const failed = new ExportResponseStub();
+    failed.failManifest = true;
+    await expect(streamWorkspaceNoteExport(failed as unknown as ExpressResponse, workspace.id, ownerApi.user.id, new AbortController().signal))
+      .rejects.toThrow('manifest write failed');
+    const events = await db.select().from(workspaceNoteExportEvents).where(eq(workspaceNoteExportEvents.workspaceId, workspace.id));
+    expect(events.map(row => row.status)).toEqual(expect.arrayContaining(['completed', 'failed']));
+
+    const closed = new ExportResponseStub();
+    const closedRun = streamWorkspaceNoteExport(closed as unknown as ExpressResponse, workspace.id, ownerApi.user.id, new AbortController().signal);
+    await vi.waitFor(() => expect(closed.ended).toBe(true));
+    closed.emit('close');
+    await expect(closedRun).rejects.toThrow('before completion');
+    const finalEvents = await db.select().from(workspaceNoteExportEvents).where(eq(workspaceNoteExportEvents.workspaceId, workspace.id));
+    expect(finalEvents.filter(row => row.status === 'failed')).toHaveLength(2);
   });
 });

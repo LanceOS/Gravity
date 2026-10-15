@@ -1116,7 +1116,7 @@ export function createWorkspacesRouter() {
       activeWorkspaceNoteExports.add(workspaceId);
       exportSlotAcquired = true;
       const abort = new AbortController();
-      res.once('close', () => { if (!res.writableEnded) abort.abort(); });
+      res.once('close', () => { if (!res.writableFinished) abort.abort(); });
       res.set('Cache-Control', 'no-store');
       res.set('Pragma', 'no-cache');
       res.set('X-Content-Type-Options', 'nosniff');

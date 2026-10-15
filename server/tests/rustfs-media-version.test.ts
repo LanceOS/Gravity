@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { S3Client, HeadObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, HeadObjectCommand, DeleteObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
+import { PassThrough } from 'node:stream';
 
 const { RustFS } = await vi.importActual<typeof import('../src/lib/rustfs.js')>('../src/lib/rustfs.js');
 let send: ReturnType<typeof vi.spyOn>;
@@ -27,5 +28,16 @@ describe('cleanup object version protection', () => {
     send.mockRejectedValueOnce(Object.assign(new Error('changed'), { name: 'PreconditionFailed' }));
     await expect(RustFS.deleteFile('notes/owner', 'photo.png', '"old"')).rejects.toThrow('changed');
     expect(send).toHaveBeenCalledTimes(1);
+  });
+
+  it('passes the attachment ETag and cancellation signal to the storage GET', async () => {
+    const controller = new AbortController();
+    const body = new PassThrough();
+    send.mockResolvedValueOnce({ Body: body });
+    expect(await RustFS.streamFile('notes/owner', 'photo.png', '"etag"', controller.signal)).toBe(body);
+    expect(send.mock.calls[0][0]).toBeInstanceOf(GetObjectCommand);
+    expect(send.mock.calls[0][0].input).toMatchObject({ Key: 'notes/owner/photo.png', IfMatch: '"etag"' });
+    expect(send.mock.calls[0][1]).toEqual({ abortSignal: controller.signal });
+    body.destroy();
   });
 });
