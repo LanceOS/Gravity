@@ -5,6 +5,7 @@ services:
     image: docker.io/library/postgres:16-alpine
     restart: unless-stopped
     environment:
+      NODE_ENV: ${NODE_ENV:-production}
       POSTGRES_DB: ${GRAVITY_POSTGRES_DB:-gravity_workspace}
       POSTGRES_USER: ${GRAVITY_POSTGRES_USER:-gravity_user}
       POSTGRES_PASSWORD: ${GRAVITY_POSTGRES_PASSWORD:?Set GRAVITY_POSTGRES_PASSWORD in ../.env}
@@ -18,7 +19,7 @@ services:
       timeout: 5s
       retries: 5
     ports:
-      - "5432:5432"
+      - "${GRAVITY_BIND_ADDRESS:-127.0.0.1}:5432:5432"
     networks:
       - gravity_backend_db_redis
 
@@ -26,16 +27,19 @@ services:
     image: rustfs/rustfs:latest
     restart: unless-stopped
     command: /data/rustfs --console-enable
+    entrypoint: ["/bin/sh", "/usr/local/bin/gravity-start-service", "rustfs"]
     user: "0:0"
     environment:
+      NODE_ENV: ${NODE_ENV:-production}
       RUSTFS_ADDRESS: 0.0.0.0:9000
       RUSTFS_CONSOLE_ADDRESS: 0.0.0.0:9001
       RUSTFS_CONSOLE_ENABLE: true
       RUSTFS_ACCESS_KEY: ${RUSTFS_ACCESS_KEY:-admin}
-      RUSTFS_SECRET_KEY: ${RUSTFS_SECRET_KEY:-password}
+      RUSTFS_SECRET_KEY: ${RUSTFS_SECRET_KEY:?Set RUSTFS_SECRET_KEY in ../.env}
     volumes:
       - gravity_rustfs_data:/data/rustfs
       - gravity_rustfs_logs:/logs
+      - ../scripts/docker/start-service.sh:/usr/local/bin/gravity-start-service:ro
     healthcheck:
       test: ["CMD", "sh", "-ec", "curl -s http://localhost:9000/ >/dev/null && curl -s http://localhost:9001/ >/dev/null"]
       interval: 10s
@@ -43,8 +47,8 @@ services:
       timeout: 5s
       retries: 12
     ports:
-      - "${RUSTFS_PORT:-9000}:9000"
-      - "${RUSTFS_CONSOLE_PORT:-9001}:9001"
+      - "${GRAVITY_BIND_ADDRESS:-127.0.0.1}:${RUSTFS_PORT:-9000}:9000"
+      - "${GRAVITY_BIND_ADDRESS:-127.0.0.1}:${RUSTFS_CONSOLE_PORT:-9001}:9001"
     networks:
       - gravity_backend_db_redis
 
@@ -52,6 +56,7 @@ services:
     image: docker.io/library/redis:7-alpine
     restart: unless-stopped
     environment:
+      NODE_ENV: ${NODE_ENV:-production}
       GRAVITY_REDIS_PASSWORD: ${GRAVITY_REDIS_PASSWORD:?Set GRAVITY_REDIS_PASSWORD in ../.env}
     entrypoint: ["/bin/sh", "/usr/local/bin/gravity-start-service", "redis"]
     volumes:
@@ -62,7 +67,7 @@ services:
       timeout: 5s
       retries: 5
     ports:
-      - "6379:6379"
+      - "${GRAVITY_BIND_ADDRESS:-127.0.0.1}:6379:6379"
     networks:
       - gravity_backend_db_redis
 

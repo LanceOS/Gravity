@@ -6,12 +6,16 @@ Quick instructions for running the app in development with a live-reloading fron
 
 Before running Compose, copy `.env.example` to `.env` in the repository root.
 Set `GRAVITY_POSTGRES_PASSWORD`, `GRAVITY_REDIS_PASSWORD`,
-`BETTER_AUTH_SECRET`, and `NODE_IDENTITY_MASTER_KEY` to four independent
-nonempty secrets (for example, run `openssl rand -hex 32` four times). Both
-Compose variants build their internal connection URLs from these values. See
+`BETTER_AUTH_SECRET`, `NODE_IDENTITY_MASTER_KEY`, and `RUSTFS_SECRET_KEY` to five
+independent nonempty secrets (for example, run `openssl rand -hex 32` five times).
+Both Compose variants build their database and Redis URLs from the service
+passwords. See
 [deployment configuration](docs/deployment-configuration.md)
 for the remaining startup settings and production requirements. Compose rejects
 blank required secrets before starting services.
+The development override enables local encrypted credentials by default, so
+also set `LOCAL_TESTING_KEK` to a separate `openssl rand -hex 32` value. To run
+without credential features, set `ENCRYPTED_CREDENTIALS_MODE=disabled` instead.
 
 Podman (recommended):
 
@@ -26,7 +30,8 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 ```
 
 This starts the backend and a containerized Vite dev server for the frontend (HMR).
-The dev frontend is reachable on host port `5173` by default.
+The dev frontend is reachable on `127.0.0.1:5173` by default. Set
+`GRAVITY_BIND_ADDRESS` deliberately if you need another host interface.
 
 To stop the dev stack:
 
