@@ -11,7 +11,12 @@ import {
   WorkspaceCacheInvalidationReason,
   invalidateWorkspaceCache,
 } from '../../lib/platform.js';
-import { audit } from '../../lib/logger.js';
+import { audit, error as logError } from '../../lib/logger.js';
+import { createRateLimiter } from '../../lib/rateLimit.js';
+import { createRedisRateLimiter } from '../../lib/rateLimitRedis.js';
+import { getRequestSourceIp } from '../../lib/request-ip.js';
+import { env } from '../../env.js';
+import { resolveRequestActorUserId } from '../auth/utils/request-auth.js';
 import { authorizeProjectAccess, authorizeTeamAccess, authorizeWorkspaceAccess, getProjectTeamId } from '../workspaces/services/membership.js';
 import {
   addCommentRecord,
@@ -48,6 +53,11 @@ import {
 import { CycleError, createCycleRecord, createCycleSchema, deleteCycleRecord, editCycleRecord, editCycleSchema, getCycleRecord, mapCycle } from './services/cycles.js';
 import { getCycleProgress } from './services/cycle-progress.js';
 import { decodeTicketCursor, encodeTicketCursor } from './services/ticket-cursor.js';
+
+const listTicketsLimiter = (env.redisEnabled ? createRedisRateLimiter : createRateLimiter)({
+  namespace: 'tickets.list', failurePolicy: 'closed', windowMs: 60_000, max: 60,
+  keyFn: async (req) => `tickets:${await resolveRequestActorUserId(req) ?? getRequestSourceIp(req) ?? 'unknown'}`,
+});
 
 function mapLabel(label: typeof labels.$inferSelect) {
   return {
@@ -325,7 +335,7 @@ export function createTicketsRouter() {
     };
   }
 
-  router.get('/tickets', async (req, res) => {
+  router.get('/tickets', listTicketsLimiter, async (req, res) => {
     const projectId = typeof req.query.projectId === 'string' ? req.query.projectId : getProjectIdFromRequest(req);
     const teamId = typeof req.query.teamId === 'string' ? req.query.teamId : undefined;
     const workspaceId = typeof req.query.workspaceId === 'string' ? req.query.workspaceId : undefined;
@@ -353,6 +363,12 @@ export function createTicketsRouter() {
       const pagePagination = req.query.pagination === 'page' && !!projectId;
       const queryLimit = parseIntQueryParam(req.query.limit);
       const queryOffset = parseIntQueryParam(req.query.offset);
+      const invalidSearch = typeof req.query.search === 'string' && req.query.search.length > 256;
+      const invalidOffset = queryOffset !== undefined && (!Number.isSafeInteger(queryOffset) || queryOffset < 0);
+      if (pagePagination && (invalidSearch || invalidOffset)) {
+        res.status(400).json({ error: 'Invalid ticket page parameters.' });
+        return;
+      }
       const cursorFingerprint = createHash('sha256').update(JSON.stringify({
         projectId, teamId, workspaceId,
         status: req.query.status, priority: req.query.priority,
@@ -400,7 +416,15 @@ export function createTicketsRouter() {
         res.json(ticketList);
       }
     } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load tickets.' });
+      const causeCode = error && typeof error === 'object' && 'cause' in error
+        && error.cause && typeof error.cause === 'object' && 'code' in error.cause && typeof error.cause.code === 'string'
+        ? error.cause.code : undefined;
+      logError('Failed to load tickets', {
+        projectId, teamId, workspaceId,
+        errorName: error instanceof Error ? error.name : typeof error,
+        causeCode,
+      });
+      res.status(500).json({ error: 'Failed to load tickets.' });
     }
   });
 

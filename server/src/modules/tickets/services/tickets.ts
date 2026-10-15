@@ -565,9 +565,11 @@ export async function listWorkspaceTickets(projectIds: string[], filters: Ticket
 
   const direction = filters.order === 'desc' ? desc : asc;
   const priorityRank = sql<number>`case ${tickets.priority} when 'urgent' then 4 when 'high' then 3 when 'medium' then 2 when 'low' then 1 else 0 end`;
+  const firstLabelName = sql<string>`(select ${labels.name} from ${ticketLabels} inner join ${labels} on ${labels.id} = ${ticketLabels.labelId} where ${ticketLabels.ticketId} = ${tickets.id} order by ${ticketLabels.labelId} limit 1)`;
   const listOrder = (() => {
     switch (filters.listSort) {
       case 'created': case 'oldest': return [asc(tickets.createdAt), asc(tickets.id)];
+      case 'label': return [sql`case when ${firstLabelName} is null then 1 else 0 end`, asc(firstLabelName), asc(tickets.createdAt), asc(tickets.id)];
       case 'newest': return [desc(tickets.createdAt), asc(tickets.id)];
       case 'priority_asc': return [asc(priorityRank), asc(tickets.createdAt), asc(tickets.id)];
       case 'priority_desc': case 'newest_urgent': return [desc(priorityRank), desc(tickets.createdAt), asc(tickets.id)];
@@ -593,42 +595,7 @@ export async function listWorkspaceTickets(projectIds: string[], filters: Ticket
     query = query.offset(filters.offset);
   }
 
-  let rows: Awaited<typeof query>;
-  if (filters.listSort === 'label') {
-    const labelRows = await db.select({
-      id: tickets.id,
-      createdAt: tickets.createdAt,
-      labelId: ticketLabels.labelId,
-      labelName: labels.name,
-    }).from(tickets)
-      .innerJoin(projects, eq(projects.id, tickets.projectId))
-      .leftJoin(ticketLabels, eq(ticketLabels.ticketId, tickets.id))
-      .leftJoin(labels, eq(labels.id, ticketLabels.labelId))
-      .where(and(...buildTicketFilterConditions(projectIds, filters)));
-    const firstLabelByTicket = new Map<string, { id: string; createdAt: Date; labelId: string | null; labelName: string | null }>();
-    for (const row of labelRows) {
-      const current = firstLabelByTicket.get(row.id);
-      if (!current || (row.labelId && (!current.labelId || row.labelId < current.labelId))) firstLabelByTicket.set(row.id, row);
-    }
-    const orderedIds = [...firstLabelByTicket.values()].sort((first, second) => {
-      if (first.labelName && !second.labelName) return -1;
-      if (!first.labelName && second.labelName) return 1;
-      if (first.labelName && second.labelName) {
-        const labelOrder = first.labelName.localeCompare(second.labelName);
-        if (labelOrder) return labelOrder;
-      }
-      return first.createdAt.getTime() - second.createdAt.getTime() || first.id.localeCompare(second.id);
-    }).map((row) => row.id);
-    const selectedIds = orderedIds.slice(filters.offset ?? 0, (filters.offset ?? 0) + (filters.limit ?? orderedIds.length));
-    if (selectedIds.length === 0) return [];
-    const selectedRows = await db.select({ ticket: tickets, projectName: projects.name, cursorCreatedAt: sql<string>`${tickets.createdAt}`
-      .mapWith((value: string | Date) => value instanceof Date ? value.toISOString() : value).as('cursor_created_at') })
-      .from(tickets).innerJoin(projects, eq(projects.id, tickets.projectId)).where(inArray(tickets.id, selectedIds));
-    const orderById = new Map(selectedIds.map((id, index) => [id, index]));
-    rows = selectedRows.sort((first, second) => (orderById.get(first.ticket.id) ?? 0) - (orderById.get(second.ticket.id) ?? 0));
-  } else {
-    rows = await query;
-  }
+  const rows = await query;
 
   if (rows.length === 0) {
     return [];

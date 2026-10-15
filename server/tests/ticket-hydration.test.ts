@@ -5,7 +5,7 @@ import { comments, labels, ticketLabels, ticketRelationships, tickets, workspace
 import { getDefaultTeamId } from '../src/modules/workspaces/utils/default-team.js';
 import * as realtime from '../src/realtime.js';
 import { createAuthenticatedApi, seedCycle, seedTicket, seedWorkspaceFixture } from './helpers/test-helpers.js';
-import { getRelationshipCleanupDetails, getRelationshipCleanupEventTargets, getTicketDetails, getTicketDetailsByKey } from '../src/modules/tickets/services/tickets.js';
+import { getRelationshipCleanupDetails, getRelationshipCleanupEventTargets, getTicketDetails, getTicketDetailsByKey, listTickets } from '../src/modules/tickets/services/tickets.js';
 
 // Count actual SQL calls, and hold each for a turn so unconstrained Promise.all
 // fan-out is observable even with the in-memory adapter's immediate responses.
@@ -151,10 +151,43 @@ describe('ticket hydration query regressions', () => {
     expect(second.status).toBe(200);
     expect(second.body.tickets.map((ticket: { id: string }) => ticket.id)).toEqual(['project-low']);
     expect(second.body.nextOffset).toBeNull();
-    const byLabel = await api.get('/api/v1/tickets?pagination=page&limit=1&offset=0&status=todo&listSort=label')
-      .set('x-project-id', project.id);
-    expect(byLabel.status, byLabel.body.error).toBe(200);
-    expect(byLabel.body.tickets.map((ticket: { id: string }) => ticket.id)).toEqual(['project-low']);
+  });
+
+  it('pushes label ordering and the page limit into one database query', async () => {
+    const queries: string[] = [];
+    const spy = vi.spyOn(pool, 'query').mockImplementation((async (...args: any[]) => {
+      queries.push(typeof args[0] === 'string' ? args[0] : args[0].text);
+      return { rows: [], rowCount: 0 } as any;
+    }) as any);
+    try {
+      expect(await listTickets('project-1', { listSort: 'label', limit: 2, offset: 0 })).toEqual([]);
+    } finally {
+      spy.mockRestore();
+    }
+    expect(queries).toHaveLength(1);
+    expect(queries[0]).toContain('order by case when (select');
+    expect(queries[0]).toMatch(/limit\s+\$\d+/i);
+  });
+
+  it('hides database query details from failed ticket-list responses', async () => {
+    const api = await createAuthenticatedApi({ name: 'Owner', email: 'ticket-error@example.com', role: 'owner' });
+    const { project } = await seedWorkspaceFixture({ owner: {
+      id: api.user.id, name: api.user.name, email: api.user.email, role: 'owner', avatarUrl: api.user.avatar,
+    } });
+    const original = pool.query.bind(pool);
+    const spy = vi.spyOn(pool, 'query').mockImplementation((async (...args: any[]) => {
+      const statement = typeof args[0] === 'string' ? args[0] : args[0].text;
+      if (statement.includes('from "tickets"')) throw new Error('Failed query: internal_schema.secret_table');
+      return (original as any)(...args);
+    }) as any);
+    try {
+      const response = await api.get('/api/v1/tickets?pagination=page&listSort=created').set('x-project-id', project.id);
+      expect(response.status).toBe(500);
+      expect(response.body).toEqual({ error: 'Failed to load tickets.' });
+      expect(JSON.stringify(response.body)).not.toContain('internal_schema');
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   it('emits follow-up invalidations without an actor after closing a ticket', async () => {
