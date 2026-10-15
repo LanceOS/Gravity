@@ -40,24 +40,29 @@ storage credentials and a nonempty bucket. `TRUSTED_PROXIES` accepts exact IPs o
 CIDRs; see [proxy configuration](trusted-proxies.md).
 
 For MCP bearer verification, `MCP_TOKEN_FAILURE_MAX_ATTEMPTS` defaults to 10
-failed attempts per source IP in `MCP_TOKEN_FAILURE_WINDOW_MS` (default 60000).
+failed or concurrent verification attempts per source IP in
+`MCP_TOKEN_FAILURE_WINDOW_MS` (default 60000).
 Both settings must be positive integers; the maximums are 1000 attempts and one
 hour. The next request after the threshold returns 429 until the window ends;
-a successful verification clears the source IP's failure counter. Configure
+a successful verification releases its own reservation without clearing prior
+failures. Configure
 `TRUSTED_PROXIES` correctly so distinct clients have distinct source IPs.
 For multiple server processes or replicas, enable Redis on every replica with
 the same `REDIS_URL` and set `REDIS_REQUIRED=true` for dependency readiness.
-Counters are shared through Redis while it is available; a Redis outage uses
-process-local fallback, so restore Redis promptly to regain a shared limit.
-The counter update and initial expiry are atomic, and updates repair older
-counters that were left without a TTL.
+Counters are shared through Redis. If configured Redis is unavailable before
+verification, the request returns 503 with `Retry-After: 1`; it never switches to separate
+per-replica counters. A Redis-disabled single-process deployment uses bounded
+process-local counters. Reservation, completion, and expiry changes are atomic;
+the reservation also repairs older counters that were left without a TTL.
+If a valid credential was already verified when its reservation release fails,
+that request completes and the conservative reservation expires with its window.
 
 At the threshold, Gravity emits one structured `security.mcp_token_verification_failures`
 alert per counter window. Route JSON logs with `securityAlert: true` and that
 message to your alerting system; the event includes count, threshold and window,
 but no bearer value, source IP, or workspace ID. For example, page on any such
 event in a five-minute interval, or investigate a sustained rise across replicas.
-`getThrottleMetrics()` also exposes process-local `totalAttempts` and
+`getThrottleMetrics()` also exposes process-local admitted `totalAttempts` and
 `blockedEvents` counters for telemetry integrations; sum them across replicas.
 
 Configure `GITHUB_WEBHOOK_SECRET` with the same independently generated random

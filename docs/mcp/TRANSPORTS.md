@@ -38,8 +38,10 @@ Use a Streamable HTTP client with URL `https://your-gravity-host/api/v1/mcp` and
 
 An explicit bearer credential takes precedence over a browser session cookie: its scopes and revocation status still apply when both are present.
 
-Failed bearer verification is limited per source IP to 10 attempts per minute
-by default, including malformed bearer headers. The next request receives 429.
+Failed or concurrent bearer verification is limited per source IP to 10
+attempts per minute by default, including malformed bearer headers. The next
+request receives 429. A successful verification releases its reservation while
+earlier failures remain until their window expires.
 Operators can tune this policy and alert on repeated failures as described in
 [deployment configuration](../deployment-configuration.md).
 

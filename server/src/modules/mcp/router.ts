@@ -6,7 +6,7 @@ import { createMcpErrorResponse } from './responses.js';
 import { createRateLimiter } from '../../lib/rateLimit.js';
 import { createRedisRateLimiter } from '../../lib/rateLimitRedis.js';
 import { env } from '../../env.js';
-import { recordFailedAttempt, isBlocked, resetAttempts } from '../../lib/authThrottle.js';
+import { beginVerificationAttempt, finishVerificationAttempt } from '../../lib/authThrottle.js';
 import { gravityOAuthProvider, isMcpOAuthEnabled, OAUTH_DISABLED_MESSAGE, oauthResourceUrl, oauthResourceMetadataUrl } from './oauth.js';
 import { getRequestSourceIp } from '../../lib/request-ip.js';
 import { securityAlert } from '../../lib/logger.js';
@@ -23,17 +23,23 @@ function requestWorkspaceId(req: Request) {
   return (typeof req.params.workspaceId === 'string' ? req.params.workspaceId : undefined) || header || body;
 }
 
-async function recordTokenFailure(ipKey: string) {
-  const count = await recordFailedAttempt(ipKey, env.mcpTokenFailureWindowMs).catch(() => 0);
+async function finishTokenAttempt(ipKey: string, generation: string, failed: boolean) {
+  const count = await finishVerificationAttempt(ipKey, generation, failed, env.mcpTokenFailureWindowMs);
+  if (count === null) return false;
   // One alert at the threshold per counter window; never include an IP,
   // workspace ID, or bearer value in security logs.
-  if (count === env.mcpTokenFailureMaxAttempts) {
+  if (failed && count === env.mcpTokenFailureMaxAttempts) {
     securityAlert('security.mcp_token_verification_failures', {
       count,
       threshold: env.mcpTokenFailureMaxAttempts,
       windowMs: env.mcpTokenFailureWindowMs,
     });
   }
+  return true;
+}
+
+function rejectUnavailable(res: Response) {
+  res.set('Retry-After', '1').status(503).json({ error: 'Authentication throttling temporarily unavailable.' });
 }
 
 /** Stateless Streamable HTTP with JSON responses and no server-initiated SSE. */
@@ -85,14 +91,20 @@ export class McpRouterFactory {
       // a session cookie. Ambient session authority must not bypass a token.
       let actorUserId = hasBearer || oauthTransport ? null : await resolveRequestActorUserId(req);
       if (hasBearer) {
-        const ipKey = `ip:${getRequestSourceIp(req) ?? 'unknown'}`;
+        const sourceIp = getRequestSourceIp(req);
+        const ipKey = `ip:${sourceIp ?? 'unknown'}`;
         // Guessed workspace IDs must not let unauthenticated callers lock out its users.
-        if (await isBlocked(ipKey, env.mcpTokenFailureMaxAttempts, env.mcpTokenFailureWindowMs)) {
+        const attempt = await beginVerificationAttempt(ipKey, env.mcpTokenFailureMaxAttempts, env.mcpTokenFailureWindowMs);
+        if (attempt.status === 'unavailable') {
+          rejectUnavailable(res);
+          return;
+        }
+        if (attempt.status === 'blocked') {
           res.status(429).json({ error: 'Too many authentication attempts; try later.' });
           return;
         }
         if (!bearer) {
-          await recordTokenFailure(ipKey);
+          if (!await finishTokenAttempt(ipKey, attempt.generation, true)) { rejectUnavailable(res); return; }
           res.status(401).json({ error: 'Invalid token.' });
           return;
         }
@@ -101,17 +113,20 @@ export class McpRouterFactory {
           const oauthToken = oauthTransport ? await gravityOAuthProvider.verifyAccessToken(bearer) : null;
           if (oauthToken && oauthToken.resource?.href !== oauthResourceUrl(workspaceId)) throw new Error('Invalid token audience.');
           const token = oauthToken ? { generatedBy: String(oauthToken.extra?.actorUserId ?? ''), scopes: oauthToken.scopes }
-            : await verifyAndConsumeToken(bearer, workspaceId, { sourceIp: getRequestSourceIp(req) });
+            : await verifyAndConsumeToken(bearer, workspaceId, { sourceIp });
           if (!token) {
-            await recordTokenFailure(ipKey);
+            if (!await finishTokenAttempt(ipKey, attempt.generation, true)) { rejectUnavailable(res); return; }
             res.status(401).json({ error: 'Invalid or expired token.' });
             return;
           }
-          await resetAttempts(ipKey).catch(() => {});
+          // The credential may already be consumed (including single-use
+          // credentials). A failed release remains a conservative reservation
+          // until expiry; it must not turn a valid request into an unusable 503.
+          await finishTokenAttempt(ipKey, attempt.generation, false);
           actorUserId = token.generatedBy;
           tokenScopes = Array.isArray(token.scopes) ? token.scopes : [];
         } catch {
-          await recordTokenFailure(ipKey);
+          if (!await finishTokenAttempt(ipKey, attempt.generation, true)) { rejectUnavailable(res); return; }
           res.status(401).json({ error: 'Invalid token.' });
           return;
         }
