@@ -7,8 +7,17 @@ export function useReducedMotion(): boolean {
       : null
   ), []);
   const subscribe = useCallback((onChange: () => void) => {
-    mediaQuery?.addEventListener('change', onChange);
-    return () => mediaQuery?.removeEventListener('change', onChange);
+    if (!mediaQuery) {
+      return () => {};
+    }
+
+    if (typeof mediaQuery.addEventListener === 'function') {
+      mediaQuery.addEventListener('change', onChange);
+      return () => mediaQuery.removeEventListener('change', onChange);
+    }
+
+    mediaQuery.addListener(onChange);
+    return () => mediaQuery.removeListener(onChange);
   }, [mediaQuery]);
   const getSnapshot = useCallback(() => mediaQuery?.matches ?? true, [mediaQuery]);
 
