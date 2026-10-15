@@ -221,7 +221,7 @@ describe('SettingsPage', () => {
     await user.click(screen.getByRole('option', { name: 'Auto Join' }));
     expect(props.onChangeSettings).toHaveBeenCalledWith({ joinMode: 'auto_join' });
 
-    await user.click(screen.getByRole('button', { name: 'Workspace' }));
+    await user.click(screen.getByRole('button', { name: 'Back' }));
     expect(props.onBackToWorkspace).toHaveBeenCalledTimes(1);
 
     await user.click(screen.getByRole('button', { name: 'Workspaces' }));

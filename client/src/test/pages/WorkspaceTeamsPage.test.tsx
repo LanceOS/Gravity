@@ -102,6 +102,20 @@ describe('WorkspaceTeamsPage', () => {
     apiMocks.delete.mockResolvedValue({});
   });
 
+  it('consumes only the create flag while preserving router history state', async () => {
+    const previousUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    const routerState = { idx: 4, usr: { source: 'workspace' } };
+    window.history.replaceState(routerState, '', '/workspaces/workspace-1/teams?create=true&status=todo#members');
+    try {
+      renderWorkspaceTeamsPage();
+      await waitFor(() => expect(window.location.pathname + window.location.search + window.location.hash)
+        .toBe('/workspaces/workspace-1/teams?status=todo#members'));
+      expect(window.history.state).toEqual(routerState);
+    } finally {
+      window.history.replaceState(null, '', previousUrl);
+    }
+  });
+
   it('renders a team-focused management page', async () => {
     const user = userEvent.setup();
     const { props } = renderWorkspaceTeamsPage();

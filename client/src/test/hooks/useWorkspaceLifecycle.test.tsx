@@ -1,6 +1,26 @@
 import { renderHook, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { useWorkspaceProjectSelection } from '../../modules/workspaceShellPage/hooks/useWorkspaceLifecycle';
+import { usePendingWorkspaceInvite, useWorkspaceProjectSelection } from '../../modules/workspaceShellPage/hooks/useWorkspaceLifecycle';
+
+describe('usePendingWorkspaceInvite', () => {
+  it('removes only the consumed invite without discarding router history state', async () => {
+    const previousUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    const routerState = { idx: 3, usr: { source: 'ticket' } };
+    window.history.replaceState(routerState, '', '/workspaces/ws-1/projects/p-1/tickets/T-1?invite=code&status=todo#comments');
+    try {
+      renderHook(() => usePendingWorkspaceInvite({
+        currentUser: null,
+        requestJoinByInvite: vi.fn(),
+        refreshWorkspaces: vi.fn(),
+      }));
+      await waitFor(() => expect(window.location.pathname + window.location.search + window.location.hash)
+        .toBe('/workspaces/ws-1/projects/p-1/tickets/T-1?status=todo#comments'));
+      expect(window.history.state).toEqual(routerState);
+    } finally {
+      window.history.replaceState(null, '', previousUrl);
+    }
+  });
+});
 
 describe('useWorkspaceProjectSelection', () => {
   it('falls back to the workspace default project when the active project is not in workspace', async () => {

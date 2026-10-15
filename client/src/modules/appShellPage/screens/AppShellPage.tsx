@@ -10,6 +10,7 @@ import { LoadingPage } from '../../loadingPage';
 import { WorkspaceDirectoryPage } from '../../workspaceDirectoryPage';
 import { usePendingWorkspaceInvite, useWorkspaceDirectoryState } from '../../workspaceShellPage/hooks';
 import { apiClient } from '../../../utils/apiClient';
+import { openSettings } from '../../../router/settingsNavigation';
 import './AppShellPage.css';
 
 export function AppShellPage() {
@@ -130,9 +131,9 @@ function AppShellLandingPage() {
           onRequestJoin={handleRequestJoin}
           onOpenWorkspace={handleSelectWorkspace}
           onOpenSettings={(wsId) => {
-            navigate(`/workspaces/${wsId}/settings`);
+            openSettings(navigate, `/workspaces/${wsId}/settings`);
           }}
-          onOpenAccountPreferences={() => navigate('/account')}
+          onOpenAccountPreferences={() => openSettings(navigate, '/account')}
           onSignOut={() => {
             void signOut();
           }}

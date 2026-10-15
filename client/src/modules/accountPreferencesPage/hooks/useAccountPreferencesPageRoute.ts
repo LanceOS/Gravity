@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 
 import { useAccountSettings } from '../../../hooks/useAccountSettings';
 import { useTheme } from '../../settings';
@@ -7,9 +7,11 @@ import { useAuth } from '../../../context/auth/AuthContext';
 import { useActiveView } from '../../../context/ui/ActiveViewContext';
 import { isOnboardingNeeded, SETTINGS_CATEGORY_IDS } from '../utils/accountPreferences';
 import type { AccountPreferencesRouteState, SettingsCategoryId } from '../types';
+import { backFromSettings } from '../../../router/settingsNavigation';
 
 export function useAccountPreferencesPageRoute(): AccountPreferencesRouteState {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const requestedCategory = searchParams.get('section') as SettingsCategoryId;
   const [localTutorialCompleted, setLocalTutorialCompleted] = useState(false);
@@ -69,7 +71,7 @@ export function useAccountPreferencesPageRoute(): AccountPreferencesRouteState {
     testing,
     testResult,
     tutorialResult,
-    onBack: navigateToDirectory,
+    onBack: () => backFromSettings(navigate, location, '/workspaces'),
     onOpenDirectory: navigateToDirectory,
     onChangeSettings: updateSettings,
     onResetProviderDraft: resetProviderDraft,

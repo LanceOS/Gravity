@@ -5,6 +5,7 @@ import { useAuth } from '../../context/auth/AuthContext';
 import { ApiError } from '../../utils/apiClient';
 import { mcpToolLabel } from '../../utils/mcp';
 import { getOAuthConsentRequest, redirectToOAuthClient, submitOAuthConsent, type OAuthConsentRequest } from './api';
+import { settingsHistoryState } from '../../router/settingsNavigation';
 import './oauthConsent.css';
 
 function consentError(error: unknown) {
@@ -168,7 +169,7 @@ function ConsentRequest({ requestId, accountEmail }: { requestId: string; accoun
             </div>
           </>
         )}
-        <Link to="/account?section=connections" className="oauth-consent__account-link">Back to Account Preferences</Link>
+        <Link to="/account?section=connections" state={settingsHistoryState} className="oauth-consent__account-link">Back to Account Preferences</Link>
       </section>
     </main>
   );
