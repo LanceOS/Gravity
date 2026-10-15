@@ -13,6 +13,14 @@ describe('MCP connection advanced flows', () => {
     await resetTestApp();
   });
 
+  it('does not expose short or malformed credentials as masked previews', async () => {
+    const { maskedConnectionTokenPreview } = await import('../../src/modules/mcp/connection.js');
+
+    expect(maskedConnectionTokenPreview('short-secret')).toBe('[REDACTED]');
+    expect(maskedConnectionTokenPreview('g'.repeat(64))).toBe('[REDACTED]');
+    expect(maskedConnectionTokenPreview('a'.repeat(64))).toBe('aaaaaaaa...aaaa');
+  });
+
   it('increments usageCount for multi-use tokens and keeps status active', async () => {
     const { api: publicApi, createAuthenticatedApi, seedWorkspaceFixture } = await import('../helpers/test-helpers.js');
     const { db } = await import('../../src/db/index.js');
@@ -134,13 +142,15 @@ describe('MCP connection advanced flows', () => {
     const refreshed = await conn.refreshConnectionToken(created.id, owner.id);
     expect(refreshed).not.toBeNull();
 
+    const auditLines = auditSinkSpy.mock.calls.map(([line]) => String(line));
+    expect(auditLines.join('\n')).not.toContain(created.rawToken);
+    expect(auditLines.join('\n')).not.toContain(refreshed!.rawToken);
+
     for (const [event, credential] of [
       ['mcp.token.created', created.rawToken],
       ['mcp.token.refreshed', refreshed!.rawToken],
     ]) {
-      const serialized = auditSinkSpy.mock.calls
-        .map(([line]) => String(line))
-        .find((line) => JSON.parse(line).event === event);
+      const serialized = auditLines.find((line) => JSON.parse(line).event === event);
       expect(serialized).toBeDefined();
       const logged = JSON.parse(serialized!);
       expect(logged.maskedPreview).toBe(`${credential.slice(0, 8)}...${credential.slice(-4)}`);

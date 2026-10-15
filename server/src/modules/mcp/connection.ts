@@ -12,6 +12,7 @@ const DEFAULT_TOKEN_TTL_SECONDS = 24 * 60 * 60;
 export const MCP_MAX_CONNECTION_TTL_SECONDS = 30 * 24 * 60 * 60;
 const SHA256_DIGEST_BYTES = 32;
 const SHA256_HEX_PATTERN = /^[0-9a-f]{64}$/;
+const RAW_TOKEN_PREVIEW_PATTERN = /^[0-9a-f]{64}$/;
 
 function connectionTokenExpiresAt(ttlSeconds?: number) {
   const ttl = ttlSeconds ?? DEFAULT_TOKEN_TTL_SECONDS;
@@ -22,8 +23,10 @@ function connectionTokenExpiresAt(ttlSeconds?: number) {
 }
 
 // Audit payloads use the `maskedPreview` key: the logger deliberately redacts
-// every key containing "token". Only this shortened value may use that key.
-function maskedConnectionTokenPreview(raw: string): string {
+// every key containing "token". Never expose an unexpected or shorter value
+// under that key, since its contents bypass the logger's sensitive-key rule.
+export function maskedConnectionTokenPreview(raw: string): string {
+  if (!RAW_TOKEN_PREVIEW_PATTERN.test(raw)) return '[REDACTED]';
   return `${raw.slice(0, 8)}...${raw.slice(-4)}`;
 }
 

@@ -52,6 +52,7 @@ describe('logger redaction and trace propagation', () => {
   it('retains a masked preview in audit data while redacting raw token fields', () => {
     logger.audit('mcp.token.created', {
       maskedPreview: '12345678...cdef',
+      maskedToken: 'legacy-preview-value',
       token: 'raw-token-value',
       rawToken: 'another-raw-token-value',
     });
@@ -59,6 +60,7 @@ describe('logger redaction and trace propagation', () => {
     const serialized = infoSpy.mock.calls[0][0];
     const logged = JSON.parse(serialized);
     expect(logged.maskedPreview).toBe('12345678...cdef');
+    expect(logged.maskedToken).toBe('[REDACTED]');
     expect(logged.token).toBe('[REDACTED]');
     expect(logged.rawToken).toBe('[REDACTED]');
     expect(serialized).not.toContain('raw-token-value');
