@@ -1,5 +1,41 @@
 # Gravity client
 
+## Development proxy and browser environment
+
+The Vite development server proxies `/api` and the OAuth endpoints to
+`http://localhost:8080` by default. Set the **server-only** `BACKEND_UPSTREAM`
+to change the target. Startup accepts `http://localhost:8080`,
+`http://127.0.0.1:8080`, and `http://[::1]:8080` without extra configuration.
+For another backend origin, list its exact HTTP(S) origin in the server-only
+`GRAVITY_DEV_PROXY_ALLOWED_ORIGINS` variable:
+
+```bash
+BACKEND_UPSTREAM=http://backend:8080
+GRAVITY_DEV_PROXY_ALLOWED_ORIGINS=http://backend:8080
+npm run -w client dev
+```
+
+The allowlist is comma-separated when several origins are needed. Proxy targets
+and allowlist entries must be origins only: no credentials, paths, query strings,
+or fragments. The Vite server fails at startup if the target is not allowed.
+Only approve backends you control; proxied browser requests may contain session
+data. `VITE_API_PROXY_TARGET` is rejected by both dev startup and client builds.
+Use `BACKEND_UPSTREAM` instead.
+This check applies to the Vite development server; the production nginx proxy
+uses its own `BACKEND_UPSTREAM` setting.
+
+Every `VITE_` variable is available to browser code at build time. **Never put
+secrets, tokens, passwords, or private backend URLs in a `VITE_` variable.**
+The repository uses these variables:
+
+| Variable | Safe default or behavior when unset | Use |
+| --- | --- | --- |
+| `VITE_API_PROXY_TARGET` | Unset; a nonempty value fails Vite startup and builds | Legacy proxy target. Use server-only `BACKEND_UPSTREAM`. |
+| `VITE_FRONTEND_PUBLIC_URL` | Unset; `GRAVITY_FRONTEND_PUBLIC_URL` is preferred | Optional public frontend URL used to allow the dev server host. Only use a public, browser-safe URL. |
+| `VITE_ALLOWED_HOSTS` | Unset; Vite allows localhost and loopback, plus the configured public frontend host | Comma-separated additional dev server hostnames. List only hosts you control. |
+| `VITE_TICKET_URL_BASE` | `https://tickets.placeholder.local` | Optional ticket link base. Use a same-origin path or an HTTPS origin approved by `VITE_ALLOWED_TICKET_HOSTS`. |
+| `VITE_ALLOWED_TICKET_HOSTS` | `tickets.placeholder.local` | Comma-separated approved HTTPS ticket hosts; see [ticket URL guidance](../docs/client/TICKET_URL_BASE.md). |
+
 ## Local tests
 
 Client Vitest suites support **Node >=22.22.2 <23**. The checked-in `.nvmrc`
