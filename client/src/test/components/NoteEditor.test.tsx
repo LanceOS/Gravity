@@ -6,6 +6,8 @@ import { writeDraft } from '../../modules/notes/components/noteDrafts';
 import { getNoteDraftStorageKey } from '../../constants/storage';
 import { useNote } from '../../modules/notes/hooks/useNote';
 
+vi.mock('../../context/auth/AuthContext', () => ({ useAuth: () => ({ currentUser: { id: 'user-1' } }) }));
+
 vi.mock('../../modules/notes/hooks/useNote', () => ({
   useNote: vi.fn(),
 }));
@@ -61,7 +63,7 @@ vi.mock('../../components/LazyRichTextEditor', async () => {
 
 function makeNote(overrides: Partial<NonNullable<ReturnType<typeof useNote>['note']>> = {}) {
   return {
-    id: 'note-1', projectId: 'proj-1', userId: 'user-1',
+    id: 'note-1', projectId: 'proj-1', userId: 'user-1', visibility: 'private' as const,
     title: 'Test Title', body: 'Test body', version: 1,
     createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z',
     ...overrides,
@@ -97,6 +99,35 @@ describe('NoteEditor', () => {
     vi.mocked(useNote, { partial: true, deep: true }).mockReturnValue({ loading: true, note: null });
     render(<NoteEditor projectId="proj-1" noteId="note-1" />);
     expect(screen.getByText('Loading note...')).toBeInTheDocument();
+  });
+
+  it('lets the author opt a clean note into sharing', async () => {
+    render(<NoteEditor projectId="proj-1" noteId="note-1" />);
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText('Note visibility'), { target: { value: 'shared' } });
+    });
+    expect(mockSaveNote).toHaveBeenCalledWith({ visibility: 'shared' });
+  });
+
+  it('shows shared status without visibility controls to another member', () => {
+    vi.mocked(useNote, { partial: true, deep: true }).mockReturnValue({
+      note: makeNote({ userId: 'another-user', visibility: 'shared' }),
+      loading: false, saving: false, saveError: null, savedAt: null,
+      saveNote: mockSaveNote, uploadMedia: mockUploadMedia,
+    });
+    render(<NoteEditor projectId="proj-1" noteId="note-1" />);
+    expect(screen.queryByLabelText('Note visibility')).not.toBeInTheDocument();
+    expect(screen.getByText('Shared with workspace')).toBeInTheDocument();
+  });
+
+  it('shows visibility controls to a workspace admin allowed to manage the shared note', () => {
+    vi.mocked(useNote, { partial: true, deep: true }).mockReturnValue({
+      note: makeNote({ userId: 'another-user', visibility: 'shared', canManage: true }),
+      loading: false, saving: false, saveError: null, savedAt: null,
+      saveNote: mockSaveNote, uploadMedia: mockUploadMedia,
+    });
+    render(<NoteEditor projectId="proj-1" noteId="note-1" />);
+    expect(screen.getByLabelText('Note visibility')).toBeInTheDocument();
   });
 
   it('renders the title input and rich text editor when loaded', () => {

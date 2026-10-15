@@ -5,10 +5,11 @@ import { RustFS } from '../../lib/rustfs.js';
 import { env } from '../../env.js';
 import { withNoteReferenceLock, type NoteTransaction } from './reference-lock.js';
 import { highlightedSnippet, searchSnippet } from './search-text.js';
+import { visibleNotesCondition } from './policy.js';
 
 export type NoteMetadata = typeof noteMetadata.$inferSelect;
 
-export type NoteListItem = Pick<NoteMetadata, 'id' | 'title' | 'excerpt' | 'version' | 'createdAt' | 'updatedAt'>;
+export type NoteListItem = Pick<NoteMetadata, 'id' | 'projectId' | 'userId' | 'visibility' | 'title' | 'excerpt' | 'version' | 'createdAt' | 'updatedAt'>;
 
 function buildSearchVector(title: string, content: string | ReturnType<typeof sql>) {
   return sql`setweight(to_tsvector('english', ${title}), 'A') || setweight(to_tsvector('english', ${content}), 'B')`;
@@ -26,6 +27,7 @@ export class MetadataRepository {
     id: string;
     projectId: string;
     userId: string;
+    visibility?: 'private' | 'shared';
     title: string;
     excerpt?: string;
     searchText?: string;
@@ -39,6 +41,7 @@ export class MetadataRepository {
       id: data.id,
       projectId: data.projectId,
       userId: data.userId,
+      visibility: data.visibility ?? 'private',
       title: data.title,
       excerpt,
       searchText: data.searchText ?? null,
@@ -76,11 +79,15 @@ export class MetadataRepository {
     userId: string,
     limit: number = 20,
     offset: number = 0,
-    sortDirection: 'desc' | 'asc' = 'desc'
+    sortDirection: 'desc' | 'asc' = 'desc',
+    executor: typeof db | NoteTransaction = db,
   ): Promise<NoteListItem[]> {
-    return await db
+    return await executor
       .select({
         id: noteMetadata.id,
+        projectId: noteMetadata.projectId,
+        userId: noteMetadata.userId,
+        visibility: noteMetadata.visibility,
         title: noteMetadata.title,
         excerpt: noteMetadata.excerpt,
         version: noteMetadata.version,
@@ -88,7 +95,7 @@ export class MetadataRepository {
         updatedAt: noteMetadata.updatedAt,
       })
       .from(noteMetadata)
-      .where(and(eq(noteMetadata.projectId, projectId), eq(noteMetadata.userId, userId)))
+      .where(visibleNotesCondition(projectId, userId))
       .orderBy(sortDirection === 'desc' ? desc(noteMetadata.updatedAt) : asc(noteMetadata.updatedAt))
       .limit(limit)
       .offset(offset);
@@ -103,7 +110,8 @@ export class MetadataRepository {
     query: string,
     limit: number = 20,
     offset: number = 0,
-    sortDirection: 'desc' | 'asc' = 'desc'
+    sortDirection: 'desc' | 'asc' = 'desc',
+    executor: typeof db | NoteTransaction = db,
   ): Promise<(NoteListItem & { snippet: string })[]> {
     const useSearchVector = typeof env.databaseUrl === 'string' && !env.databaseUrl.startsWith('pgmem://');
     const pageSize = Math.max(1, Math.min(limit, 100));
@@ -113,9 +121,12 @@ export class MetadataRepository {
       // We use websearch_to_tsquery for user-friendly query parsing when tsvector is available
       const tsQuery = sql`websearch_to_tsquery('english', ${query})`;
 
-      const rows = await db
+      const rows = await executor
         .select({
           id: noteMetadata.id,
+          projectId: noteMetadata.projectId,
+          userId: noteMetadata.userId,
+          visibility: noteMetadata.visibility,
           title: noteMetadata.title,
           excerpt: noteMetadata.excerpt,
           version: noteMetadata.version,
@@ -126,8 +137,7 @@ export class MetadataRepository {
         .from(noteMetadata)
         .where(
           and(
-            eq(noteMetadata.projectId, projectId),
-            eq(noteMetadata.userId, userId),
+            visibleNotesCondition(projectId, userId),
             eq(noteMetadata.searchIndexedVersion, noteMetadata.version),
             sql`${noteMetadata.searchText} IS NOT NULL`,
             sql`${noteMetadata.searchVector} @@ ${tsQuery}`
@@ -141,9 +151,12 @@ export class MetadataRepository {
 
     // Fallback for pg-mem: match the same complete content with simple ILIKE.
     const likeQuery = `%${query}%`;
-    const rows = await db
+    const rows = await executor
       .select({
         id: noteMetadata.id,
+        projectId: noteMetadata.projectId,
+        userId: noteMetadata.userId,
+        visibility: noteMetadata.visibility,
         title: noteMetadata.title,
         excerpt: noteMetadata.excerpt,
         version: noteMetadata.version,
@@ -154,8 +167,7 @@ export class MetadataRepository {
       .from(noteMetadata)
       .where(
         and(
-          eq(noteMetadata.projectId, projectId),
-          eq(noteMetadata.userId, userId),
+          visibleNotesCondition(projectId, userId),
           eq(noteMetadata.searchIndexedVersion, noteMetadata.version),
           sql`${noteMetadata.searchText} IS NOT NULL`,
           sql`(${noteMetadata.title} ILIKE ${likeQuery} OR ${noteMetadata.searchText} ILIKE ${likeQuery})`
@@ -175,7 +187,7 @@ export class MetadataRepository {
   static async updateNoteMetadata(
     id: string,
     currentVersion: number,
-    updates: Partial<{ title: string; excerpt: string; searchText: string; bodyKey: string }>,
+    updates: Partial<{ title: string; excerpt: string; searchText: string; bodyKey: string; visibility: 'private' | 'shared' }>,
     validateReferences?: (tx: NoteTransaction) => Promise<void>
   ): Promise<NoteMetadata> {
     const existing = await this.getNoteMetadata(id);

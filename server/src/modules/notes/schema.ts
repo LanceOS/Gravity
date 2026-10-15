@@ -11,6 +11,7 @@ export const noteMetadata = pgTable('note_metadata', {
   id: text('id').primaryKey(),
   projectId: text('project_id').notNull(),
   userId: text('user_id').notNull(),
+  visibility: text('visibility').$type<'private' | 'shared'>().notNull().default('private'),
   title: text('title').notNull(),
   excerpt: text('excerpt').notNull().default(''),
   searchText: text('search_text'),
@@ -25,6 +26,7 @@ export const noteMetadata = pgTable('note_metadata', {
   bucketPathIdx: index('note_metadata_bucket_path_idx').on(table.bucketPath),
   projectIdUserIdIdx: index('note_metadata_project_id_user_id_idx').on(table.projectId, table.userId),
   projectIdUserIdUpdatedAtIdx: index('note_metadata_project_id_user_id_updated_at_idx').on(table.projectId, table.userId, table.updatedAt),
+  projectVisibilityUpdatedAtIdx: index('note_metadata_project_visibility_updated_at_idx').on(table.projectId, table.visibility, table.updatedAt),
   searchIdx: index('note_metadata_search_idx').using('gin', table.searchVector),
   searchBackfillIdx: index('note_metadata_search_backfill_idx').on(table.id)
     .where(sql`search_text IS NULL OR COALESCE(search_indexed_version, 0) <> version`),

@@ -3,7 +3,7 @@ import { db } from '../src/db/index.js';
 import { RustFS } from '../src/lib/rustfs.js';
 import { noteBucketCleanups } from '../src/modules/notes/schema.js';
 import { MetadataRepository } from '../src/modules/notes/repositories.js';
-import { createNote, deleteNote, getNote, updateNote } from '../src/modules/notes/services/notes.js';
+import { createNoteUnchecked as createNote, deleteNoteUnchecked as deleteNote, getNoteUnchecked as getNote, updateNoteUnchecked as updateNote } from '../src/modules/notes/services/notes.js';
 import { recoverDeletedNoteBuckets } from '../src/modules/notes/services/deleted-note-cleanup.js';
 import { runCleanup } from '../src/jobs/cleanupOrphanedAssets.js';
 

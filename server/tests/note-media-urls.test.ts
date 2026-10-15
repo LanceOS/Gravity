@@ -33,7 +33,7 @@ describe('authorized note media URLs', () => {
     const url = `/api/v1/notes/${note.body.id}/media/photo.png?projectId=${encodeURIComponent(project.id)}`;
     const storageRead = vi.spyOn(NotesRepository, 'getAttachmentStream');
     expect((await outsider.get(url)).status).toBe(403);
-    expect((await outsider.get(url.split('?')[0])).status).toBe(403);
+    expect((await outsider.get(url.split('?')[0])).status).toBe(404);
     expect(storageRead).not.toHaveBeenCalled();
     expect((await owner.get('/api/v1/notes/missing-note/media/photo.png')).status).toBe(404);
     expect((await owner.get(`/api/v1/notes/${note.body.id}/media/missing.png`)).status).toBe(404);

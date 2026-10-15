@@ -2,23 +2,31 @@ import { noteBucketCleanups } from '../schema.js';
 import { recoverDeletedNoteBuckets } from './deleted-note-cleanup.js';
 import { randomUUID } from 'node:crypto';
 import { withNoteReferenceLock } from '../reference-lock.js';
+import type { NoteTransaction } from '../reference-lock.js';
 import { MetadataRepository, NotesRepository, NoteRevisionRepository } from '../repositories.js';
 import { RustFS } from '../../../lib/rustfs.js';
+import { db } from '../../../db/index.js';
 import { cleanupMedia, type CleanupOptions, type MediaCleanupDependencies } from './media-cleanup.js';
 import { assertNoteAttachmentsUnshared, validateMediaReferences } from './media-deletion.js';
 import { noteExcerpt, noteSearchText } from '../search-text.js';
+import { authorizedNote, authorizedNoteAccess, canAccessNote, currentNoteActor, NoteAccessDeniedError, requireCurrentNoteActor, type NoteActor } from './access.js';
 
 type NoteMetadata = NonNullable<Awaited<ReturnType<typeof MetadataRepository.getNoteMetadata>>>;
+
+// HTTP and other user-initiated callers use the ForActor entry points. The
+// explicitly named unchecked operations are for internal maintenance/tests.
 
 export type NoteCleanupDependencies = MediaCleanupDependencies & {
   getMetadata: (id: string) => Promise<NoteMetadata | null>;
 };
 
-export async function createNote(
+export async function createNoteUnchecked(
   projectId: string,
   userId: string,
   title: string,
-  body: string
+  body: string,
+  visibility: 'private' | 'shared' = 'private',
+  authorizeCommit?: (tx: NoteTransaction) => Promise<void>,
 ) {
   const noteUuid = randomUUID();
   const noteId = `note-${noteUuid}`;
@@ -32,8 +40,8 @@ export async function createNote(
   try {
     await NotesRepository.saveBody(bucketPath, body, bodyKey);
     metadata = await MetadataRepository.createNoteMetadata({
-      id: noteId, projectId, userId, title, excerpt, searchText, bucketPath, bodyKey,
-    }, tx => validateMediaReferences(body, tx));
+      id: noteId, projectId, userId, visibility, title, excerpt, searchText, bucketPath, bodyKey,
+    }, async tx => { await authorizeCommit?.(tx); await validateMediaReferences(body, tx); });
   } catch (err) {
     await discardRevision(bodyKey);
     throw err;
@@ -43,12 +51,27 @@ export async function createNote(
   return { ...publicMetadata, body };
 }
 
-export async function getNote(noteId: string, projectId: string) {
+export async function createNoteForActor(
+  projectId: string, actor: NoteActor, title: string, body: string,
+  visibility: 'private' | 'shared' = 'private',
+) {
+  await requireCurrentNoteActor(projectId, actor);
+  const note = await createNoteUnchecked(projectId, actor.userId, title, body, visibility, async tx => {
+    if (!await currentNoteActor(projectId, actor.userId, tx, true)) throw new NoteAccessDeniedError();
+  });
+  return { ...note, canManage: true };
+}
+
+export async function getNoteUnchecked(noteId: string, projectId: string) {
   const metadata = await MetadataRepository.getNoteMetadata(noteId);
   if (!metadata || metadata.projectId !== projectId) {
     return null;
   }
 
+  return readNote(metadata);
+}
+
+async function readNote(metadata: NoteMetadata) {
   try {
     const body = await NotesRepository.getBody(metadata.bucketPath, metadata.bodyKey);
     const { searchText: _searchText, ...publicMetadata } = metadata;
@@ -62,11 +85,17 @@ export async function getNote(noteId: string, projectId: string) {
   }
 }
 
-export async function updateNote(
+export async function getNoteForActor(noteId: string, projectId: string, actor: NoteActor) {
+  const access = await authorizedNoteAccess(noteId, projectId, actor, 'read');
+  return access ? { ...await readNote(access.note), canManage: canAccessNote(access.note, access.actor, 'manage') } : null;
+}
+
+export async function updateNoteUnchecked(
   noteId: string,
   projectId: string,
   currentVersion: number,
-  updates: { title?: string; body?: string }
+  updates: { title?: string; body?: string; visibility?: 'private' | 'shared' },
+  authorizeCommit?: (tx: NoteTransaction) => Promise<void>,
 ) {
   const existing = await MetadataRepository.getNoteMetadata(noteId);
   if (!existing || existing.projectId !== projectId) {
@@ -92,8 +121,8 @@ export async function updateNote(
   try {
     if (bodyKey) await NotesRepository.saveBody(existing.bucketPath, body, bodyKey);
     updatedMeta = await MetadataRepository.updateNoteMetadata(noteId, currentVersion, {
-      title: updates.title, excerpt: newExcerpt, ...(searchText !== undefined ? { searchText } : {}), ...(bodyKey ? { bodyKey } : {}),
-    }, updates.body !== undefined ? tx => validateMediaReferences(updates.body!, tx) : undefined);
+      title: updates.title, visibility: updates.visibility, excerpt: newExcerpt, ...(searchText !== undefined ? { searchText } : {}), ...(bodyKey ? { bodyKey } : {}),
+    }, async tx => { await authorizeCommit?.(tx); if (updates.body !== undefined) await validateMediaReferences(updates.body, tx); });
   } catch (err: any) {
     if (bodyKey) await discardRevision(bodyKey);
     if (err.message === 'NOTE_DELETED' || err.message === 'Note not found') throw new Error('NOT_FOUND');
@@ -105,10 +134,34 @@ export async function updateNote(
   return { ...publicMetadata, body };
 }
 
-export async function deleteNote(noteId: string, projectId: string) {
+export async function updateNoteForActor(
+  noteId: string, projectId: string, actor: NoteActor, currentVersion: number,
+  updates: { title?: string; body?: string; visibility?: 'private' | 'shared' },
+) {
+  const action = updates.visibility === undefined ? 'write' : 'manage';
+  if (!await authorizedNote(noteId, projectId, actor, action)) throw new Error('NOT_FOUND');
+  const updated = await updateNoteUnchecked(noteId, projectId, currentVersion, updates, async tx => {
+    const currentActor = await currentNoteActor(projectId, actor.userId, tx, true);
+    const currentNote = await MetadataRepository.getNoteMetadata(noteId, tx);
+    if (!currentActor || !currentNote || currentNote.projectId !== projectId || !canAccessNote(currentNote, currentActor, action)) throw new Error('NOT_FOUND');
+  });
+  const latestActor = await currentNoteActor(projectId, actor.userId);
+  return { ...updated, canManage: !!latestActor && canAccessNote(updated, latestActor, 'manage') };
+}
+
+export async function deleteNoteUnchecked(noteId: string, projectId: string) {
+  return deleteNoteInternal(noteId, projectId);
+}
+
+export async function deleteNoteForActor(noteId: string, projectId: string, actor: NoteActor) {
+  return deleteNoteInternal(noteId, projectId, actor);
+}
+
+async function deleteNoteInternal(noteId: string, projectId: string, actor?: NoteActor) {
   const deleted = await withNoteReferenceLock(async tx => {
     const metadata = await MetadataRepository.getNoteMetadata(noteId, tx);
-    if (!metadata || metadata.projectId !== projectId) return null;
+    const currentActor = actor ? await currentNoteActor(projectId, actor.userId, tx, true) : null;
+    if (!metadata || metadata.projectId !== projectId || (actor && (!currentActor || !canAccessNote(metadata, currentActor, 'manage')))) return null;
     await assertNoteAttachmentsUnshared(metadata, tx);
     await tx.insert(noteBucketCleanups).values({ bucketPath: metadata.bucketPath, noteId });
     await MetadataRepository.deleteNoteMetadata(noteId, tx);
@@ -126,12 +179,26 @@ export async function deleteNote(noteId: string, projectId: string) {
   return true;
 }
 
-export async function listNotes(projectId: string, userId: string, limit: number = 50, offset: number = 0, sortDirection: 'desc' | 'asc' = 'desc') {
+export async function listNotesUnchecked(projectId: string, userId: string, limit: number = 50, offset: number = 0, sortDirection: 'desc' | 'asc' = 'desc') {
   return await MetadataRepository.listNotesMetadata(projectId, userId, limit, offset, sortDirection);
 }
 
-export async function searchNotes(projectId: string, userId: string, query: string, limit: number = 50, offset: number = 0, sortDirection: 'desc' | 'asc' = 'desc') {
+export async function listNotesForActor(projectId: string, actor: NoteActor, limit: number = 50, offset: number = 0, sortDirection: 'desc' | 'asc' = 'desc') {
+  return db.transaction(async tx => {
+    if (!await currentNoteActor(projectId, actor.userId, tx, true)) throw new NoteAccessDeniedError();
+    return MetadataRepository.listNotesMetadata(projectId, actor.userId, limit, offset, sortDirection, tx);
+  });
+}
+
+export async function searchNotesUnchecked(projectId: string, userId: string, query: string, limit: number = 50, offset: number = 0, sortDirection: 'desc' | 'asc' = 'desc') {
   return await MetadataRepository.searchNotesMetadata(projectId, userId, query, limit, offset, sortDirection);
+}
+
+export async function searchNotesForActor(projectId: string, actor: NoteActor, query: string, limit: number = 50, offset: number = 0, sortDirection: 'desc' | 'asc' = 'desc') {
+  return db.transaction(async tx => {
+    if (!await currentNoteActor(projectId, actor.userId, tx, true)) throw new NoteAccessDeniedError();
+    return MetadataRepository.searchNotesMetadata(projectId, actor.userId, query, limit, offset, sortDirection, tx);
+  });
 }
 
 export class NoteCleanupService {
@@ -150,9 +217,32 @@ export class NoteCleanupService {
   }
 
   async cleanupNoteMedia(noteId: string, projectId: string, options: CleanupOptions = {}) {
+    return this.cleanupNoteMediaInternal(noteId, projectId, options);
+  }
+
+  async cleanupNoteMediaForActor(noteId: string, projectId: string, actor: NoteActor, options: CleanupOptions = {}) {
+    return this.cleanupNoteMediaInternal(noteId, projectId, options, actor);
+  }
+
+  private async cleanupNoteMediaInternal(noteId: string, projectId: string, options: CleanupOptions, actor?: NoteActor) {
     const metadata = await this.dependencies.getMetadata(noteId);
-    if (!metadata || metadata.projectId !== projectId) throw new Error('NOT_FOUND');
-    const result = await cleanupMedia(this.dependencies, options, metadata);
+    const currentActor = actor ? await currentNoteActor(projectId, actor.userId) : null;
+    if (!metadata || metadata.projectId !== projectId || (actor && (!currentActor || !canAccessNote(metadata, currentActor, 'manage')))) throw new Error('NOT_FOUND');
+    const dependencies = actor ? {
+      ...this.dependencies,
+      authorizeTarget: async (tx: NoteTransaction) => {
+        const latestActor = await currentNoteActor(projectId, actor.userId, tx, true);
+        const latestNote = await MetadataRepository.getNoteMetadata(noteId, tx);
+        if (!latestActor || !latestNote || latestNote.projectId !== projectId || latestNote.bucketPath !== metadata.bucketPath
+          || !canAccessNote(latestNote, latestActor, 'manage')) throw new Error('NOT_FOUND');
+      },
+    } : this.dependencies;
+    const result = await cleanupMedia(dependencies, options, metadata);
+    if (actor) {
+      const latestActor = await currentNoteActor(projectId, actor.userId);
+      const latestNote = await MetadataRepository.getNoteMetadata(noteId);
+      if (!latestActor || !latestNote || latestNote.projectId !== projectId || !canAccessNote(latestNote, latestActor, 'manage')) throw new Error('NOT_FOUND');
+    }
     return {
       cleanedFiles: result.deleted.map(entry => entry.file),
       orphanedFiles: result.orphanedFound.map(entry => entry.file),
@@ -168,8 +258,12 @@ export function createNoteCleanupService(dependencies?: Partial<NoteCleanupDepen
   return new NoteCleanupService(dependencies);
 }
 
-export async function cleanupNoteMedia(noteId: string, projectId: string, options: CleanupOptions = {}) {
+export async function cleanupNoteMediaUnchecked(noteId: string, projectId: string, options: CleanupOptions = {}) {
   return noteCleanupService.cleanupNoteMedia(noteId, projectId, options);
+}
+
+export async function cleanupNoteMediaForActor(noteId: string, projectId: string, actor: NoteActor, options: CleanupOptions = {}) {
+  return noteCleanupService.cleanupNoteMediaForActor(noteId, projectId, actor, options);
 }
 
 // Never delete on an ambiguous DB failure alone: the transaction may have

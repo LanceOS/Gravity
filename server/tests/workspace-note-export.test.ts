@@ -4,7 +4,7 @@ import { PassThrough } from 'node:stream';
 import { EventEmitter } from 'node:events';
 import type { Response as ExpressResponse } from 'express';
 import { describe, expect, it, vi } from 'vitest';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { db } from '../src/db/index.js';
 import { noteMetadata, workspaceMembers, workspaceNoteExportEvents } from '../src/db/schema.js';
 import { RustFS } from '../src/lib/rustfs.js';
@@ -41,6 +41,30 @@ async function exportLines(agent: Awaited<ReturnType<typeof createAuthenticatedA
 }
 
 describe('workspace note audit export', () => {
+  it('stops before emitting a note if owner access is revoked during its body read', async () => {
+    const owner = await createAuthenticatedApi({ email: 'export-revoked-owner@example.com', role: 'owner' });
+    const { workspace, project } = await seedWorkspaceFixture({ owner: { ...owner.user, avatarUrl: owner.user.avatar } });
+    const created = await owner.post('/api/v1/notes').set('x-project-id', project.id).send({ title: 'Private audit', body: 'private body' });
+    expect(created.status).toBe(201);
+    let entered!: () => void;
+    let release!: () => void;
+    const enteredPromise = new Promise<void>(resolve => { entered = resolve; });
+    const releasePromise = new Promise<void>(resolve => { release = resolve; });
+    const read = RustFS.readFileUtf8;
+    vi.spyOn(RustFS, 'readFileUtf8').mockImplementationOnce(async (...args) => {
+      entered();
+      await releasePromise;
+      return read(...args);
+    });
+    const response = new ExportResponseStub();
+    const running = streamWorkspaceNoteExport(response as unknown as ExpressResponse, workspace.id, owner.user.id, new AbortController().signal);
+    const rejected = expect(running).rejects.toThrow('access revoked');
+    await enteredPromise;
+    await db.update(workspaceMembers).set({ role: 'member' }).where(and(eq(workspaceMembers.workspaceId, workspace.id), eq(workspaceMembers.userId, owner.user.id)));
+    release();
+    await rejected;
+    expect(response.records.join('')).not.toContain('"type":"note"');
+  });
   it('limits private note export to the workspace owner and includes complete content and binary attachments', async () => {
     const ownerApi = await createAuthenticatedApi({ email: 'note-export-owner@example.com', role: 'owner' });
     const memberApi = await createAuthenticatedApi({ email: 'note-export-member@example.com', role: 'member' });
@@ -58,6 +82,7 @@ describe('workspace note audit export', () => {
       excerpt: 'Complete body', bucketPath, bodyKey: '.revisions/rev1.md', version: 3,
       createdAt: new Date('2026-09-01T00:00:00Z'), updatedAt: new Date('2026-09-03T00:00:00Z'),
     });
+    expect((await db.select({ visibility: noteMetadata.visibility }).from(noteMetadata).where(eq(noteMetadata.id, noteId)))[0]?.visibility).toBe('private');
 
     const denied = await memberApi.get(`/api/v1/workspaces/${workspace.id}/export/notes`);
     expect(denied.status).toBe(403);

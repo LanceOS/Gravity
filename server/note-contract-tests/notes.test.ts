@@ -5,19 +5,30 @@ import { Readable } from 'node:stream';
 import { beforeAll, afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../src/lib/platform.js', () => ({ getProjectIdFromRequest: (req: any) => req.headers['x-project-id'] || req.query.projectId || req.body?.projectId || '' }));
-vi.mock('../src/modules/workspaces/services/membership.js', () => ({ authorizeProjectAccess: vi.fn(async () => ({ allowed: true, userId: 'test-user' })) }));
 vi.mock('../src/modules/auth/utils/request-auth.js', () => ({ resolveRequestActorUserId: vi.fn(async () => 'test-user') }));
-vi.mock('../src/modules/notes/services/notes.js', () => ({ createNote: vi.fn(), updateNote: vi.fn(), getNote: vi.fn(), listNotes: vi.fn(), searchNotes: vi.fn(), deleteNote: vi.fn(), cleanupNoteMedia: vi.fn() }));
+vi.mock('../src/modules/notes/services/notes.js', () => ({ createNoteForActor: vi.fn(), updateNoteForActor: vi.fn(), getNoteForActor: vi.fn(), listNotesForActor: vi.fn(), searchNotesForActor: vi.fn(), deleteNoteForActor: vi.fn(), cleanupNoteMediaForActor: vi.fn() }));
+vi.mock('../src/modules/notes/services/access.js', () => ({
+  currentNoteActor: vi.fn(async (_projectId: string, userId: string) => ({ userId, workspaceRole: 'owner' })),
+  noteProjectExists: vi.fn(async () => true),
+  authorizedNote: vi.fn(async (noteId: string, projectId: string) => {
+    const { MetadataRepository } = await import('../src/modules/notes/repositories.js');
+    const metadata = await MetadataRepository.getNoteMetadata(noteId);
+    return metadata?.projectId === projectId ? metadata : null;
+  }),
+  NoteAccessDeniedError: class extends Error {},
+}));
 vi.mock('../src/modules/notes/repositories.js', () => ({ isNoteBodyFile: (name: string) => name === 'body.md' || name.startsWith('.revisions/'), MetadataRepository: { getNoteMetadata: vi.fn() }, NotesRepository: { getAttachmentStream: vi.fn(), saveAttachmentStream: vi.fn() } }));
 vi.mock('../src/modules/notes/services/media-deletion.js', () => ({
-  deleteNoteMedia: vi.fn(),
+  deleteNoteMediaForActor: vi.fn(),
+  uploadNoteMediaForActor: vi.fn(),
+  MediaUploadBlockedError: class extends Error {},
   MediaReferenceUnavailableError: class extends Error { constructor() { super('Note media references are unavailable; refresh the note and try again.'); } },
   NoteMediaInUseError: class extends Error { constructor() { super('Note attachments are still referenced by other notes.'); } },
 }));
-import { deleteNoteMedia, MediaReferenceUnavailableError, NoteMediaInUseError } from '../src/modules/notes/services/media-deletion.js';
+import { deleteNoteMediaForActor, uploadNoteMediaForActor, MediaReferenceUnavailableError, NoteMediaInUseError } from '../src/modules/notes/services/media-deletion.js';
 import * as notes from '../src/modules/notes/services/notes.js';
 import { MetadataRepository, NotesRepository } from '../src/modules/notes/repositories.js';
-import { authorizeProjectAccess } from '../src/modules/workspaces/services/membership.js';
+import { authorizedNote, currentNoteActor, noteProjectExists } from '../src/modules/notes/services/access.js';
 import { createNotesRouter } from '../src/modules/notes/routes.js';
 import { parseApiJson } from '../src/modules/notes/request-body.js';
 import { noteErrorContext, noteErrorHandler } from '../src/modules/notes/errors.js';
@@ -43,17 +54,30 @@ const assertError = (response: any, status = 400) => {
   expect(response.body).toEqual({ error: expect.any(String), code: status === 500 ? 'INTERNAL_ERROR' : 'INVALID_INPUT', requestId: response.headers['x-request-id'] });
   expect(response.body.requestId).toMatch(/^[a-f0-9-]{36}$/);
 };
-beforeEach(() => { vi.resetAllMocks(); vi.mocked(MetadataRepository.getNoteMetadata).mockResolvedValue({ projectId: 'project-test', bucketPath: 'synthetic' } as any); vi.mocked(authorizeProjectAccess).mockResolvedValue({ allowed: true, userId: 'test-user' }); });
+beforeEach(() => {
+  vi.resetAllMocks();
+  vi.mocked(MetadataRepository.getNoteMetadata).mockResolvedValue({ projectId: 'project-test', userId: 'test-user', visibility: 'private', bucketPath: 'synthetic' } as any);
+  vi.mocked(currentNoteActor).mockImplementation(async (_projectId, userId) => ({ userId, workspaceRole: 'owner' }));
+  vi.mocked(noteProjectExists).mockResolvedValue(true);
+  vi.mocked(authorizedNote).mockImplementation(async (noteId, projectId) => {
+    const metadata = await MetadataRepository.getNoteMetadata(noteId);
+    return metadata?.projectId === projectId ? metadata : null;
+  });
+  vi.mocked(uploadNoteMediaForActor).mockImplementation(async (_id, _project, filename, stream, length) => {
+    await NotesRepository.saveAttachmentStream('synthetic', filename, stream, length);
+    return true;
+  });
+});
 
 describe('note runtime contracts (isolated, no database or storage)', () => {
   it.each(['limit=-1', 'limit=101', 'limit=Infinity', 'limit=9999999999999999999', 'limit=1.5', 'limit=0', 'limit=1&limit=2', 'offset=-1', 'offset=100001', 'sort=invalid'])('rejects paging %s', async query => {
     for (const path of ['/notes?', '/notes/search?q=hello&']) assertError(await api().get(path + query).set('x-project-id', 'project-test'));
-    expect(notes.listNotes).not.toHaveBeenCalled(); expect(notes.searchNotes).not.toHaveBeenCalled();
+    expect(notes.listNotesForActor).not.toHaveBeenCalled(); expect(notes.searchNotesForActor).not.toHaveBeenCalled();
   });
   it('validates trailing-slash route aliases', async () => {
     assertError(await api().post('/notes/').set('x-project-id', 'project-test').send({ title: 'Title', body: {} }));
     assertError(await api().get('/notes/search/').set('x-project-id', 'project-test'));
-    expect(notes.createNote).not.toHaveBeenCalled(); expect(notes.searchNotes).not.toHaveBeenCalled();
+    expect(notes.createNoteForActor).not.toHaveBeenCalled(); expect(notes.searchNotesForActor).not.toHaveBeenCalled();
   });
   it.each([undefined, '-1', 'Infinity', '5junk', '10485761'])('rejects invalid media length %s before storage access', length => {
     const res = { status: vi.fn().mockReturnThis(), json: vi.fn() };
@@ -64,7 +88,7 @@ describe('note runtime contracts (isolated, no database or storage)', () => {
   it('validates HEAD paging and bounds the original search string', async () => {
     expect((await api().head('/notes?limit=-1').set('x-project-id', 'project-test')).status).toBe(400);
     assertError(await api().get('/notes/search').query({ q: 'a' + ' '.repeat(1001) }).set('x-project-id', 'project-test'));
-    expect(notes.listNotes).not.toHaveBeenCalled(); expect(notes.searchNotes).not.toHaveBeenCalled();
+    expect(notes.listNotesForActor).not.toHaveBeenCalled(); expect(notes.searchNotesForActor).not.toHaveBeenCalled();
   });
   it.each([
     '/notes?limit[]=1', '/notes?offset[0]=2', '/notes/search?q=a&q=b',
@@ -72,14 +96,14 @@ describe('note runtime contracts (isolated, no database or storage)', () => {
     '/notes?projectId[]=project-test', '/notes/%ZZ', '/notes/%FF/media/a.png',
   ])('rejects arrays and malformed encodings: %s', async path => {
     assertError(await api().get(path).set('x-project-id', 'project-test'));
-    expect(notes.listNotes).not.toHaveBeenCalled(); expect(notes.searchNotes).not.toHaveBeenCalled();
+    expect(notes.listNotesForActor).not.toHaveBeenCalled(); expect(notes.searchNotesForActor).not.toHaveBeenCalled();
   });
   it('accepts case-insensitive aliases with encoded valid identifiers', async () => {
-    vi.mocked(notes.createNote).mockResolvedValue({ id: 'note-test' } as any);
+    vi.mocked(notes.createNoteForActor).mockResolvedValue({ id: 'note-test' } as any);
     expect((await api().post('/NOTES/').set('x-project-id', 'project-test').send({ title: 'Title', body: '' })).status).toBe(201);
-    vi.mocked(notes.getNote).mockResolvedValue({ id: 'note-test' } as any);
+    vi.mocked(notes.getNoteForActor).mockResolvedValue({ id: 'note-test' } as any);
     expect((await api().get('/NOTES/note%2Dtest/').set('x-project-id', 'project-test')).status).toBe(200);
-    expect(notes.getNote).toHaveBeenCalledWith('note-test', 'project-test');
+    expect(notes.getNoteForActor).toHaveBeenCalledWith('note-test', 'project-test', expect.objectContaining({ userId: 'test-user' }));
   });
   it('preserves valid rich-text, Markdown and exact byte/depth/node boundaries', async () => {
     const rich = JSON.stringify({ type: 'doc', content: [{ type: 'paragraph', content: [
@@ -89,10 +113,10 @@ describe('note runtime contracts (isolated, no database or storage)', () => {
     let atDepth: unknown = 1;
     for (let i = 0; i < NOTE_CONTENT_MAX_DEPTH; i++) atDepth = [atDepth];
     const atNodes = Array(NOTE_CONTENT_MAX_NODES - 1).fill(1);
-    vi.mocked(notes.updateNote).mockResolvedValue({ id: 'note-test' } as any);
+    vi.mocked(notes.updateNoteForActor).mockResolvedValue({ id: 'note-test' } as any);
     for (const body of [rich, '# Legacy markdown', '', 'é'.repeat(NOTE_BODY_MAX_BYTES / 2), JSON.stringify(atDepth), JSON.stringify(atNodes)]) {
       expect((await api().patch('/notes/note-test/').set('x-project-id', 'project-test').send({ version: 1, body })).status).toBe(200);
-      expect(notes.updateNote).toHaveBeenLastCalledWith('note-test', 'project-test', 1, { title: undefined, body });
+      expect(notes.updateNoteForActor).toHaveBeenLastCalledWith('note-test', 'project-test', expect.objectContaining({ userId: 'test-user' }), 1, { title: undefined, body, visibility: undefined });
     }
     for (const body of [JSON.stringify([atDepth]), JSON.stringify([...atNodes, 1])]) {
       assertError(await api().patch('/notes/note-test').set('x-project-id', 'project-test').send({ version: 1, body }));
@@ -123,12 +147,12 @@ describe('note runtime contracts (isolated, no database or storage)', () => {
     }
     assertError(await api().get('/notes/search?q=a%00').set('x-project-id', 'project-test'));
     assertError(await api().get('/notes/search?q=a?b%ZZ').set('x-project-id', 'project-test'));
-    expect(notes.updateNote).not.toHaveBeenCalled();
+    expect(notes.updateNoteForActor).not.toHaveBeenCalled();
   });
   it('uses fresh server IDs and logs only allowlisted diagnostics', async () => {
     const log = vi.spyOn(console, 'error').mockImplementation(() => {});
     const secret = 'synthetic_private_value';
-    vi.mocked(notes.listNotes).mockRejectedValue(Object.assign(new Error(secret), {
+    vi.mocked(notes.listNotesForActor).mockRejectedValue(Object.assign(new Error(secret), {
       code: secret, stack: `Error: ${secret}\n    at /server/src/${secret}.ts:1:2\n    at /server/src/modules/notes/repositories.ts:10:20`,
     }));
     const first = await api().get('/notes').set('x-project-id', 'project-test').set('X-Request-ID', secret);
@@ -140,20 +164,20 @@ describe('note runtime contracts (isolated, no database or storage)', () => {
     log.mockRestore();
   });
   it('passes bounded paging and defaults', async () => {
-    vi.mocked(notes.listNotes).mockResolvedValue([]);
+    vi.mocked(notes.listNotesForActor).mockResolvedValue([]);
     expect((await api().get('/notes').set('x-project-id', 'project-test')).status).toBe(200);
-    expect(notes.listNotes).toHaveBeenCalledWith('project-test', 'test-user', 50, 0, 'desc');
+    expect(notes.listNotesForActor).toHaveBeenCalledWith('project-test', expect.objectContaining({ userId: 'test-user' }), 50, 0, 'desc');
     await api().get('/notes?limit=100&offset=100000&sort=asc').set('x-project-id', 'project-test');
-    expect(notes.listNotes).toHaveBeenLastCalledWith('project-test', 'test-user', 100, 100000, 'asc');
+    expect(notes.listNotesForActor).toHaveBeenLastCalledWith('project-test', expect.objectContaining({ userId: 'test-user' }), 100, 100000, 'asc');
   });
   it.each([null, {}, [], 42, true])('rejects non-string body %j before mutation', async body => {
     assertError(await api().post('/notes').set('x-project-id', 'project-test').send({ title: 'Title', body }));
     assertError(await api().patch('/notes/note-test').set('x-project-id', 'project-test').send({ version: 1, body }));
-    expect(notes.createNote).not.toHaveBeenCalled(); expect(notes.updateNote).not.toHaveBeenCalled();
+    expect(notes.createNoteForActor).not.toHaveBeenCalled(); expect(notes.updateNoteForActor).not.toHaveBeenCalled();
   });
   it.each([null, '1', 0, -1, 1.2, 2147483647, {}, true])('rejects revision %j', async version => {
     assertError(await api().patch('/notes/note-test').set('x-project-id', 'project-test').send({ version, body: 'changed' }));
-    expect(notes.updateNote).not.toHaveBeenCalled();
+    expect(notes.updateNoteForActor).not.toHaveBeenCalled();
   });
   it('rejects byte, depth and node limits', async () => {
     let nested: any = { type: 'text', text: 'secret' };
@@ -161,24 +185,24 @@ describe('note runtime contracts (isolated, no database or storage)', () => {
     for (const body of ['é'.repeat(NOTE_BODY_MAX_BYTES / 2 + 1), JSON.stringify(nested), JSON.stringify({ type: 'doc', content: Array(10001).fill({ text: 'a' }) })]) {
       assertError(await api().patch('/notes/note-test').set('x-project-id', 'project-test').send({ version: 1, body }));
     }
-    expect(notes.updateNote).not.toHaveBeenCalled();
+    expect(notes.updateNoteForActor).not.toHaveBeenCalled();
   });
   it('rejects malformed and oversized JSON using the same envelope', async () => {
     for (const payload of ['{"body":', JSON.stringify({ body: 'x'.repeat(1024 * 1024) })]) assertError(await api().post('/notes').set('Content-Type', 'application/json').send(payload));
   });
   it.each(['/notes/note-test/media?filename=a.png&filename=b.png', '/notes/note-test/media?filename=..', '/notes/note-test/media?filename=' + 'a'.repeat(260) + '.png', '/notes/note-test/cleanup?dryRun=yes'])('rejects media/cleanup input %s', async path => {
     assertError(await api().post(path).set('x-project-id', 'project-test').send('data'));
-    expect(NotesRepository.saveAttachmentStream).not.toHaveBeenCalled(); expect(notes.cleanupNoteMedia).not.toHaveBeenCalled();
+    expect(NotesRepository.saveAttachmentStream).not.toHaveBeenCalled(); expect(notes.cleanupNoteMediaForActor).not.toHaveBeenCalled();
   });
   it('hides database, authorization and storage errors with correlated safe diagnostics', async () => {
     const secret = 'password=synthetic-private-value';
     const error = Object.assign(new Error(secret), { code: 'ECONNRESET' });
     const log = vi.spyOn(console, 'error').mockImplementation(() => {});
-    vi.mocked(notes.listNotes).mockRejectedValueOnce(error);
+    vi.mocked(notes.listNotesForActor).mockRejectedValueOnce(error);
     assertError(await api().get('/notes').set('x-project-id', 'project-test'), 500);
-    vi.mocked(authorizeProjectAccess).mockRejectedValueOnce(error);
+    vi.mocked(currentNoteActor).mockRejectedValueOnce(error);
     assertError(await api().get('/notes').set('x-project-id', 'project-test'), 500);
-    vi.mocked(MetadataRepository.getNoteMetadata).mockResolvedValue({ projectId: 'project-test', bucketPath: 'synthetic' } as any);
+    vi.mocked(MetadataRepository.getNoteMetadata).mockResolvedValue({ projectId: 'project-test', userId: 'test-user', visibility: 'private', bucketPath: 'synthetic' } as any);
     vi.mocked(NotesRepository.getAttachmentStream).mockRejectedValueOnce(error);
     const failed = await api().get('/notes/note-test/media/a.png').set('x-project-id', 'project-test');
     assertError(failed, 500);
@@ -208,9 +232,9 @@ describe('note runtime contracts (isolated, no database or storage)', () => {
     log.mockRestore();
   });
   it('wraps reference conflicts in the correlated GRAV-230 error envelope', async () => {
-    vi.mocked(notes.createNote).mockRejectedValueOnce(new MediaReferenceUnavailableError());
-    vi.mocked(notes.updateNote).mockRejectedValueOnce(new MediaReferenceUnavailableError());
-    vi.mocked(notes.deleteNote).mockRejectedValueOnce(new NoteMediaInUseError());
+    vi.mocked(notes.createNoteForActor).mockRejectedValueOnce(new MediaReferenceUnavailableError());
+    vi.mocked(notes.updateNoteForActor).mockRejectedValueOnce(new MediaReferenceUnavailableError());
+    vi.mocked(notes.deleteNoteForActor).mockRejectedValueOnce(new NoteMediaInUseError());
     const responses = [
       await api().post('/notes').set('x-project-id', 'project-test').send({ title: 'Title', body: 'body' }),
       await api().patch('/notes/note-test').set('x-project-id', 'project-test').send({ version: 1, body: 'body' }),
@@ -226,8 +250,8 @@ describe('note runtime contracts (isolated, no database or storage)', () => {
   it('redacts deletion inventory failures while preserving correlation diagnostics', async () => {
     const secret = 'synthetic-hidden-note-storage-path';
     const log = vi.spyOn(console, 'error').mockImplementation(() => {});
-    vi.mocked(deleteNoteMedia).mockRejectedValueOnce(new Error(secret));
-    vi.mocked(notes.deleteNote).mockRejectedValueOnce(new Error(secret));
+    vi.mocked(deleteNoteMediaForActor).mockRejectedValueOnce(new Error(secret));
+    vi.mocked(notes.deleteNoteForActor).mockRejectedValueOnce(new Error(secret));
     for (const path of ['/notes/note-test/media/a.png', '/notes/note-test']) {
       const response = await api().delete(path).set('x-project-id', 'project-test');
       assertError(response, 500);

@@ -4,7 +4,7 @@ import { db } from '../src/db/index.js';
 import { RustFS } from '../src/lib/rustfs.js';
 import { MetadataRepository, NotesRepository, NoteRevisionRepository } from '../src/modules/notes/repositories.js';
 import { noteBodyRevisions } from '../src/modules/notes/schema.js';
-import { createNote, getNote, updateNote, cleanupNoteMedia, recoverAbandonedNoteRevisions } from '../src/modules/notes/services/notes.js';
+import { createNoteUnchecked as createNote, getNoteUnchecked as getNote, updateNoteUnchecked as updateNote, cleanupNoteMediaUnchecked as cleanupNoteMedia, recoverAbandonedNoteRevisions } from '../src/modules/notes/services/notes.js';
 import { runCleanup } from '../src/jobs/cleanupOrphanedAssets.js';
 
 function gate() {

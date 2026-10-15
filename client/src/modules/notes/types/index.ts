@@ -2,6 +2,7 @@ export interface NoteMetadata {
   id: string;
   projectId: string;
   userId: string;
+  visibility: 'private' | 'shared';
   title: string;
   version: number;
   createdAt: string;
@@ -10,4 +11,5 @@ export interface NoteMetadata {
 
 export interface Note extends NoteMetadata {
   body: string;
+  canManage?: boolean;
 }

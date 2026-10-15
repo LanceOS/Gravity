@@ -13,6 +13,7 @@ import './NoteEditor.css';
 import { readDraft, writeDraft, subscribeDraft } from './noteDrafts';
 import { NOTE_IMAGE_ACCEPT, validateNoteImage } from '../utils/noteMedia';
 import { getNoteDraftStorageKey } from '../../../constants/storage';
+import { useAuth } from '../../../context/auth/AuthContext';
 
 interface NoteEditorProps {
   projectId: string;
@@ -39,6 +40,8 @@ export function NoteEditor(props: NoteEditorProps) {
 
 function NoteEditorSession({ projectId, noteId, onTitleChange }: NoteEditorProps) {
   const { note, loading, saving, saveError, savedAt, saveNote, uploadMedia, reloadNote } = useNote(projectId, noteId);
+  const { currentUser } = useAuth();
+  const [changingVisibility, setChangingVisibility] = useState(false);
 
   const [uploading, setUploading] = useState(false);
   const uploadingRef = useRef(false);
@@ -54,7 +57,7 @@ function NoteEditorSession({ projectId, noteId, onTitleChange }: NoteEditorProps
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const draftKey = note ? getNoteDraftStorageKey(note.userId, projectId, noteId) : null;
+  const draftKey = note && currentUser ? getNoteDraftStorageKey(currentUser.id, projectId, noteId) : null;
   const versionRef = useRef<number>(0);
   const draft = useSyncExternalStore(
     useCallback(listener => subscribeDraft(draftKey, listener), [draftKey]),
@@ -235,6 +238,20 @@ function NoteEditorSession({ projectId, noteId, onTitleChange }: NoteEditorProps
     e.target.value = '';
   };
 
+  const handleVisibilityChange = async (event: React.ChangeEvent<HTMLSelectElement>) => {
+    if (!note || !currentUser || !(note.canManage ?? note.userId === currentUser.id) || dirty || saving) return;
+    const visibility = event.target.value as 'private' | 'shared';
+    setChangingVisibility(true);
+    try {
+      await saveNote({ visibility });
+      toast.show(visibility === 'shared' ? 'Note shared with workspace members.' : 'Note made private.', 'success');
+    } catch {
+      toast.show('Unable to change note visibility. Reload and try again.', 'error');
+    } finally {
+      setChangingVisibility(false);
+    }
+  };
+
   const onDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(true);
@@ -265,6 +282,17 @@ function NoteEditorSession({ projectId, noteId, onTitleChange }: NoteEditorProps
       onDrop={onDrop}
     >
       <div className="note-editor__header">
+        {note && ((note.canManage ?? note.userId === currentUser?.id) ? (
+          <label className="note-editor__visibility">
+            Visibility{' '}
+            <select aria-label="Note visibility" value={note.visibility}
+              disabled={dirty || saving || changingVisibility || reloading}
+              onChange={handleVisibilityChange}>
+              <option value="private">Private</option>
+              <option value="shared">Shared with workspace</option>
+            </select>
+          </label>
+        ) : <span className="note-editor__visibility">Shared with workspace</span>)}
         <Button size="sm" type="button" disabled={!note || reloading || uploading}
           onClick={() => fileInputRef.current?.click()}>
           {uploading ? 'Uploading image…' : 'Attach image'}

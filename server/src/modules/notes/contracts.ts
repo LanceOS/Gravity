@@ -30,10 +30,11 @@ export const noteQuery = z.object({
   limit: paging(50, 1, 100), offset: paging(0, 0, 100000),
   sort: z.enum(['asc', 'desc']).default('desc'),
 });
-const create = z.object({ title, body, projectId: identifier.optional() }).strict();
+const visibility = z.enum(['private', 'shared']);
+const create = z.object({ title, body, visibility: visibility.optional(), projectId: identifier.optional() }).strict();
 const update = z.object({ title: title.optional(), body: body.optional(),
-  version: z.number().int().min(1).max(2147483646), projectId: identifier.optional(),
-}).strict().refine(value => value.title !== undefined || value.body !== undefined);
+  visibility: visibility.optional(), version: z.number().int().min(1).max(2147483646), projectId: identifier.optional(),
+}).strict().refine(value => value.title !== undefined || value.body !== undefined || value.visibility !== undefined);
 const filename = z.string().min(1).max(255).regex(/^[a-zA-Z0-9_.-]+$/)
   .refine(value => value !== '.' && value !== '..');
 

@@ -9,6 +9,8 @@ import { ApiError } from '../../utils/apiClient';
 import type { Note } from '../../modules/notes/types';
 import { getNoteDraftStorageKey } from '../../constants/storage';
 
+vi.mock('../../context/auth/AuthContext', () => ({ useAuth: () => ({ currentUser: { id: 'owner' } }) }));
+
 vi.mock('@library', () => ({
   toast: { show: vi.fn() },
   Button: ({ children, size, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { size?: string }) => <button data-size={size} {...props}>{children}</button>,
@@ -26,7 +28,7 @@ vi.mock('../../components/LazyRichTextEditor', async () => {
 });
 
 const note = (id: string, version = 1): Note => ({
-  id, projectId: 'project', userId: 'owner', title: id, body: `body ${id}`, version, createdAt: '', updatedAt: '',
+  id, projectId: 'project', userId: 'owner', visibility: 'private', title: id, body: `body ${id}`, version, createdAt: '', updatedAt: '',
 });
 const draftKey = (id: string) => getNoteDraftStorageKey('owner', 'project', id);
 const deferred = <T,>() => {
