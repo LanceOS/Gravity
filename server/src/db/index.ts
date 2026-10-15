@@ -72,6 +72,14 @@ async function createPool() {
       implementation: () => new Date(),
     });
 
+    memoryDb.public.registerFunction({
+      name: 'regexp_replace',
+      args: [DataType.text, DataType.text, DataType.text, DataType.text],
+      returns: DataType.text,
+      implementation: (value: string, pattern: string, replacement: string, flags: string) =>
+        value.replace(new RegExp(pattern, flags), replacement),
+    });
+
     const adapter = memoryDb.adapters.createPg();
     const patchQuery = (prototype: { query?: (...args: unknown[]) => unknown }) => {
       if (!prototype.query) {

@@ -55,6 +55,7 @@ export type TicketFilters = {
   limit?: number;
   offset?: number;
   order?: 'asc' | 'desc';
+  listSort?: 'created' | 'label' | 'newest' | 'newest_urgent' | 'oldest' | 'priority_desc' | 'priority_asc' | 'updated_desc' | 'updated_asc';
   after?: { createdAt: string; id: string };
 };
 
@@ -190,7 +191,14 @@ function buildTicketFilterConditions(projectIds: string[], filters: TicketFilter
     )!);
   }
   if (filters.teamId) conditions.push(eq(projects.teamId, filters.teamId));
-  if (filters.query) {
+  if (filters.listSort && filters.query) {
+    const term = filters.query.trim().toLowerCase();
+    const token = term.replace(/[^a-z0-9]+/g, '');
+    const fields = [tickets.title, tickets.key, tickets.description, tickets.branchName];
+    const exact = fields.map((field) => ilike(field, `%${term.replace(/[\\%_]/g, '\\$&')}%`));
+    const normalized = token ? fields.map((field) => sql<boolean>`regexp_replace(lower(${field}), '[^a-z0-9]+', '', 'g') LIKE ${`%${token}%`}`) : [];
+    conditions.push(or(...exact, ...normalized)!);
+  } else if (filters.query) {
     const pattern = `%${filters.query.replace(/[\\%_]/g, '\\$&')}%`;
     conditions.push(or(ilike(tickets.title, pattern), ilike(tickets.key, pattern), ilike(tickets.description, pattern))!);
   }
@@ -202,16 +210,12 @@ function buildTicketFilterConditions(projectIds: string[], filters: TicketFilter
   if (filters.updatedAfter) conditions.push(gte(tickets.updatedAt, filters.updatedAfter));
   if (filters.updatedBefore) conditions.push(lte(tickets.updatedAt, filters.updatedBefore));
 
-  if (filters.status) {
-    // Normalize incoming status filter to canonical DB values
-    const s = canonicalizeStatus(filters.status);
-    conditions.push(eq(tickets.status, s));
-  }
-  if (filters.priority) {
-    // Normalize incoming priority filter to canonical DB values
-    const p = canonicalizePriority(filters.priority);
-    conditions.push(eq(tickets.priority, p));
-  }
+  if (filters.status) conditions.push(filters.listSort
+    ? inArray(tickets.status, filters.status.split(',').map((value) => canonicalizeStatus(value.trim())))
+    : eq(tickets.status, canonicalizeStatus(filters.status)));
+  if (filters.priority) conditions.push(filters.listSort
+    ? inArray(tickets.priority, filters.priority.split(',').map((value) => canonicalizePriority(value.trim())))
+    : eq(tickets.priority, canonicalizePriority(filters.priority)));
   if (filters.assigneeId) {
     conditions.push(eq(tickets.assigneeId, filters.assigneeId));
   }
@@ -534,19 +538,51 @@ export async function listTickets(projectId: string, filters: TicketFilters = {}
   return listWorkspaceTickets([projectId], filters);
 }
 
+export async function getProjectTicketCounts(projectId: string, userId?: string) {
+  const active = sql<boolean>`${tickets.status} not in ('done', 'canceled')`;
+  const [ticketGroups, labelGroups] = await Promise.all([
+    db.select({ assigneeId: tickets.assigneeId, cycleId: tickets.cycleId, count: sql<number>`count(*)::int` })
+      .from(tickets).where(and(eq(tickets.projectId, projectId), active))
+      .groupBy(tickets.assigneeId, tickets.cycleId),
+    db.select({ labelId: ticketLabels.labelId, count: sql<number>`count(*)::int` })
+      .from(ticketLabels).innerJoin(tickets, eq(tickets.id, ticketLabels.ticketId))
+      .where(and(eq(tickets.projectId, projectId), active)).groupBy(ticketLabels.labelId),
+  ]);
+  const counts = { myIssues: 0, activeProjectIssues: 0, labels: {} as Record<string, number>, cycles: {} as Record<string, number> };
+  for (const group of ticketGroups) {
+    counts.activeProjectIssues += group.count;
+    if (userId && group.assigneeId === userId) counts.myIssues += group.count;
+    if (group.cycleId) counts.cycles[group.cycleId] = (counts.cycles[group.cycleId] ?? 0) + group.count;
+  }
+  for (const group of labelGroups) counts.labels[group.labelId] = group.count;
+  return counts;
+}
+
 export async function listWorkspaceTickets(projectIds: string[], filters: TicketFilters = {}) {
   if (projectIds.length === 0) {
     return [];
   }
 
   const direction = filters.order === 'desc' ? desc : asc;
+  const priorityRank = sql<number>`case ${tickets.priority} when 'urgent' then 4 when 'high' then 3 when 'medium' then 2 when 'low' then 1 else 0 end`;
+  const listOrder = (() => {
+    switch (filters.listSort) {
+      case 'created': case 'oldest': return [asc(tickets.createdAt), asc(tickets.id)];
+      case 'newest': return [desc(tickets.createdAt), asc(tickets.id)];
+      case 'priority_asc': return [asc(priorityRank), asc(tickets.createdAt), asc(tickets.id)];
+      case 'priority_desc': case 'newest_urgent': return [desc(priorityRank), desc(tickets.createdAt), asc(tickets.id)];
+      case 'updated_asc': return [asc(tickets.updatedAt), asc(tickets.id)];
+      case 'updated_desc': return [desc(tickets.updatedAt), asc(tickets.id)];
+      default: return [direction(tickets.createdAt), direction(tickets.id)];
+    }
+  })();
   let query = db
     .select({ ticket: tickets, projectName: projects.name, cursorCreatedAt: sql<string>`${tickets.createdAt}`
       .mapWith((value: string | Date) => value instanceof Date ? value.toISOString() : value).as('cursor_created_at') })
     .from(tickets)
     .innerJoin(projects, eq(projects.id, tickets.projectId))
     .where(and(...buildTicketFilterConditions(projectIds, filters)))
-    .orderBy(direction(tickets.createdAt), direction(tickets.id))
+    .orderBy(...listOrder)
     .$dynamic();
 
   if (typeof filters.limit === 'number' && filters.limit > 0) {
@@ -557,7 +593,42 @@ export async function listWorkspaceTickets(projectIds: string[], filters: Ticket
     query = query.offset(filters.offset);
   }
 
-  const rows = await query;
+  let rows: Awaited<typeof query>;
+  if (filters.listSort === 'label') {
+    const labelRows = await db.select({
+      id: tickets.id,
+      createdAt: tickets.createdAt,
+      labelId: ticketLabels.labelId,
+      labelName: labels.name,
+    }).from(tickets)
+      .innerJoin(projects, eq(projects.id, tickets.projectId))
+      .leftJoin(ticketLabels, eq(ticketLabels.ticketId, tickets.id))
+      .leftJoin(labels, eq(labels.id, ticketLabels.labelId))
+      .where(and(...buildTicketFilterConditions(projectIds, filters)));
+    const firstLabelByTicket = new Map<string, { id: string; createdAt: Date; labelId: string | null; labelName: string | null }>();
+    for (const row of labelRows) {
+      const current = firstLabelByTicket.get(row.id);
+      if (!current || (row.labelId && (!current.labelId || row.labelId < current.labelId))) firstLabelByTicket.set(row.id, row);
+    }
+    const orderedIds = [...firstLabelByTicket.values()].sort((first, second) => {
+      if (first.labelName && !second.labelName) return -1;
+      if (!first.labelName && second.labelName) return 1;
+      if (first.labelName && second.labelName) {
+        const labelOrder = first.labelName.localeCompare(second.labelName);
+        if (labelOrder) return labelOrder;
+      }
+      return first.createdAt.getTime() - second.createdAt.getTime() || first.id.localeCompare(second.id);
+    }).map((row) => row.id);
+    const selectedIds = orderedIds.slice(filters.offset ?? 0, (filters.offset ?? 0) + (filters.limit ?? orderedIds.length));
+    if (selectedIds.length === 0) return [];
+    const selectedRows = await db.select({ ticket: tickets, projectName: projects.name, cursorCreatedAt: sql<string>`${tickets.createdAt}`
+      .mapWith((value: string | Date) => value instanceof Date ? value.toISOString() : value).as('cursor_created_at') })
+      .from(tickets).innerJoin(projects, eq(projects.id, tickets.projectId)).where(inArray(tickets.id, selectedIds));
+    const orderById = new Map(selectedIds.map((id, index) => [id, index]));
+    rows = selectedRows.sort((first, second) => (orderById.get(first.ticket.id) ?? 0) - (orderById.get(second.ticket.id) ?? 0));
+  } else {
+    rows = await query;
+  }
 
   if (rows.length === 0) {
     return [];
@@ -573,7 +644,8 @@ export async function listWorkspaceTickets(projectIds: string[], filters: Ticket
       })
       .from(ticketLabels)
       .innerJoin(labels, eq(labels.id, ticketLabels.labelId))
-      .where(inArray(ticketLabels.ticketId, ticketIds)),
+      .where(inArray(ticketLabels.ticketId, ticketIds))
+      .orderBy(asc(ticketLabels.labelId)),
   ]);
 
   const labelsByTicketId = new Map<string, any[]>();

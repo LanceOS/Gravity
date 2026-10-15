@@ -1953,6 +1953,39 @@ globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) =>
     const tickets = projectId
       ? dbState.tickets.filter((ticket) => ticket.projectId === projectId)
       : dbState.tickets;
+    if (url.searchParams.get('pagination') === 'page') {
+      const status = url.searchParams.get('status');
+      const priority = url.searchParams.get('priority');
+      const search = url.searchParams.get('search')?.trim().toLowerCase();
+      const filtered = tickets.filter((ticket) =>
+        (!status || status.split(',').includes(ticket.status))
+        && (!priority || priority.split(',').includes(ticket.priority))
+        && (!search || [ticket.title, ticket.key, ticket.description].some((field) => field.toLowerCase().includes(search))));
+      const priorityRank = { no_priority: 0, low: 1, medium: 2, high: 3, urgent: 4 };
+      const sort = url.searchParams.get('listSort');
+      filtered.sort((first, second) => {
+        if (sort === 'newest_urgent' || sort === 'priority_desc') {
+          const rank = priorityRank[second.priority] - priorityRank[first.priority];
+          if (rank) return rank;
+        }
+        if (sort === 'priority_asc') {
+          const rank = priorityRank[first.priority] - priorityRank[second.priority];
+          if (rank) return rank;
+        }
+        return (sort === 'created' || sort === 'oldest' || sort === 'priority_asc' ? 1 : -1)
+          * first.createdAt.localeCompare(second.createdAt);
+      });
+      const offset = Number(url.searchParams.get('offset') ?? 0);
+      const limit = Number(url.searchParams.get('limit') ?? 120);
+      const active = tickets.filter((ticket) => ticket.status !== 'done' && ticket.status !== 'canceled');
+      const counts = { myIssues: 0, activeProjectIssues: active.length, labels: {} as Record<string, number>, cycles: {} as Record<string, number> };
+      for (const ticket of active) {
+        if (ticket.assigneeId === dbState.currentUser?.id) counts.myIssues++;
+        if (ticket.cycleId) counts.cycles[ticket.cycleId] = (counts.cycles[ticket.cycleId] ?? 0) + 1;
+        for (const labelId of ticket.labelIds ?? []) counts.labels[labelId] = (counts.labels[labelId] ?? 0) + 1;
+      }
+      return jsonResponse(200, { tickets: filtered.slice(offset, offset + limit).map(serializeTicket), nextOffset: offset + limit < filtered.length ? offset + limit : null, counts });
+    }
     return jsonResponse(200, tickets.map(serializeTicket));
   }
 

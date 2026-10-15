@@ -116,7 +116,7 @@ describe('ticket hydration query regressions', () => {
       await seedTicket(project.id, { id: `cursor-${index}`, key: `GRV-${index + 1}` });
     }
     const first = await api.get('/api/v1/tickets?pagination=cursor&limit=2').set('x-project-id', project.id);
-    expect(first.status).toBe(200);
+    expect(first.status, first.body.error).toBe(200);
     expect(first.body.tickets.map((ticket: { id: string }) => ticket.id)).toEqual(['cursor-0', 'cursor-1']);
     expect(first.body.nextCursor).toBeTypeOf('string');
     const wrongFilter = await api.get(`/api/v1/tickets?pagination=cursor&limit=2&status=done&cursor=${encodeURIComponent(first.body.nextCursor)}`)
@@ -128,6 +128,33 @@ describe('ticket hydration query regressions', () => {
     expect(second.status).toBe(200);
     expect(second.body.tickets.map((ticket: { id: string }) => ticket.id)).toEqual(['cursor-2', 'cursor-3']);
     expect(second.body.nextCursor).toBeNull();
+  });
+
+  it('paginates project tickets after filtering and sorting the full project', async () => {
+    const api = await createAuthenticatedApi({ name: 'Owner', email: 'project-pages@example.com', role: 'owner' });
+    const { project, workspace } = await seedWorkspaceFixture({ owner: {
+      id: api.user.id, name: api.user.name, email: api.user.email, role: 'owner', avatarUrl: api.user.avatar,
+    } });
+    await seedTicket(project.id, { id: 'project-low', key: 'GRV-1', title: 'Search match one', status: 'todo', priority: 'low' });
+    await seedTicket(project.id, { id: 'project-urgent', key: 'GRV-2', title: 'Search match two', status: 'todo', priority: 'urgent' });
+    await seedTicket(project.id, { id: 'project-done', key: 'GRV-3', title: 'Search match three', status: 'done', priority: 'urgent' });
+    await db.insert(labels).values({ id: 'project-page-label', projectId: project.id, name: 'Alpha', color: '#abcdef', teamId: getDefaultTeamId(workspace.id) });
+    await db.insert(ticketLabels).values({ ticketId: 'project-low', labelId: 'project-page-label' });
+    const first = await api.get('/api/v1/tickets?pagination=page&limit=1&offset=0&status=todo&search=search&listSort=newest_urgent')
+      .set('x-project-id', project.id);
+    expect(first.status, first.body.error).toBe(200);
+    expect(first.body.tickets.map((ticket: { id: string }) => ticket.id)).toEqual(['project-urgent']);
+    expect(first.body.nextOffset).toBe(1);
+    expect(first.body.counts.activeProjectIssues).toBe(2);
+    const second = await api.get('/api/v1/tickets?pagination=page&limit=1&offset=1&status=todo&search=search&listSort=newest_urgent')
+      .set('x-project-id', project.id);
+    expect(second.status).toBe(200);
+    expect(second.body.tickets.map((ticket: { id: string }) => ticket.id)).toEqual(['project-low']);
+    expect(second.body.nextOffset).toBeNull();
+    const byLabel = await api.get('/api/v1/tickets?pagination=page&limit=1&offset=0&status=todo&listSort=label')
+      .set('x-project-id', project.id);
+    expect(byLabel.status, byLabel.body.error).toBe(200);
+    expect(byLabel.body.tickets.map((ticket: { id: string }) => ticket.id)).toEqual(['project-low']);
   });
 
   it('emits follow-up invalidations without an actor after closing a ticket', async () => {

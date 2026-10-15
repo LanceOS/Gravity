@@ -25,6 +25,7 @@ import {
   hasCircularDependency,
   getTicketDetails,
   getRelationshipCleanupEventTargets,
+  getProjectTicketCounts,
   ticketSearchCreatedAt,
   listComments,
   listTicketBlockers,
@@ -349,6 +350,7 @@ export function createTicketsRouter() {
 
     try {
       const cursorPagination = req.query.pagination === 'cursor';
+      const pagePagination = req.query.pagination === 'page' && !!projectId;
       const queryLimit = parseIntQueryParam(req.query.limit);
       const queryOffset = parseIntQueryParam(req.query.offset);
       const cursorFingerprint = createHash('sha256').update(JSON.stringify({
@@ -375,7 +377,10 @@ export function createTicketsRouter() {
         cycleId: typeof req.query.cycleId === 'string' ? req.query.cycleId : undefined,
         labels: typeof req.query.labels === 'string' ? req.query.labels.split(',').filter(Boolean) : undefined,
         labelMode: (req.query.labelMode === 'all' || req.query.labelMode === 'any') ? req.query.labelMode : undefined,
-        limit: cursorPagination ? pageSize + 1 : queryLimit,
+        query: pagePagination && typeof req.query.search === 'string' ? req.query.search : undefined,
+        listSort: pagePagination && typeof req.query.listSort === 'string' && ['created', 'label', 'newest', 'newest_urgent', 'oldest', 'priority_desc', 'priority_asc', 'updated_desc', 'updated_asc'].includes(req.query.listSort)
+          ? req.query.listSort as 'created' | 'label' | 'newest' | 'newest_urgent' | 'oldest' | 'priority_desc' | 'priority_asc' | 'updated_desc' | 'updated_asc' : undefined,
+        limit: cursorPagination || pagePagination ? pageSize + 1 : queryLimit,
         offset: cursorPagination ? undefined : queryOffset,
         after,
       });
@@ -387,6 +392,10 @@ export function createTicketsRouter() {
           ? encodeTicketCursor({ createdAt: last[ticketSearchCreatedAt], id: last.id }, cursorFingerprint)
           : null;
         res.json({ tickets: page, nextCursor });
+      } else if (pagePagination) {
+        const offset = Math.max(queryOffset ?? 0, 0);
+        const counts = offset === 0 ? await getProjectTicketCounts(projectId, auth.userId) : undefined;
+        res.json({ tickets: ticketList.slice(0, pageSize), nextOffset: ticketList.length > pageSize ? offset + pageSize : null, counts });
       } else {
         res.json(ticketList);
       }

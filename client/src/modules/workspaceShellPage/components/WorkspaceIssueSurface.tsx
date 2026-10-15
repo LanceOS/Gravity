@@ -148,7 +148,7 @@ export function WorkspaceIssueSurface({
   );
 
   const activeRouteTicket = routeTicketKey
-    ? ticketsByKey.get(routeTicketKey.toUpperCase()) || activeTicket
+    ? ticketsByKey.get(routeTicketKey.toUpperCase()) || null
     : activeTicket;
 
   const handleSelectLabel = useCallback(

@@ -57,7 +57,7 @@ import {
   WorkspaceProjectPanel,
   WorkspaceTeamProjectsPanel,
 } from '../../workspaces';
-import { createWorkspaceProjectCounts } from '../../workspaces/utils/workspaceProjectCounts';
+import { createWorkspaceProjectCounts, type WorkspaceProjectCounts } from '../../workspaces/utils/workspaceProjectCounts';
 import '../../workspaceProjectsPanel/styles/WorkspaceProjectsPage.css';
 import '../../workspacePage/styles/WorkspacePage.css';
 import { WorkspacePageLayout } from '../../../layouts/WorkspacePageLayout/WorkspacePageLayout';
@@ -73,6 +73,7 @@ interface WorkspaceMember {
 
 const AGGREGATE_TICKETS_PAGE_SIZE = 120;
 type TicketPage = { tickets: Ticket[]; nextCursor: string | null };
+type ProjectTicketPage = { tickets: Ticket[]; nextOffset: number | null; counts?: WorkspaceProjectCounts };
 
 export function WorkspaceShellPage() {
   const { currentUser, loading: authLoading, signOut } = useAuth();
@@ -157,6 +158,7 @@ export function WorkspaceShellPage() {
   } = route;
   const shouldUseAggregateTicketPagination = isWorkspaceAllTasksPath || isTeamAggregatePath;
   const isAggregateDetailRoute = shouldUseAggregateTicketPagination && !!route.ticketKey;
+  const scopedProjectId = shouldUseAggregateTicketPagination ? '' : (projectIdParam || activeProjectId);
   const {
     workspaces,
     loading: workspacesLoading,
@@ -247,6 +249,32 @@ export function WorkspaceShellPage() {
     }),
     [aggregateScopeLabels, safeFilters.assigneeId, safeFilters.cycleId, safeFilters.labelMode, safeFilters.priority, safeFilters.status]
   );
+
+  const projectQueryParams = useMemo(() => ({
+    ...aggregateQueryParams,
+    search: safeFilters.search || undefined,
+    listSort: activeView === 'list' ? listSort : 'created',
+  }), [aggregateQueryParams, safeFilters.search, activeView, listSort]);
+  const {
+    data: projectTicketPages,
+    fetchNextPage: fetchNextProjectTicketPage,
+    hasNextPage: projectHasNextPage,
+    isFetchingNextPage: projectIsFetchingNextPage,
+    isLoading: projectTicketsLoading,
+  } = useInfiniteQuery<ProjectTicketPage>({
+    queryKey: [...queryKeys.tickets(scopedProjectId), projectQueryParams, 'paged'],
+    queryFn: ({ pageParam }) => apiClient.get<ProjectTicketPage>('/tickets', {
+      params: { projectId: scopedProjectId, ...projectQueryParams, pagination: 'page', limit: `${AGGREGATE_TICKETS_PAGE_SIZE}`, offset: `${pageParam}` },
+      projectId: scopedProjectId,
+    }),
+    getNextPageParam: (lastPage) => lastPage.nextOffset ?? undefined,
+    initialPageParam: 0,
+    enabled: !!scopedProjectId && !route.ticketKey && activeContext === 'issues' && !!currentUser,
+    staleTime: CACHE_CONFIGS.ticketsList.staleTime,
+    gcTime: CACHE_CONFIGS.ticketsList.gcTime,
+  });
+  const pagedProjectTickets = useMemo(() => projectTicketPages?.pages.flatMap((page) => page.tickets) ?? [], [projectTicketPages]);
+  const projectTicketCounts = projectTicketPages?.pages[0]?.counts;
 
   const {
     data: workspaceAggregatePages,
@@ -482,6 +510,8 @@ export function WorkspaceShellPage() {
         return routeTicketLoading || routeParentTicketLoading;
       }
 
+      if (scopedProjectId && activeContext === 'issues') return projectTicketsLoading;
+
       if (shouldUseAggregateTicketPagination) {
         if (isWorkspaceAllTasksPath) {
           return workspaceAggregateTicketsLoading || workspaceAggregateTicketsFetching;
@@ -498,12 +528,14 @@ export function WorkspaceShellPage() {
     },
     [
       currentUser,
-      isAggregateDetailRoute,
       isTeamAggregatePath,
       isWorkspaceAllTasksPath,
       routeTicketLoading,
       routeParentTicketLoading,
       route.ticketKey,
+      scopedProjectId,
+      activeContext,
+      projectTicketsLoading,
       scopedProjectTicketsFetching,
       shouldUseAggregateTicketPagination,
       teamAggregateTicketsFetching,
@@ -590,10 +622,10 @@ export function WorkspaceShellPage() {
           ? isAggregateDetailRoute
             ? routeAggregateDetailTickets
             : teamAggregateTickets
-          : route.ticketKey && routeTicket
+          : route.ticketKey && routeTicket && routeTicket.projectId === projectIdParam && activeWorkspaceProjectIds.has(routeTicket.projectId)
             ? [...new Map([...tickets.filter((ticket) => ticket.projectId === routeTicket.projectId), ...routeAggregateDetailTickets]
               .map((ticket) => [ticket.id, ticket])).values()]
-            : tickets,
+            : route.ticketKey ? [] : scopedProjectId ? pagedProjectTickets : tickets,
     [
       isAggregateDetailRoute,
       isTeamAggregatePath,
@@ -604,16 +636,22 @@ export function WorkspaceShellPage() {
       routeAggregateDetailTickets,
       route.ticketKey,
       routeTicket,
+      projectIdParam,
+      scopedProjectId,
+      activeWorkspaceProjectIds,
+      pagedProjectTickets,
     ]
   );
   const sharedLinkFallbackRoute = `${pathname}${searchParams.toString() ? `?${searchParams.toString()}` : ''}`;
   const ticketCountsByProject = useMemo(() => {
-    return createWorkspaceProjectCounts(
+    const counts = createWorkspaceProjectCounts(
       activeWorkspaceProjects,
       (projectId) => ticketsByProjectIdFromQueries.get(projectId),
       currentUser?.id
     );
-  }, [activeWorkspaceProjects, ticketsByProjectIdFromQueries, currentUser?.id]);
+    if (scopedProjectId && projectTicketCounts) counts[scopedProjectId] = projectTicketCounts;
+    return counts;
+  }, [activeWorkspaceProjects, ticketsByProjectIdFromQueries, currentUser?.id, scopedProjectId, projectTicketCounts]);
 
   const scopedTicketMaps = useMemo(() => {
     const mapByKey = new Map<string, Ticket>();
@@ -984,12 +1022,12 @@ export function WorkspaceShellPage() {
     : activeWorkspaceProjects;
   const scopedTickets = routeScopedTickets;
   const scopedCycles = isTeamAggregatePath ? teamCycles : cycles;
-  const scopedProjectId = projectIdParam || activeProjectId;
+  const labelProjectId = projectIdParam || activeProjectId;
   const scopedLabels = isTeamAggregatePath
     ? teamLabels
     : isWorkspaceAllTasksPath
       ? workspaceLabels
-      : labels.filter((label) => label.projectId === scopedProjectId);
+      : labels.filter((label) => label.projectId === labelProjectId);
 
   const sidebarActiveViewId =
     route.teamIdParam && sidebarNavigationState.activeScope === 'views'
@@ -1039,10 +1077,10 @@ export function WorkspaceShellPage() {
       activeProjectId,
       filters: safeFilters,
       counts: {
-        myIssues: myIssuesCount,
-        activeProjectIssues: openTicketsCount,
-        labels: labelCounts,
-        cycles: cycleCounts,
+        myIssues: projectTicketCounts?.myIssues ?? myIssuesCount,
+        activeProjectIssues: projectTicketCounts?.activeProjectIssues ?? openTicketsCount,
+        labels: projectTicketCounts?.labels ?? labelCounts,
+        cycles: projectTicketCounts?.cycles ?? cycleCounts,
         byProject: ticketCountsByProject,
       },
       activeContext,
@@ -1258,9 +1296,9 @@ export function WorkspaceShellPage() {
               onSetFilters={handleSetFilters}
               onSetListSort={setListSort}
               onSetView={setView}
-              onLoadMoreTickets={shouldUseAggregateTicketPagination ? aggregateLoadMoreRows : undefined}
-              hasMoreTickets={shouldUseAggregateTicketPagination ? aggregateHasMoreRows : false}
-              isLoadingMoreTickets={shouldUseAggregateTicketPagination ? aggregateIsLoadingMoreRows : false}
+              onLoadMoreTickets={scopedProjectId && !route.ticketKey ? () => { void fetchNextProjectTicketPage(); } : shouldUseAggregateTicketPagination ? aggregateLoadMoreRows : undefined}
+              hasMoreTickets={scopedProjectId && !route.ticketKey ? projectHasNextPage : shouldUseAggregateTicketPagination ? aggregateHasMoreRows : false}
+              isLoadingMoreTickets={scopedProjectId && !route.ticketKey ? projectIsFetchingNextPage : shouldUseAggregateTicketPagination ? aggregateIsLoadingMoreRows : false}
               createTicket={{
                 isOpen: isCreateModalOpen,
                 onClose: () => setIsCreateModalOpen(false),
