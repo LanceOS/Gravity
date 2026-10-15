@@ -51,10 +51,17 @@ describe('TreeView keyboard controls', () => {
     expect(onSubmit).not.toHaveBeenCalled();
   });
 
-  it('does not offer selection buttons when no selection handler exists', () => {
-    render(<TreeView nodes={[{ id: 'file', label: 'Readme.md' }]} />);
-    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+  it('only offers expansion when no selection handler exists', async () => {
+    const user = userEvent.setup();
+    render(<TreeView nodes={[{ id: 'folder', label: 'Documents', isFolder: true, children: [{ id: 'file', label: 'Readme.md' }] }]} />);
+    const expand = screen.getByRole('button', { name: 'Expand Documents' });
+    expect(expand.parentElement).not.toHaveClass('clickable');
+    expect(screen.queryByRole('button', { name: 'Documents' })).not.toBeInTheDocument();
+    await user.tab();
+    expect(expand).toHaveFocus();
+    await user.keyboard(' ');
     expect(screen.getByText('Readme.md')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Readme.md' })).not.toBeInTheDocument();
   });
 });
 
@@ -63,7 +70,7 @@ describe('FileUploader keyboard control', () => {
     const user = userEvent.setup();
     const onFileSelect = vi.fn();
     const onSubmit = vi.fn((event: React.FormEvent) => event.preventDefault());
-    const { container } = render(
+    const { container, rerender } = render(
       <form onSubmit={onSubmit}>
         <FileUploader label="Attachments" onFileSelect={onFileSelect} />
       </form>,
@@ -94,5 +101,8 @@ describe('FileUploader keyboard control', () => {
     fireEvent.drop(trigger, { dataTransfer: { files: [file] } });
     expect(onFileSelect).toHaveBeenCalledTimes(2);
     expect(onFileSelect.mock.calls[1][0]).toEqual([file]);
+
+    rerender(<FileUploader onFileSelect={onFileSelect} />);
+    expect(screen.getByRole('button', { name: 'Drag and drop files here, or click to upload' })).toBeInTheDocument();
   });
 });

@@ -55,7 +55,7 @@ export function TreeView({ nodes, onNodeClick, style }: TreeViewProps) {
     return (
       <div key={node.id} style={{ display: 'flex', flexDirection: 'column' }}>
         <div
-          className={isFolder || onNodeClick ? 'clickable' : undefined}
+          className={onNodeClick ? 'clickable' : undefined}
           style={{
             display: 'flex',
             alignItems: 'center',
