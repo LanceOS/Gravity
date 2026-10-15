@@ -157,6 +157,7 @@ assert_production_csp() {
   assert_csp_directive_contains "$policy" 'trusted-types' 'dompurify'
   assert_csp_directive_contains "$policy" 'trusted-types' 'gravity-editor'
   assert_csp_directive_contains "$policy" 'trusted-types' 'ProseMirrorClipboard'
+  assert_csp_directive_contains "$policy" 'report-uri' '/api/v1/csp-reports'
 
   script_src="$(csp_directive_value "$policy" 'script-src')"
   if [[ "$script_src" == *"'unsafe-inline'"* || "$script_src" == *"'unsafe-eval'"* ]]; then

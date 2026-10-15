@@ -13,6 +13,7 @@ import { createOAuthAuthorizationRouter } from './modules/mcp/oauth.js';
 import { createHealthRouter } from './modules/health/routes.js';
 import { requireInitializedServer } from './lib/admission.js';
 import { isServerShuttingDown } from './lib/server-lifecycle.js';
+import { CSP_REPORT_PATH, createCspReportRouter } from './lib/csp-reporting.js';
 
 export { bootstrapMcpRegistries } from './modules/mcp/bootstrap.js';
 
@@ -39,6 +40,7 @@ export const APP_SHELL_CONTENT_SECURITY_POLICY = [
   "manifest-src 'self'",
   'trusted-types gravity-editor dompurify ProseMirrorClipboard',
   "require-trusted-types-for 'script'",
+  `report-uri ${CSP_REPORT_PATH}`,
 ].join('; ');
 
 export function createApp() {
@@ -69,6 +71,8 @@ export function createApp() {
   );
 
   app.use('/api/v1', createHealthRouter());
+  // Browser reports must remain available while dependencies are starting or degraded.
+  app.use(createCspReportRouter());
   app.use('/api/v1/notes', noteErrorContext);
   app.use(requireInitializedServer);
 
