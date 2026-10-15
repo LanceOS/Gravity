@@ -71,6 +71,39 @@ async function grant() {
 }
 
 describe('workspace OAuth MCP authorization', () => {
+  it('preserves OAuth navigation redirects without granting CORS to the client callback origin', async () => {
+    const configuredCors = [...env.corsOrigins];
+    try {
+      env.corsOrigins.splice(0);
+      await fixture();
+      const client = await register();
+      const verifier = randomBytes(32).toString('base64url');
+      const authorization = {
+        client_id: client.client_id,
+        redirect_uri: redirectUri,
+        response_type: 'code',
+        code_challenge: hash(verifier),
+        code_challenge_method: 'S256',
+        state: 'cors-check',
+        resource,
+        scope: scopes.join(' '),
+      };
+
+      const navigation = await api().get('/authorize').query(authorization);
+      expect(navigation.status).toBe(302);
+      expect(new URL(navigation.headers.location).pathname).toBe('/oauth/consent');
+
+      const clientOrigin = await api().get('/authorize')
+        .set('Origin', new URL(redirectUri).origin).query(authorization);
+      expect(clientOrigin.status).toBe(302);
+      expect(new URL(clientOrigin.headers.location).pathname).toBe('/oauth/consent');
+      expect(clientOrigin.headers).not.toHaveProperty('access-control-allow-origin');
+      expect(clientOrigin.headers).not.toHaveProperty('access-control-allow-credentials');
+    } finally {
+      env.corsOrigins.splice(0, env.corsOrigins.length, ...configuredCors);
+    }
+  });
+
   it('discovers a workspace-bound resource and registers only public PKCE clients', async () => {
     const account = await fixture();
     const setup = await account.get('/api/v1/workspaces/oauth-workspace/mcp/setup');

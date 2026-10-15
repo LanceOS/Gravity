@@ -35,6 +35,15 @@ or fragment. Equivalent origins (case, default port, trailing slash) are normali
 to the browser Origin format. Production rejects HTTP and localhost origins. Internal dependency
 URLs may use HTTP and private service names. `DATABASE_URL` must use postgres or
 postgresql; pgmem is accepted only in test mode. Redis URLs use redis/rediss.
+Outside production, an unset or empty `CORS_ORIGINS` uses `TRUSTED_ORIGINS`
+(which defaults to `http://localhost:<PORT>`). Set `CORS_ORIGINS` explicitly
+to allow a separate browser origin during development; it replaces the fallback
+list and does not add that origin to the auth/CSRF trust list. Origins in
+`CORS_ORIGINS` but not `TRUSTED_ORIGINS` receive `Access-Control-Allow-Origin`
+but not `Access-Control-Allow-Credentials`. Add a browser origin to both lists if
+it needs cookie-based auth. OAuth redirects are ordinary browser navigation
+and do not require the redirect destination in
+`CORS_ORIGINS`.
 `REDIS_REQUIRED=true` requires `REDIS_ENABLED=true`. Set non-default object
 storage credentials and a nonempty bucket. `TRUSTED_PROXIES` accepts exact IPs or
 CIDRs; see [proxy configuration](trusted-proxies.md).

@@ -79,6 +79,22 @@ describe('retired MCP agent command', () => {
   });
 });
 
+describe('CORS origin configuration', () => {
+  it('defaults to the local server origin when both origin lists are absent', async () => {
+    const { env } = await import('../src/env.js');
+    expect(env.corsOrigins).toEqual([]);
+    expect(env.trustedOrigins).toEqual(['http://localhost:8080']);
+  });
+
+  it.each([undefined, '', ' , , '])('parses absent and empty CORS_ORIGINS as an empty list: %j', async (value) => {
+    process.env.TRUSTED_ORIGINS = 'https://app.example';
+    if (value !== undefined) process.env.CORS_ORIGINS = value;
+    const { env } = await import('../src/env.js');
+    expect(env.corsOrigins).toEqual([]);
+    expect(env.trustedOrigins).toEqual(['https://app.example']);
+  });
+});
+
 describe('MCP token verification throttle settings', () => {
   it('uses conservative defaults and accepts deployment overrides', async () => {
     const { env: defaults } = await import('../src/env.js');

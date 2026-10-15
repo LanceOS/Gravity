@@ -48,13 +48,23 @@ export function createApp() {
 
   app.use((_req, res, next) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
+    // Denied origins also vary the response, so a cache cannot reuse one
+    // origin's CORS decision for another.
+    res.vary('Origin');
     next();
   });
 
+  const allowedCorsOrigins = new Set(env.corsOrigins.length > 0 ? env.corsOrigins : env.trustedOrigins);
+  const credentialedCorsOrigins = new Set(env.trustedOrigins);
   app.use(
-    cors({
-      origin: env.corsOrigins.length > 0 ? env.corsOrigins : true,
-      credentials: true,
+    cors((req, callback) => {
+      const requestOrigin = req.get('Origin');
+      // An absent CORS_ORIGINS follows the browser origins trusted by auth/CSRF.
+      // Explicit CORS-only origins cannot read credentialed browser responses.
+      callback(null, {
+        origin: !!requestOrigin && allowedCorsOrigins.has(requestOrigin),
+        credentials: !!requestOrigin && credentialedCorsOrigins.has(requestOrigin),
+      });
     }),
   );
 
