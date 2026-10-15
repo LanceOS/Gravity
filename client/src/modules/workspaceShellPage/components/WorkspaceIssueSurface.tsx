@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react';
+import { lazy, Suspense, useCallback, useEffect } from 'react';
 
 import type { Ticket } from '../../../context/TicketContextContext';
 import { useCommentContext } from '../../../context/comment/CommentContext';
@@ -6,9 +6,12 @@ import { useTicketRelationsContext } from '../../../context/relation/TicketRelat
 import { useTicketDetailContext } from '../../../context/ticket/TicketDetailContext';
 import { useTicketMutations } from '../../../context/ticket/TicketMutationContext';
 import type { Cycle, Label, Project, User } from '../../../types/domain';
-import { CreateTicketModal, TicketDetailRoute, type TicketFilters, type TicketListSort } from '../../tickets';
+import type { TicketFilters, TicketListSort } from '../../tickets';
 import { WorkspacePage } from '../../workspacePage';
 import type { WorkspaceIssueView } from '../../workspacePage/screens/WorkspacePage';
+
+const TicketDetailRoute = lazy(() => import('../../tickets/components/TicketDetailRoute').then(({ TicketDetailRoute }) => ({ default: TicketDetailRoute })));
+const CreateTicketModal = lazy(() => import('../../tickets/components/CreateTicketModal/CreateTicketModal').then(({ CreateTicketModal }) => ({ default: CreateTicketModal })));
 
 type Navigate = (to: string, options?: { replace?: boolean }) => void;
 
@@ -172,7 +175,7 @@ export function WorkspaceIssueSurface({
   return (
     <>
       {routeTicketKey ? (
-        <TicketDetailRoute
+        <Suspense fallback={<div role="status">Loading ticket details...</div>}><TicketDetailRoute
           activeWorkspaceId={activeWorkspaceId}
           activeTicket={activeRouteTicket}
           activeTicketDetail={activeTicketDetail}
@@ -197,7 +200,7 @@ export function WorkspaceIssueSurface({
           ticketsById={ticketsById}
           ticketsByParentId={ticketsByParentId}
           isLoading={isLoadingTickets}
-        />
+        /></Suspense>
       ) : (
         <WorkspacePage
           workspaceId={activeWorkspaceId}
@@ -237,7 +240,7 @@ export function WorkspaceIssueSurface({
         />
       )}
 
-      <CreateTicketModal
+      {createTicketModal.isOpen && <Suspense fallback={<div role="status">Loading ticket editor...</div>}><CreateTicketModal
         isOpen={createTicketModal.isOpen}
         onClose={createTicketModal.onClose}
         projects={createTicketModal.projects}
@@ -249,7 +252,7 @@ export function WorkspaceIssueSurface({
         onSubmitTicket={handleCreateTicketSubmit}
         initialStatus={createTicketModal.initialStatus}
         parentId={createTicketModal.parentId}
-      />
+      /></Suspense>}
     </>
   );
 }

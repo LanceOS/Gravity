@@ -1,8 +1,11 @@
 import type { LabelCreateScope } from '../../tickets/components/LabelCreateOverlay';
+import { lazy, Suspense } from 'react';
 import type { ReactNode } from 'react';
 import type { Cycle, Label, Project, Ticket, User } from '../../../types/domain';
-import { CreateTicketModal, LabelCreateOverlay } from '../../../modules/tickets';
+import { LabelCreateOverlay } from '../../../modules/tickets';
 import { ProjectCreateOverlay } from '../../../components/WorkspaceProjectPanel';
+
+const CreateTicketModal = lazy(() => import('../../../modules/tickets/components/CreateTicketModal/CreateTicketModal').then(({ CreateTicketModal }) => ({ default: CreateTicketModal })));
 
 type CreateTicketOverlayProps = {
   isOpen: boolean;
@@ -60,7 +63,7 @@ export function AppShellOverlays({
 }: AppShellOverlaysProps) {
   return (
     <>
-      <CreateTicketModal
+      {createTicket?.isOpen && <Suspense fallback={<div role="status">Loading ticket editor...</div>}><CreateTicketModal
         isOpen={!!createTicket?.isOpen}
         onClose={createTicket?.onClose || (() => {})}
         projects={createTicket?.projects || []}
@@ -72,7 +75,7 @@ export function AppShellOverlays({
         onSubmitTicket={createTicket?.onSubmitTicket || (async () => false)}
         initialStatus={createTicket?.initialStatus}
         parentId={createTicket?.parentId}
-      />
+      /></Suspense>}
 
       {onboarding}
 

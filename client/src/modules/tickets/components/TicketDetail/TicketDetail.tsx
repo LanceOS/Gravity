@@ -1,13 +1,13 @@
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import {
   Button,
-  MarkdownEditor,
-  RichTextEditor,
   toast,
   useCopyToClipboard,
   Accordion,
   createEmptyRichTextValue,
 } from '@library';
+import { MarkdownEditor } from '@library/components/markdowneditor/MarkdownEditor';
+import { LazyRichTextEditor } from '../../../../components/LazyRichTextEditor';
 import generateBranchName from '../../../../utils/branch';
 import { safeAnime, prefersReducedMotion } from '../../../../utils/animationUtils';
 import anime from 'animejs';
@@ -82,7 +82,7 @@ function TicketDescriptionEditor({
 
   return (
     <>
-    <RichTextEditor
+    <LazyRichTextEditor
       key={`desc-${ticketId}`}
       value={editingDescriptionBody}
       onChange={value => {

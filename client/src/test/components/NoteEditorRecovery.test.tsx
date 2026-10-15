@@ -20,6 +20,11 @@ vi.mock('@library', () => ({
   ),
 }));
 
+vi.mock('../../components/LazyRichTextEditor', async () => {
+  const library = await import('@library') as unknown as { RichTextEditor: typeof import('@library/components/richtext/RichTextEditor').RichTextEditor };
+  return { LazyRichTextEditor: library.RichTextEditor };
+});
+
 const note = (id: string, version = 1): Note => ({
   id, projectId: 'project', userId: 'owner', title: id, body: `body ${id}`, version, createdAt: '', updatedAt: '',
 });

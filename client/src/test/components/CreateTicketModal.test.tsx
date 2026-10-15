@@ -3,7 +3,7 @@ import type { ButtonHTMLAttributes, ChangeEvent, ReactNode, SelectHTMLAttributes
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { CreateTicketModal } from '../../modules/tickets';
+import { CreateTicketModal } from '../../modules/tickets/components/CreateTicketModal/CreateTicketModal';
 
 type MockButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   children?: ReactNode;
@@ -165,6 +165,11 @@ vi.mock('@library', async (importOriginal) => {
     ),
     RichTextEditor: MockRichTextEditor,
   };
+});
+
+vi.mock('../../components/LazyRichTextEditor', async () => {
+  const library = await import('@library') as unknown as { RichTextEditor: typeof import('@library/components/richtext/RichTextEditor').RichTextEditor };
+  return { LazyRichTextEditor: library.RichTextEditor };
 });
 
 const projects = [

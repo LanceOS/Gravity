@@ -1,7 +1,8 @@
 import { act, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { TextSelection } from 'prosemirror-state';
-import { createEmptyRichTextValue, parseRichTextValue, renderRichTextHtml, RichTextEditor, serializeRichTextJson } from '@library';
+import { createEmptyRichTextValue, parseRichTextValue, renderRichTextHtml, serializeRichTextJson } from '@library';
+import { RichTextEditor } from '@library/components/richtext/RichTextEditor';
 
 let lastEditorView: /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any = null;
 

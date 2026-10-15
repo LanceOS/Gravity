@@ -33,7 +33,6 @@ export * from './divider';
 export * from './drawer';
 export * from './dropdownmenu';
 
-export * from './markdowneditor';
 export * from './emptystate';
 export * from './fileuploader';
 export * from './flex';
@@ -59,7 +58,6 @@ export * from './radiogroup';
 export * from './rangeslider';
 export * from './rating';
 export * from './result';
-export * from './richtext';
 export * from './scrollspy';
 export * from './searchinput';
 export * from './select';

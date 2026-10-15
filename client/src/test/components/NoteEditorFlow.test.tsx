@@ -139,11 +139,16 @@ describe('WorkspacePage – notes context', () => {
     expect(screen.queryByTestId('note-editor')).not.toBeInTheDocument();
   });
 
-  it('renders NoteEditor instead of NotesList when activeNoteId is set', () => {
+  it('renders NoteEditor instead of NotesList when activeNoteId is set', async () => {
     renderWorkspacePage(buildProps({ activeNoteId: 'note-abc' }));
-    expect(screen.getByTestId('note-editor')).toBeInTheDocument();
+    expect(await screen.findByTestId('note-editor')).toBeInTheDocument();
     expect(screen.getByTestId('note-editor').dataset.noteId).toBe('note-abc');
     expect(screen.queryByTestId('notes-list')).not.toBeInTheDocument();
+  });
+
+  it('does not load the note editor while the tickets context is active', () => {
+    renderWorkspacePage(buildProps({ activeContext: 'issues', activeNoteId: 'note-abc' }));
+    expect(screen.queryByTestId('note-editor')).not.toBeInTheDocument();
   });
 
   it('shows "Create New Note" and hides "Back to Notes" when no note is active', () => {

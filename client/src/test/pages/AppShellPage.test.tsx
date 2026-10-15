@@ -217,6 +217,18 @@ vi.mock('../../modules/tickets', async (importOriginal) => {
   };
 });
 
+vi.mock('../../modules/tickets/components/CreateTicketModal/CreateTicketModal', () => ({
+  CreateTicketModal: () => <div>CreateTicketModal</div>,
+}));
+vi.mock('../../modules/tickets/components/TicketDetailRoute', () => ({
+  TicketDetailRoute: ({ onDeleteTicket, activeTicket }: { onDeleteTicket?: (id: string) => void; activeTicket?: { id: string } }) => (
+    <div>
+      <div>TicketDetailRoute Mock</div>
+      {onDeleteTicket && activeTicket && <button type="button" onClick={() => onDeleteTicket(activeTicket.id)}>Delete active ticket</button>}
+    </div>
+  ),
+}));
+
 vi.mock('../../modules/onboarding', () => ({
   OnboardingModal: ({ onComplete }: { onComplete: () => void }) => (
     <div>
@@ -1258,7 +1270,7 @@ describe('AppShellPage', () => {
     });
 
     await user.keyboard('n');
-    expect(screen.getByText('CreateTicketModal')).toBeInTheDocument();
+    expect(await screen.findByText('CreateTicketModal')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Open settings' }));
     await waitFor(() => {

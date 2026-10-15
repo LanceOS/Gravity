@@ -1,4 +1,4 @@
-import { useMemo, useCallback, useState, useRef } from 'react';
+import { lazy, Suspense, useMemo, useCallback, useState, useRef } from 'react';
 import { toast, Button, Timeline, createEmptyRichTextValue, ContextMenu } from '@library';
 import type { Cycle, Label, Project, Ticket, User } from '../../../context/TicketContextContext';
 import {
@@ -14,7 +14,7 @@ import {
   type TicketFilters,
   type TicketListSort,
 } from '../../tickets';
-import { NotesList, NoteEditor } from '../../notes';
+import { NotesList } from '../../notes/components/NotesList';
 import { WorkspaceHeader } from '../../workspaces';
 import { WorkspaceViewContainer } from '../../../components/WorkspaceViewContainer';
 import { WorkspacePageLayout } from '../../../layouts/WorkspacePageLayout/WorkspacePageLayout';
@@ -25,6 +25,8 @@ import { WorkspacePageContextMenu } from '../components/WorkspacePageContextMenu
 import { apiClient } from '../../../utils/apiClient';
 import { formatTicketTimelineDate } from '../../tickets/utils/ticketDateFormatter';
 import '../styles/WorkspacePage.css';
+
+const NoteEditor = lazy(() => import('../../notes/components/NoteEditor').then(({ NoteEditor }) => ({ default: NoteEditor })));
 
 export type WorkspaceIssueView = 'board' | 'list' | 'timeline';
 
@@ -392,8 +394,8 @@ export function WorkspacePage({
                     {({ reset }) => (
                       <ErrorBoundary onReset={reset}>
                         <WorkspaceViewContainer>
-                          {activeNoteId ? (
-                            <NoteEditor projectId={filters.projectId || ''} noteId={activeNoteId} onTitleChange={setActiveNoteTitle} />
+                          {isNoteEditor ? (
+                            <Suspense fallback={<div role="status">Loading note editor...</div>}><NoteEditor projectId={filters.projectId || ''} noteId={activeNoteId} onTitleChange={setActiveNoteTitle} /></Suspense>
                           ) : (
                             <NotesList projectId={filters.projectId || ''} onSelectNote={onSelectNote || (() => { })} sortDirection={notesSort} />
                           )}
