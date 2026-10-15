@@ -1,4 +1,4 @@
-import type { McpToolDefinition } from './types.js';
+import type { JsonSchema, McpToolDefinition } from './types.js';
 
 // Compatibility names share policy but retain their own input schemas.
 export const TOOL_ALIAS_GROUPS: readonly (readonly string[])[] = [
@@ -21,6 +21,24 @@ export function getToolDefinition(name: string): McpToolDefinition | undefined {
     ?? mcpToolsList.find((tool) => tool.aliases?.includes(name));
 }
 
+/** Handler output is always wrapped as { data } or { error } on the wire. */
+export function createToolOutputSchema(dataSchema: JsonSchema = {}): JsonSchema {
+  return {
+    type: 'object',
+    properties: {
+      data: dataSchema,
+      error: {
+        type: 'object',
+        properties: { code: { type: 'string' }, message: { type: 'string' } },
+        required: ['code', 'message'],
+        additionalProperties: true,
+      },
+    },
+    oneOf: [{ required: ['data'] }, { required: ['error'] }],
+    additionalProperties: false,
+  };
+}
+
 export function registerMcpTools(tools: McpToolDefinition[]) {
   for (const tool of tools) {
     const readOnly = /^(get|read|list|search|preview)_/.test(tool.name);
@@ -28,20 +46,7 @@ export function registerMcpTools(tools: McpToolDefinition[]) {
     const definition: McpToolDefinition = {
       ...tool,
       inputSchema: { additionalProperties: false, ...tool.inputSchema },
-      outputSchema: tool.outputSchema ?? {
-        type: 'object',
-        properties: {
-          data: {},
-          error: {
-            type: 'object',
-            properties: { code: { type: 'string' }, message: { type: 'string' } },
-            required: ['code', 'message'],
-            additionalProperties: true,
-          },
-        },
-        oneOf: [{ required: ['data'] }, { required: ['error'] }],
-        additionalProperties: false,
-      },
+      outputSchema: createToolOutputSchema(tool.outputSchema),
       annotations: {
         readOnlyHint: readOnly,
         destructiveHint: /^(delete|remove|set)_/.test(tool.name),

@@ -6,7 +6,7 @@ import { workspaceSettings, tickets, workspaceMembers } from '../src/db/schema.j
 import { bootstrapMcpRegistries } from '../src/modules/mcp/bootstrap.js';
 import { executeTool } from '../src/modules/mcp/tool-executor.js';
 import { handleMcpRequest } from '../src/modules/mcp/request-handler.js';
-import { listCanonicalTools } from '../src/modules/mcp/tools.js';
+import { getToolDefinition, listCanonicalTools, mcpToolsList, registerMcpTools } from '../src/modules/mcp/tools.js';
 import { seedWorkspaceFixture, seedTicket, seedUser } from './helpers/test-helpers.js';
 
 beforeEach(() => bootstrapMcpRegistries());
@@ -90,6 +90,26 @@ describe('MCP execution boundary', () => {
     }
   });
 
+  it('wraps a custom data output schema without weakening its validation', () => {
+    const name = 'custom_schema_probe';
+    registerMcpTools([{
+      name,
+      description: 'Schema registration probe',
+      inputSchema: { type: 'object', properties: {} },
+      outputSchema: { type: 'object', properties: { count: { type: 'number' } }, required: ['count'], additionalProperties: false },
+    }]);
+    try {
+      const schema = getToolDefinition(name)?.outputSchema;
+      expect(schema).toBeDefined();
+      const validate = new AjvJsonSchemaValidator().getValidator(schema!);
+      expect(validate({ data: { count: 1 } }).valid).toBe(true);
+      expect(validate({ data: { count: 'wrong' } }).valid).toBe(false);
+      expect(validate({ error: { code: 'FAILED', message: 'Could not count.' } }).valid).toBe(true);
+    } finally {
+      mcpToolsList.splice(mcpToolsList.findIndex((tool) => tool.name === name), 1);
+    }
+  });
+
   it('returns SDK-valid structured successes, execution failures, and validation failures', async () => {
     const { workspace, owner, ticket } = await fixture();
     const listed: any = await handleMcpRequest({ jsonrpc: '2.0', id: 1, method: 'tools/list' }, workspace.id, owner.id);
@@ -108,7 +128,7 @@ describe('MCP execution boundary', () => {
 
     const missing: any = await handleMcpRequest(request('get_ticket', { ticketKey: 'NONE-999' }), workspace.id, owner.id);
     expect(missing.result).toMatchObject({ isError: true, structuredContent: { error: {
-      code: 'TOOL_EXECUTION_FAILED', message: expect.any(String),
+      code: 'NOT_FOUND', message: 'Ticket NONE-999 not found.',
     } } });
     validateFor('get_ticket', missing);
 
@@ -164,6 +184,6 @@ describe('MCP execution boundary', () => {
     expect(await handleMcpRequest({ jsonrpc: '2.0', method: 'notifications/initialized' })).toBeNull();
     expect(await handleMcpRequest({ jsonrpc: '2.0', id: 1, method: 'ping' })).toMatchObject({ result: {} });
     const missing = await handleMcpRequest(request('get_ticket', { ticketKey: 'NONE-999' }), workspace.id, owner.id);
-    expect(missing).toMatchObject({ result: { isError: true, structuredContent: { error: { code: 'TOOL_EXECUTION_FAILED' } } } });
+    expect(missing).toMatchObject({ result: { isError: true, structuredContent: { error: { code: 'NOT_FOUND' } } } });
   });
 });

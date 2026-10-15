@@ -39,6 +39,35 @@ function createToolResult(data: unknown, isError: boolean) {
   };
 }
 
+function toolExecutionFailure(error: unknown): ToolFailure {
+  if (error instanceof McpToolValidationError) {
+    return {
+      code: 'INVALID_ARGUMENTS',
+      message: error.message,
+      ...(error.data ? { details: error.data } : {}),
+    };
+  }
+  // These handler messages have a bounded, user-facing identifier. All other
+  // exceptions may contain database, network, or other internal diagnostics.
+  if (error instanceof Error && /^(Ticket|Project) [A-Za-z0-9_-]{1,128} not found\.$/.test(error.message)) {
+    return { code: 'NOT_FOUND', message: error.message };
+  }
+  if (error instanceof Error && error.message.startsWith('Rate limit exceeded:')) {
+    return { code: 'RATE_LIMITED', message: 'Rate limit exceeded. Please wait a moment and try again.' };
+  }
+  return { code: 'TOOL_EXECUTION_FAILED', message: 'Tool execution failed. Retry the call or contact support if it persists.' };
+}
+
+function requestFailure(id: string | number | null | undefined, error: unknown) {
+  if (error instanceof McpToolError) return createMcpErrorResponse(id, error.code, error.message, error.data);
+  if (error instanceof Error && [
+    'workspaceId is required.', 'Authenticated user is required.', 'Unauthorized workspace access.',
+  ].includes(error.message)) {
+    return createMcpErrorResponse(id, -32001, error.message);
+  }
+  return createMcpErrorResponse(id, -32603, 'Internal error handling MCP request.');
+}
+
 /** Transport-independent protocol handling. All actual dispatch policy lives in the executor. */
 export class McpRequestHandler {
   async handle(request: unknown, workspaceId = '', actorUserId = '', options: McpRequestHandlerOptions = {}) {
@@ -118,17 +147,10 @@ export class McpRequestHandler {
           // Authorization failures remain protocol errors. Domain errors are
           // visible to the model as tool failures so it can correct its input.
           if (error instanceof McpToolError && !(error instanceof McpToolValidationError)) throw error;
-          const failure = {
-            code: error instanceof McpToolValidationError ? 'INVALID_ARGUMENTS' : 'TOOL_EXECUTION_FAILED',
-            message: error instanceof Error ? error.message : 'Tool execution failed.',
-            ...(error instanceof McpToolError && error.data ? { details: error.data } : {}),
-          };
-          return { jsonrpc: '2.0', id: payload.id, result: toolResult(failure, true) };
+          return { jsonrpc: '2.0', id: payload.id, result: toolResult(toolExecutionFailure(error), true) };
         }
       } catch (error) {
-        return createMcpErrorResponse(payload.id, error instanceof McpToolError ? error.code : -32603,
-          error instanceof Error ? error.message : 'Internal error handling MCP request.',
-          error instanceof McpToolError ? error.data : undefined);
+        return requestFailure(payload.id, error);
       }
     });
   }
