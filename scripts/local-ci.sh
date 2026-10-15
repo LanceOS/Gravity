@@ -97,19 +97,21 @@ prepare_compose_env() {
 
   # The Compose manifests require an env file. A fresh CI checkout gets
   # disposable, independent secrets without changing a developer's own .env.
-  local postgres_password redis_password auth_secret identity_key
+  local postgres_password redis_password auth_secret identity_key local_testing_kek
   postgres_password="$(openssl rand -hex 32)"
   redis_password="$(openssl rand -hex 32)"
   auth_secret="$(openssl rand -hex 32)"
   identity_key="$(openssl rand -hex 32)"
+  local_testing_kek="$(openssl rand -hex 32)"
   CI_ENV_TEMP="$(mktemp "$ROOT_DIR/.env.ci.XXXXXX")"
   cat > "$CI_ENV_TEMP" <<EOF
 GRAVITY_POSTGRES_PASSWORD=$postgres_password
 GRAVITY_REDIS_PASSWORD=$redis_password
 BETTER_AUTH_SECRET=$auth_secret
 NODE_IDENTITY_MASTER_KEY=$identity_key
+LOCAL_TESTING_KEK=$local_testing_kek
 NODE_ENV=development
-ENCRYPTED_CREDENTIALS_MODE=disabled
+ENCRYPTED_CREDENTIALS_MODE=required
 EOF
   if ln "$CI_ENV_TEMP" "$ROOT_DIR/.env" 2>/dev/null; then
     CI_ENV_CREATED=1
