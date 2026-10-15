@@ -54,25 +54,28 @@ describe('createApp', () => {
       expect(allowed.status).toBe(204);
       expect(allowed.headers['access-control-allow-origin']).toBe('https://app.example');
       expect(allowed.headers['access-control-allow-credentials']).toBe('true');
+      expect(allowed.headers.vary).toContain('Origin');
 
       const hostile = await request(app).get('/api/v1/health/live')
         .set('Origin', 'https://evil.example');
       expect(hostile.status).toBe(200);
       expect(hostile.headers).not.toHaveProperty('access-control-allow-origin');
       expect(hostile.headers).not.toHaveProperty('access-control-allow-credentials');
+      expect(hostile.headers.vary).toContain('Origin');
 
       const hostilePreflight = await request(app).options('/api/v1/health/live')
         .set('Origin', 'https://evil.example')
         .set('Access-Control-Request-Method', 'GET');
       expect(hostilePreflight.headers).not.toHaveProperty('access-control-allow-origin');
       expect(hostilePreflight.headers).not.toHaveProperty('access-control-allow-credentials');
+      expect(hostilePreflight.headers.vary).toContain('Origin');
     } finally {
       env.corsOrigins.splice(0, env.corsOrigins.length, ...configuredCors);
       env.trustedOrigins.splice(0, env.trustedOrigins.length, ...configuredTrusted);
     }
   });
 
-  it('uses an explicitly configured CORS origin as the development override', async () => {
+  it('allows an explicit CORS-only origin without credential access', async () => {
     const configuredCors = [...env.corsOrigins];
     const configuredTrusted = [...env.trustedOrigins];
     try {
@@ -83,11 +86,40 @@ describe('createApp', () => {
       const allowed = await request(app).get('/api/v1/health/live')
         .set('Origin', 'http://localhost:5173');
       expect(allowed.headers['access-control-allow-origin']).toBe('http://localhost:5173');
-      expect(allowed.headers['access-control-allow-credentials']).toBe('true');
+      expect(allowed.headers).not.toHaveProperty('access-control-allow-credentials');
+      expect(allowed.headers.vary).toContain('Origin');
+
+      const preflight = await request(app).options('/api/v1/health/live')
+        .set('Origin', 'http://localhost:5173')
+        .set('Access-Control-Request-Method', 'GET');
+      expect(preflight.headers['access-control-allow-origin']).toBe('http://localhost:5173');
+      expect(preflight.headers).not.toHaveProperty('access-control-allow-credentials');
+
+      const authSession = await request(app).get('/api/auth/session')
+        .set('Origin', 'http://localhost:5173');
+      expect(authSession.headers['access-control-allow-origin']).toBe('http://localhost:5173');
+      expect(authSession.headers).not.toHaveProperty('access-control-allow-credentials');
 
       const notListed = await request(app).get('/api/v1/health/live')
         .set('Origin', 'http://localhost:8080');
       expect(notListed.headers).not.toHaveProperty('access-control-allow-origin');
+
+      // Each app keeps a stable policy even if another test changes env later.
+      env.corsOrigins.splice(0, env.corsOrigins.length, 'https://other.example');
+      env.trustedOrigins.splice(0, env.trustedOrigins.length, 'http://localhost:5173');
+      const original = await request(app).get('/api/v1/health/live')
+        .set('Origin', 'http://localhost:5173');
+      expect(original.headers['access-control-allow-origin']).toBe('http://localhost:5173');
+      expect(original.headers).not.toHaveProperty('access-control-allow-credentials');
+      const laterOrigin = await request(app).get('/api/v1/health/live')
+        .set('Origin', 'https://other.example');
+      expect(laterOrigin.headers).not.toHaveProperty('access-control-allow-origin');
+
+      env.corsOrigins.splice(0, env.corsOrigins.length, 'http://localhost:5173');
+      const credentialed = await request(createApp()).get('/api/v1/health/live')
+        .set('Origin', 'http://localhost:5173');
+      expect(credentialed.headers['access-control-allow-origin']).toBe('http://localhost:5173');
+      expect(credentialed.headers['access-control-allow-credentials']).toBe('true');
     } finally {
       env.corsOrigins.splice(0, env.corsOrigins.length, ...configuredCors);
       env.trustedOrigins.splice(0, env.trustedOrigins.length, ...configuredTrusted);
