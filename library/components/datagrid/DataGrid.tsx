@@ -15,6 +15,7 @@ export interface DataGridProps<T> {
   data: T[];
   /** Unique, stable identity for each row, including across immutable updates. */
   getRowKey: (row: T) => React.Key;
+  /** Fixed pixel pitch for virtual rows; change this prop instead of overriding row height in CSS. */
   rowHeight?: number;
   height?: number;
   style?: React.CSSProperties;
@@ -22,47 +23,83 @@ export interface DataGridProps<T> {
 
 export function DataGrid<T>({ columns, data, getRowKey, rowHeight = 36, height = 360, style }: DataGridProps<T>) {
   const containerRef = React.useRef<HTMLDivElement | null>(null);
+  const headerRef = React.useRef<HTMLDivElement | null>(null);
+  const bodyRef = React.useRef<HTMLDivElement | null>(null);
   const buffer = 5;
+  const layoutRef = React.useRef({ headerHeight: 0, viewportHeight: height, rowCount: data.length, maxScrollTop: 0 });
 
-  // Track viewport bounds independently of data length so insertions do not
-  // temporarily omit (and unmount) rows before an effect updates the range.
+  // Keep the range independent of data length so insertions do not briefly
+  // unmount rows that remain in the viewport.
   const [scrollRange, setScrollRange] = React.useState({
     start: 0,
     end: Math.ceil(height / rowHeight) + buffer
   });
 
-  // Re-read scrollTop on length changes because the browser may clamp it
-  // when the scrollable content shrinks.
-  React.useEffect(() => {
-    const visibleCount = Math.ceil(height / rowHeight);
-    if (containerRef.current) {
-      const scrollTop = containerRef.current.scrollTop;
-      const start = Math.floor(scrollTop / rowHeight);
-      const boundedStart = Math.max(0, start - buffer);
-      const boundedEnd = start + visibleCount + buffer;
-      setScrollRange({ start: boundedStart, end: boundedEnd });
-    } else {
-      setScrollRange({ start: 0, end: visibleCount + buffer });
-    }
-  }, [data.length, height, rowHeight, buffer]);
-
   const totalHeight = data.length * rowHeight;
 
-  const handleScroll = React.useCallback((e: React.UIEvent<HTMLDivElement>) => {
-    const scrollTop = e.currentTarget.scrollTop;
+  const updateScrollRange = React.useCallback(() => {
+    const viewport = containerRef.current;
+    if (!viewport) return;
+
+    const { headerHeight, viewportHeight, maxScrollTop } = layoutRef.current;
+    const scrollTop = Math.min(Math.max(0, viewport.scrollTop), maxScrollTop);
+    // The sticky header occupies the top of the viewport. The body follows it
+    // in normal flow, so its visible rows run from scrollTop to the viewport
+    // bottom minus the measured header height.
     const start = Math.floor(scrollTop / rowHeight);
-    const visibleCount = Math.ceil(height / rowHeight);
-    
     const boundedStart = Math.max(0, start - buffer);
-    const boundedEnd = start + visibleCount + buffer;
-    
+    const boundedEnd = Math.max(start, Math.ceil((scrollTop + viewportHeight - headerHeight) / rowHeight)) + buffer;
+
     setScrollRange(prev => {
       if (prev.start !== boundedStart || prev.end !== boundedEnd) {
         return { start: boundedStart, end: boundedEnd };
       }
       return prev;
     });
-  }, [height, rowHeight, buffer]);
+  }, [rowHeight, buffer]);
+
+  const refreshScrollBounds = React.useCallback(() => {
+    const viewport = containerRef.current;
+    if (!viewport) return;
+
+    // scrollHeight includes the header and any CSS border or padding applied
+    // to the canvas. jsdom has no layout, so tests use the fixed row pitch.
+    const contentHeight = viewport.scrollHeight || layoutRef.current.headerHeight + layoutRef.current.rowCount * rowHeight;
+    layoutRef.current.maxScrollTop = Math.max(0, contentHeight - layoutRef.current.viewportHeight);
+  }, [rowHeight]);
+
+  const measureLayout = React.useCallback(() => {
+    const viewport = containerRef.current;
+    const header = headerRef.current;
+    if (!viewport || !header) return;
+
+    layoutRef.current.headerHeight = header.getBoundingClientRect().height;
+    layoutRef.current.viewportHeight = viewport.clientHeight || height;
+    refreshScrollBounds();
+    updateScrollRange();
+  }, [height, refreshScrollBounds, updateScrollRange]);
+
+  // Recalculate after content changes, even if the browser has not delivered
+  // the scroll event caused by clamping a now-shorter body.
+  React.useLayoutEffect(() => {
+    layoutRef.current.rowCount = data.length;
+    refreshScrollBounds();
+    updateScrollRange();
+  }, [data.length, refreshScrollBounds, updateScrollRange]);
+
+  // Measurements change with theme, responsive layout, and zoom. Keep the
+  // observer independent of data and column identities; scrolling uses the
+  // cached dimensions instead of forcing a fresh layout measurement.
+  React.useLayoutEffect(() => {
+    measureLayout();
+    if (typeof ResizeObserver === 'undefined') return;
+
+    const observer = new ResizeObserver(measureLayout);
+    if (headerRef.current) observer.observe(headerRef.current);
+    if (containerRef.current) observer.observe(containerRef.current);
+    if (bodyRef.current) observer.observe(bodyRef.current, { box: 'border-box' });
+    return () => observer.disconnect();
+  }, [measureLayout]);
 
   const visibleRows = React.useMemo(() => {
     const rows = [];
@@ -77,7 +114,7 @@ export function DataGrid<T>({ columns, data, getRowKey, rowHeight = 36, height =
   return (
     <div
       ref={containerRef}
-      onScroll={handleScroll}
+      onScroll={updateScrollRange}
       className="scroll-container"
       style={{
         position: 'relative',
@@ -91,6 +128,7 @@ export function DataGrid<T>({ columns, data, getRowKey, rowHeight = 36, height =
       }}
     >
       <div
+        ref={headerRef}
         style={{
           position: 'sticky',
           top: 0,
@@ -100,7 +138,8 @@ export function DataGrid<T>({ columns, data, getRowKey, rowHeight = 36, height =
           backgroundColor: 'var(--color-base50)',
           borderBottom: '1px solid var(--border-subtle)',
           display: 'flex',
-          height: `${rowHeight}px`,
+          minHeight: `${rowHeight}px`,
+          boxSizing: 'border-box',
           alignItems: 'center',
           fontWeight: 500,
           fontSize: '13px',
@@ -114,16 +153,17 @@ export function DataGrid<T>({ columns, data, getRowKey, rowHeight = 36, height =
         ))}
       </div>
 
-      <div style={{ position: 'relative', height: `${totalHeight + rowHeight}px`, width: '100%' }}>
+      <div ref={bodyRef} style={{ position: 'relative', height: `${totalHeight}px`, width: '100%' }}>
         {visibleRows.map((row) => (
           <div
             key={getRowKey(row.item)}
             style={{
               position: 'absolute',
-              top: `${row.index * rowHeight + rowHeight}px`,
+              top: `${row.index * rowHeight}px`,
               left: 0,
               right: 0,
               height: `${rowHeight}px`,
+              boxSizing: 'border-box',
               display: 'flex',
               alignItems: 'center',
               borderBottom: '1px solid var(--border-subtle)',
