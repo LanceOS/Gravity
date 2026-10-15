@@ -1,5 +1,6 @@
 import { bigint, index, pgTable, primaryKey, jsonb, text, timestamp, check, type AnyPgColumn } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
+import { cycles } from '../workspaces/schema.js';
 
 // No foreign key: deleting a project must not release its external identities.
 export const ticketKeyCounters = pgTable('ticket_key_counters', {
@@ -16,7 +17,7 @@ export const tickets = pgTable('tickets', {
   priority: text('priority').notNull().default('no_priority'),
   assigneeId: text('assignee_id'),
   projectId: text('project_id').notNull(),
-  cycleId: text('cycle_id'),
+  cycleId: text('cycle_id').references(() => cycles.id, { onDelete: 'restrict' }),
   parentId: text('parent_id').references((): AnyPgColumn => tickets.id),
   prStatus: text('pr_status').notNull().default('none'),
   prUrl: text('pr_url'),

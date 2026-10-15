@@ -1089,6 +1089,8 @@ async function bootstrapDatabase() {
     'FOREIGN KEY (ticket_id) REFERENCES tickets(id) ON DELETE CASCADE' + ticketFkValidation);
   await ensureConstraint('ticket_labels', 'ticket_labels_ticket_id_tickets_id_fk',
     'FOREIGN KEY (ticket_id) REFERENCES tickets(id) ON DELETE CASCADE' + ticketFkValidation);
+  await ensureConstraint('tickets', 'tickets_cycle_id_cycles_id_fk',
+    'FOREIGN KEY (cycle_id) REFERENCES cycles(id) ON DELETE RESTRICT' + ticketFkValidation);
   await migrateTicketKeyCounters(pool, env.databaseUrl.startsWith('pgmem://'));
   // Legacy REST routes could create edges across workspaces. Run this after
   // project backfills and before the server starts accepting requests.
