@@ -143,6 +143,8 @@ function renderSettingsPage(overrides: Partial<Parameters<typeof SettingsPage>[0
     onRevokeInvite: vi.fn().mockResolvedValue(true),
     onApproveJoinRequest: vi.fn().mockResolvedValue(true),
     onExportTasks: vi.fn().mockResolvedValue(true),
+    onExportNotes: vi.fn().mockResolvedValue(true),
+    onCancelExportNotes: vi.fn(),
   };
 
   const props = { ...baseProps, ...overrides };
@@ -387,18 +389,20 @@ describe('SettingsPage', () => {
       exportError: 'Export failed.',
     });
 
-    await user.click(screen.getByRole('button', { name: /Download task audit data/i }));
+    await user.click(screen.getByRole('button', { name: /Download task and note audit data/i }));
     expect(screen.getByText('Export failed.')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Export Tasks' }));
     expect(props.onExportTasks).toHaveBeenCalledTimes(1);
+    await user.click(screen.getByRole('button', { name: 'Export Notes' }));
+    expect(props.onExportNotes).toHaveBeenCalledTimes(1);
 
     unmount();
     renderSettingsPage({
       workspace: { ...workspace, memberRole: 'member' },
     });
 
-    expect(screen.queryByRole('button', { name: /Download task audit data/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Download task and note audit data/i })).not.toBeInTheDocument();
   });
 
   it('renders all sections stacked on mobile viewport', () => {

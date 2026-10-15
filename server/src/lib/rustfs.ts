@@ -187,11 +187,12 @@ export class RustFS {
   /**
    * Retrieves a file from the specified bucket path as a stream.
    */
-  static async streamFile(bucketPath: string, filename: string): Promise<NodeJS.ReadableStream> {
+  static async streamFile(bucketPath: string, filename: string, etag?: string): Promise<NodeJS.ReadableStream> {
     const key = `${bucketPath}/${filename}`;
     const command = new GetObjectCommand({
       Bucket: env.rustfsBucket,
       Key: key,
+      IfMatch: etag,
     });
     try {
       const response = await s3Client.send(command);

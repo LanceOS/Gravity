@@ -41,6 +41,19 @@ export const workspaceMemberActivity = pgTable(
   }),
 );
 
+export const workspaceNoteExportEvents = pgTable('workspace_note_export_events', {
+  id: text('id').primaryKey(),
+  workspaceId: text('workspace_id').notNull(),
+  actorUserId: text('actor_user_id').notNull(),
+  status: text('status').notNull(),
+  startedAt: timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
+  finishedAt: timestamp('finished_at', { withTimezone: true }),
+  noteCount: integer('note_count').notNull().default(0),
+  attachmentCount: integer('attachment_count').notNull().default(0),
+  diagnosticCount: integer('diagnostic_count').notNull().default(0),
+  error: text('error'),
+}, table => ({ workspaceIdStartedAtIdx: index('workspace_note_export_events_workspace_started_idx').on(table.workspaceId, table.startedAt) }));
+
 export const workspaceSettings = pgTable('workspace_settings', {
   workspaceId: text('workspace_id').primaryKey(),
   hostUrl: text('host_url').notNull().default(''),

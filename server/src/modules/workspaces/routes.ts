@@ -59,6 +59,7 @@ import { getToolDefinition, listCanonicalTools } from '../mcp/tools.js';
 import { getMcpWorkspaceRole } from '../mcp/access.js';
 import { getToolPolicyParents } from '../mcp/policy.js';
 import { env } from '../../env.js';
+import { streamWorkspaceNoteExport } from './services/note-export.js';
 
 function getParamString(param?: string | string[] | undefined): string {
   if (typeof param === 'string') return param;
@@ -68,6 +69,8 @@ function getParamString(param?: string | string[] | undefined): string {
 
 const DEFAULT_WORKSPACE_INVITE_TTL_MS = 24 * 60 * 60 * 1000;
 const DEFAULT_WORKSPACE_INVITE_MAX_USES = 1;
+const activeWorkspaceNoteExports = new Set<string>();
+const MAX_ACTIVE_NOTE_EXPORTS = 2;
 const MCP_SCOPE_LIST = 'tools/list';
 const MCP_SCOPE_CALL = 'tools/call';
 const MCP_SCOPE_CALL_WILDCARD = 'tools/call:*';
@@ -1084,6 +1087,49 @@ export function createWorkspacesRouter() {
       if (!res.headersSent) {
         res.status(500).json({ error: exportError.message });
       }
+    }
+  });
+
+  router.get('/workspaces/:workspaceId/export/notes', async (req, res) => {
+    const workspaceId = getParamString(req.params.workspaceId);
+    if (!workspaceId) {
+      res.status(400).json({ error: 'Invalid workspace id.' });
+      return;
+    }
+    let exportSlotAcquired = false;
+    try {
+      const auth = await authorizeWorkspaceAccess(req, workspaceId);
+      if (!auth.allowed) {
+        res.status(auth.status).json({ error: auth.error });
+        return;
+      }
+      // Note privacy is per author in normal routes. This audit endpoint is a
+      // deliberate owner-only exception; admins and project owners cannot use it.
+      if (auth.workspaceRole !== 'owner') {
+        res.status(403).json({ error: 'Only workspace owners can export notes.' });
+        return;
+      }
+      if (activeWorkspaceNoteExports.has(workspaceId) || activeWorkspaceNoteExports.size >= MAX_ACTIVE_NOTE_EXPORTS) {
+        res.status(429).json({ error: 'A note export is already running. Please try again later.' });
+        return;
+      }
+      activeWorkspaceNoteExports.add(workspaceId);
+      exportSlotAcquired = true;
+      const abort = new AbortController();
+      res.once('close', () => { if (!res.writableEnded) abort.abort(); });
+      res.set('Cache-Control', 'no-store');
+      res.set('Pragma', 'no-cache');
+      res.set('X-Content-Type-Options', 'nosniff');
+      res.set('Content-Disposition', `attachment; filename="gravity-${toExportFilenameSegment(workspaceId)}-notes-${new Date().toISOString().slice(0, 10)}.jsonl"`);
+      res.type('application/x-ndjson');
+      const workspace = await streamWorkspaceNoteExport(res, workspaceId, auth.userId, abort.signal);
+      if (!workspace && !res.headersSent) res.status(404).json({ error: 'Workspace not found.' });
+    } catch (error) {
+      console.error('Failed to stream workspace note export:', error);
+      if (res.headersSent) res.destroy(error instanceof Error ? error : new Error('Note export failed'));
+      else res.status(500).json({ error: 'Failed to export notes.' });
+    } finally {
+      if (exportSlotAcquired) activeWorkspaceNoteExports.delete(workspaceId);
     }
   });
 

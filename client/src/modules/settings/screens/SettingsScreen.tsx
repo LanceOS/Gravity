@@ -34,8 +34,8 @@ const SETTINGS_CATEGORIES: Array<{
   },
   {
     id: 'export',
-    label: 'Export Tasks',
-    description: 'Download task audit data for this workspace.',
+    label: 'Export Data',
+    description: 'Download task and note audit data for this workspace.',
     icon: Download,
     ownerOnly: true,
   },
