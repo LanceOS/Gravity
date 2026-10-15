@@ -71,6 +71,8 @@ export const env = {
   objectStorageRequired: parsed.OBJECT_STORAGE_REQUIRED === 'true',
   redisUrl: parsed.REDIS_URL,
   redisEnabled: parsed.REDIS_ENABLED,
+  mcpTokenFailureMaxAttempts: parsed.MCP_TOKEN_FAILURE_MAX_ATTEMPTS,
+  mcpTokenFailureWindowMs: parsed.MCP_TOKEN_FAILURE_WINDOW_MS,
   betterAuthOldSecrets: splitList(parsed.BETTER_AUTH_OLD_SECRETS),
   betterAuthOldSecretsMap: (() => {
     const raw = splitList(parsed.BETTER_AUTH_OLD_SECRETS);

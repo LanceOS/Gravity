@@ -9,6 +9,7 @@ import { env } from '../../env.js';
 import { recordFailedAttempt, isBlocked, resetAttempts } from '../../lib/authThrottle.js';
 import { gravityOAuthProvider, isMcpOAuthEnabled, OAUTH_DISABLED_MESSAGE, oauthResourceUrl, oauthResourceMetadataUrl } from './oauth.js';
 import { getRequestSourceIp } from '../../lib/request-ip.js';
+import { securityAlert } from '../../lib/logger.js';
 
 export interface McpRouterDependencies {
   workspaceAccessService?: McpWorkspaceAccessService;
@@ -20,6 +21,19 @@ function requestWorkspaceId(req: Request) {
   const header = req.header('x-workspace-id')?.trim();
   const body = typeof req.body?.params?.workspaceId === 'string' ? req.body.params.workspaceId.trim() : undefined;
   return (typeof req.params.workspaceId === 'string' ? req.params.workspaceId : undefined) || header || body;
+}
+
+async function recordTokenFailure(ipKey: string) {
+  const count = await recordFailedAttempt(ipKey, env.mcpTokenFailureWindowMs).catch(() => 0);
+  // One alert at the threshold per counter window; never include an IP,
+  // workspace ID, or bearer value in security logs.
+  if (count === env.mcpTokenFailureMaxAttempts) {
+    securityAlert('security.mcp_token_verification_failures', {
+      count,
+      threshold: env.mcpTokenFailureMaxAttempts,
+      windowMs: env.mcpTokenFailureWindowMs,
+    });
+  }
 }
 
 /** Stateless Streamable HTTP with JSON responses and no server-initiated SSE. */
@@ -71,14 +85,15 @@ export class McpRouterFactory {
       // a session cookie. Ambient session authority must not bypass a token.
       let actorUserId = hasBearer || oauthTransport ? null : await resolveRequestActorUserId(req);
       if (hasBearer) {
-        if (!bearer) {
-          res.status(401).json({ error: 'Invalid token.' });
-          return;
-        }
         const ipKey = `ip:${getRequestSourceIp(req) ?? 'unknown'}`;
         // Guessed workspace IDs must not let unauthenticated callers lock out its users.
-        if (await isBlocked(ipKey)) {
+        if (await isBlocked(ipKey, env.mcpTokenFailureMaxAttempts, env.mcpTokenFailureWindowMs)) {
           res.status(429).json({ error: 'Too many authentication attempts; try later.' });
+          return;
+        }
+        if (!bearer) {
+          await recordTokenFailure(ipKey);
+          res.status(401).json({ error: 'Invalid token.' });
           return;
         }
         try {
@@ -88,7 +103,7 @@ export class McpRouterFactory {
           const token = oauthToken ? { generatedBy: String(oauthToken.extra?.actorUserId ?? ''), scopes: oauthToken.scopes }
             : await verifyAndConsumeToken(bearer, workspaceId, { sourceIp: getRequestSourceIp(req) });
           if (!token) {
-            await recordFailedAttempt(ipKey).catch(() => {});
+            await recordTokenFailure(ipKey);
             res.status(401).json({ error: 'Invalid or expired token.' });
             return;
           }
@@ -96,6 +111,7 @@ export class McpRouterFactory {
           actorUserId = token.generatedBy;
           tokenScopes = Array.isArray(token.scopes) ? token.scopes : [];
         } catch {
+          await recordTokenFailure(ipKey);
           res.status(401).json({ error: 'Invalid token.' });
           return;
         }

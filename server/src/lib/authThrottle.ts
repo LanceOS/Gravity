@@ -5,8 +5,27 @@ type AttemptRecord = { count: number; windowStart: number; expireAt: number };
 const store = new Map<string, AttemptRecord>();
 
 const DEFAULT_WINDOW_MS = 60_000;
-const DEFAULT_MAX_ATTEMPTS = 20;
+const DEFAULT_MAX_ATTEMPTS = 10;
 const CLEANUP_INTERVAL_MS = 60_000;
+
+// An EVAL runs both commands without a client-side interruption point. PTTL
+// also repairs counters left without an expiry by the previous INCR/EXPIRE path.
+const RECORD_FAILURE_SCRIPT = `
+local count = redis.call('INCR', KEYS[1])
+if redis.call('PTTL', KEYS[1]) < 0 then
+  redis.call('PEXPIRE', KEYS[1], ARGV[1])
+end
+return count
+`;
+
+const CHECK_FAILURE_SCRIPT = `
+local count = redis.call('GET', KEYS[1])
+if not count then return 0 end
+if redis.call('PTTL', KEYS[1]) < 0 then
+  redis.call('PEXPIRE', KEYS[1], ARGV[1])
+end
+return tonumber(count) or 0
+`;
 
 // Simple in-process metrics for throttle observability. Exported so tests
 // and lightweight telemetry integrations can read observed values.
@@ -19,7 +38,7 @@ function isRedisReady(): boolean {
   return !!client && (client as any).isOpen && (client as any).isReady;
 }
 
-async function redisKeyFor(key: string) {
+function redisKeyFor(key: string) {
   return `authThrottle:${key}`;
 }
 
@@ -36,12 +55,11 @@ export async function recordFailedAttempt(key: string, windowMs = DEFAULT_WINDOW
   // Try Redis first when available (preferred for cross-process throttling).
   if (isRedisReady()) {
     try {
-      const rKey = await redisKeyFor(key);
-      const count = (await (client as any).incr(rKey)) as number;
-      if (count === 1) {
-        // Set TTL for the window on first increment
-        await (client as any).expire(rKey, Math.ceil(windowMs / 1000));
-      }
+      const rKey = redisKeyFor(key);
+      const count = await client!.eval(RECORD_FAILURE_SCRIPT, {
+        keys: [rKey], arguments: [String(windowMs)],
+      });
+      if (typeof count !== 'number' || !Number.isSafeInteger(count) || count < 1) throw new Error('Invalid throttle counter');
       throttleMetrics.totalAttempts += 1;
       return count;
     } catch (err) {
@@ -52,7 +70,7 @@ export async function recordFailedAttempt(key: string, windowMs = DEFAULT_WINDOW
 
   const now = Date.now();
   const rec = store.get(key);
-  if (!rec || now > rec.expireAt) {
+  if (!rec || now >= rec.expireAt) {
     const newRec: AttemptRecord = { count: 1, windowStart: now, expireAt: now + windowMs };
     store.set(key, newRec);
     throttleMetrics.totalAttempts += 1;
@@ -68,9 +86,11 @@ export async function recordFailedAttempt(key: string, windowMs = DEFAULT_WINDOW
 export async function isBlocked(key: string, maxAttempts = DEFAULT_MAX_ATTEMPTS, windowMs = DEFAULT_WINDOW_MS) {
   if (isRedisReady()) {
     try {
-      const rKey = await redisKeyFor(key);
-      const raw = await (client as any).get(rKey);
-      const count = raw ? parseInt(raw, 10) : 0;
+      const rKey = redisKeyFor(key);
+      const count = await client!.eval(CHECK_FAILURE_SCRIPT, {
+        keys: [rKey], arguments: [String(windowMs)],
+      });
+      if (typeof count !== 'number' || !Number.isSafeInteger(count) || count < 0) throw new Error('Invalid throttle counter');
       const blocked = count >= maxAttempts;
       if (blocked) throttleMetrics.blockedEvents += 1;
       return blocked;
@@ -81,7 +101,7 @@ export async function isBlocked(key: string, maxAttempts = DEFAULT_MAX_ATTEMPTS,
 
   const rec = store.get(key);
   if (!rec) return false;
-  if (Date.now() > rec.expireAt) {
+  if (Date.now() >= rec.expireAt) {
     store.delete(key);
     return false;
   }
@@ -93,7 +113,7 @@ export async function isBlocked(key: string, maxAttempts = DEFAULT_MAX_ATTEMPTS,
 export async function resetAttempts(key: string) {
   if (isRedisReady()) {
     try {
-      const rKey = await redisKeyFor(key);
+      const rKey = redisKeyFor(key);
       await (client as any).del(rKey);
     } catch (err) {
       // best-effort

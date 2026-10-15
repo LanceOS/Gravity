@@ -78,3 +78,31 @@ describe('retired MCP agent command', () => {
     expect(env.mcpStdioActorUserId).toBe('actor-id');
   });
 });
+
+describe('MCP token verification throttle settings', () => {
+  it('uses conservative defaults and accepts deployment overrides', async () => {
+    const { env: defaults } = await import('../src/env.js');
+    expect(defaults.mcpTokenFailureMaxAttempts).toBe(10);
+    expect(defaults.mcpTokenFailureWindowMs).toBe(60_000);
+    vi.resetModules();
+    process.env.MCP_TOKEN_FAILURE_MAX_ATTEMPTS = '5';
+    process.env.MCP_TOKEN_FAILURE_WINDOW_MS = '30000';
+    const { env: tuned } = await import('../src/env.js');
+    expect(tuned.mcpTokenFailureMaxAttempts).toBe(5);
+    expect(tuned.mcpTokenFailureWindowMs).toBe(30_000);
+  });
+
+  it.each(['0', '-1', '1.5', '1001', 'not-a-number'])(
+    'rejects invalid attempt thresholds: %s', async value => {
+      process.env.MCP_TOKEN_FAILURE_MAX_ATTEMPTS = value;
+      await expect(import('../src/env.js')).rejects.toThrow('MCP_TOKEN_FAILURE_MAX_ATTEMPTS');
+    },
+  );
+
+  it.each(['0', '-1', '3600001', 'not-a-number'])(
+    'rejects invalid window durations: %s', async value => {
+      process.env.MCP_TOKEN_FAILURE_WINDOW_MS = value;
+      await expect(import('../src/env.js')).rejects.toThrow('MCP_TOKEN_FAILURE_WINDOW_MS');
+    },
+  );
+});

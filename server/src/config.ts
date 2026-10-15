@@ -57,6 +57,8 @@ const envSchema = z.object({
     if (s === 'false' || s === '0' || s === '') return false;
     return v;
   }, z.boolean()).default(false),
+  MCP_TOKEN_FAILURE_MAX_ATTEMPTS: z.coerce.number().int().positive().max(1000).default(10),
+  MCP_TOKEN_FAILURE_WINDOW_MS: z.coerce.number().int().positive().max(3_600_000).default(60_000),
   RUSTFS_ENDPOINT: z.string().default('http://localhost:9000'),
   RUSTFS_ACCESS_KEY: z.string().default('admin'),
   RUSTFS_SECRET_KEY: z.string().default('password'),
