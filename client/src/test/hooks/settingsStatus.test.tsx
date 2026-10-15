@@ -40,7 +40,7 @@ describe('settings persistence status', () => {
   it('keeps workspace edits on failure, permits retry, then becomes clean after confirmation', async () => {
     vi.mocked(apiClient.get).mockImplementation(async path => path.endsWith('/settings') ? { ...workspace } : [] as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any);
     const client = new QueryClient();
-    const { result } = renderHook(() => useWorkspaceSettings({ currentUser: user, activeWorkspaceId: workspace.workspaceId }), {
+    const { result } = renderHook(() => useWorkspaceSettings({ currentUser: user, activeWorkspaceId: workspace.workspaceId, canManageWorkspaceAccess: true }), {
       wrapper: ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>,
     });
     await waitFor(() => expect(result.current.settingsLoading).toBe(false));
@@ -93,7 +93,7 @@ describe('settings persistence status', () => {
 it('refreshes workspace settings after all local edits have been reverted', async () => {
   vi.mocked(apiClient.get).mockImplementation(async path => path.endsWith('/settings') ? { ...workspace } : [] as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any);
   const client = new QueryClient();
-  const { result } = renderHook(() => useWorkspaceSettings({ currentUser: user, activeWorkspaceId: workspace.workspaceId }), {
+  const { result } = renderHook(() => useWorkspaceSettings({ currentUser: user, activeWorkspaceId: workspace.workspaceId, canManageWorkspaceAccess: true }), {
     wrapper: ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>,
   });
   await waitFor(() => expect(result.current.settingsLoading).toBe(false));
@@ -109,7 +109,7 @@ it('refreshes workspace settings after all local edits have been reverted', asyn
 it('preserves a workspace revert made while a different value is being saved', async () => {
   vi.mocked(apiClient.get).mockImplementation(async path => path.endsWith('/settings') ? { ...workspace } : [] as /* eslint-disable-line @typescript-eslint/no-explicit-any -- This test supplies a partial mock or malformed fixture at a component/transport boundary. */ any);
   const client = new QueryClient();
-  const { result } = renderHook(() => useWorkspaceSettings({ currentUser: user, activeWorkspaceId: workspace.workspaceId }), {
+  const { result } = renderHook(() => useWorkspaceSettings({ currentUser: user, activeWorkspaceId: workspace.workspaceId, canManageWorkspaceAccess: true }), {
     wrapper: ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>,
   });
   await waitFor(() => expect(result.current.settingsLoading).toBe(false));

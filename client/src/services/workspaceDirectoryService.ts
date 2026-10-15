@@ -67,8 +67,9 @@ export class DefaultWorkspaceDirectoryService implements WorkspaceDirectoryServi
   }
 
   async requestJoinByInvite(userId: string, inviteCode: string, message?: string): Promise<{ status?: 'approved' | 'pending' } | void> {
-    return this.client.post<{ status?: 'approved' | 'pending' }>('/workspaces/invites/' + encodeURIComponent(inviteCode) + '/join-requests', {
+    return this.client.post<{ status?: 'approved' | 'pending' }>('/workspaces/invites/join-requests', {
       userId,
+      inviteCode,
       message: message || '',
     }, {
       headers: { 'Content-Type': 'application/json', },

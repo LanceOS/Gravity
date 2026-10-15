@@ -1135,6 +1135,33 @@ describe('AppShellPage', () => {
     });
   });
 
+  it('redeems an invite while onboarding is displayed', async () => {
+    const previousUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    const inviteCode = `WSP-${'B'.repeat(48)}`;
+    const requestJoinByInvite = vi.fn().mockResolvedValue(true);
+    const refreshWorkspaces = vi.fn().mockResolvedValue([]);
+    window.history.replaceState(null, '', `/#invite=${inviteCode}`);
+    mocks.fetch.mockImplementation((input: RequestInfo | URL) => {
+      const inputUrl = typeof input === 'string' ? input : input.toString();
+      if (inputUrl.includes('/api/v1/settings/')) return Promise.resolve(jsonResponse({ tutorialCompleted: false }));
+      return Promise.resolve(jsonResponse({ success: true }));
+    });
+
+    try {
+      renderAppShell({
+        tickets: buildUseTickets({ currentUser: makeCurrentUser() }),
+        directory: buildWorkspaceDirectory({ requestJoinByInvite, refreshWorkspaces }),
+        initialEntries: ['/workspaces'],
+      });
+      await waitFor(() => expect(screen.getByText('OnboardingModal')).toBeInTheDocument());
+      await waitFor(() => expect(requestJoinByInvite).toHaveBeenCalledTimes(1));
+      expect(requestJoinByInvite).toHaveBeenCalledWith(inviteCode);
+      expect(window.location.hash).toBe('');
+    } finally {
+      window.history.replaceState(null, '', previousUrl);
+    }
+  });
+
   it('returns to the board after reset and then completing onboarding from account preferences without remounting', async () => {
     const user = userEvent.setup();
     const accountState = {

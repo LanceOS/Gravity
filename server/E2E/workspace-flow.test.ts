@@ -124,11 +124,12 @@ describe('Server Workspaces Flow E2E', () => {
     expect(Array.isArray(resListInvites.body)).toBe(true);
     expect(resListInvites.body.some((inv: any) => inv.code === inviteCode)).toBe(true);
 
-    // 6. POST /api/v1/workspaces/invites/:code/join-requests to request to join
+    // 6. POST /api/v1/workspaces/invites/join-requests to request to join
     const resJoinRequest = await request(app)
-      .post(`/api/v1/workspaces/invites/${encodeURIComponent(inviteCode)}/join-requests`)
+      .post('/api/v1/workspaces/invites/join-requests')
       .set('x-user-id', collaboratorId)
       .send({
+        inviteCode,
         userId: collaboratorId,
         message: 'Requesting access for integration test.',
       });

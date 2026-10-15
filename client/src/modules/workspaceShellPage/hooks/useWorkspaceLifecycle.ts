@@ -9,7 +9,7 @@ import {
 import { useWorkspaceSelectionState } from './useWorkspaceSelectionState';
 import { normalizeInviteCode } from '../../../utils/workspace';
 
-const WORKSPACE_INVITE_TTL_MS = 5 * 60 * 1000;
+const WORKSPACE_INVITE_TTL_MS = 15 * 60 * 1000;
 
 type PendingWorkspaceInviteState = {
   code: string;
@@ -40,7 +40,9 @@ function consumePendingWorkspaceInvite(): string | null {
     return null;
   }
 
-  return pendingWorkspaceInviteState.code;
+  const code = pendingWorkspaceInviteState.code;
+  pendingWorkspaceInviteState = null;
+  return code;
 }
 
 function clearPendingWorkspaceInvite() {
@@ -100,7 +102,10 @@ export function usePendingWorkspaceInvite({
     if (typeof window === 'undefined') return;
 
     const urlParams = new URLSearchParams(window.location.search);
-    const invite = urlParams.get('invite');
+    const fragmentInvite = window.location.hash.startsWith('#invite=')
+      ? new URLSearchParams(window.location.hash.slice(1)).get('invite')
+      : null;
+    const invite = fragmentInvite || urlParams.get('invite');
     if (!invite) {
       return;
     }
@@ -108,6 +113,7 @@ export function usePendingWorkspaceInvite({
     storePendingWorkspaceInvite(invite);
     const url = new URL(window.location.href);
     url.searchParams.delete('invite');
+    if (fragmentInvite) url.hash = '';
     window.history.replaceState(window.history.state, document.title, `${url.pathname}${url.search}${url.hash}`);
   }, []);
 
@@ -122,14 +128,10 @@ export function usePendingWorkspaceInvite({
     }
 
     const runAutoJoin = async () => {
-    try {
       const success = await requestJoinByInvite(pendingInvite);
       if (success) {
         await refreshWorkspaces();
       }
-    } finally {
-      clearPendingWorkspaceInvite();
-    }
     };
     void runAutoJoin();
   }, [currentUser, requestJoinByInvite, refreshWorkspaces]);

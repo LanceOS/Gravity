@@ -19,6 +19,7 @@ const SETTINGS_CATEGORIES: Array<{
   description: string;
   icon: typeof Settings2;
   ownerOnly?: boolean;
+  managerOnly?: boolean;
 }> = [
   {
     id: 'overview',
@@ -44,6 +45,7 @@ const SETTINGS_CATEGORIES: Array<{
     label: 'Invites',
     description: 'Create invite links and review access entry points.',
     icon: Link2,
+    managerOnly: true,
   },
   {
     id: 'members',
@@ -56,6 +58,7 @@ const SETTINGS_CATEGORIES: Array<{
     label: 'Join Requests',
     description: 'Approve or review pending access requests.',
     icon: UserPlus,
+    managerOnly: true,
   },
 ];
 
@@ -76,7 +79,9 @@ export function SettingsScreen(props: SettingsScreenProps) {
   const [activeCategory, setActiveCategory] = useState<SettingsCategoryId>('overview');
   const isMobile = useIsMobile();
   const isWorkspaceOwner = workspace.memberRole === 'owner';
-  const visibleCategories = SETTINGS_CATEGORIES.filter((category) => !category.ownerOnly || isWorkspaceOwner);
+  const isWorkspaceManager = isWorkspaceOwner || workspace.memberRole === 'admin';
+  const visibleCategories = SETTINGS_CATEGORIES.filter((category) =>
+    (!category.ownerOnly || isWorkspaceOwner) && (!category.managerOnly || isWorkspaceManager));
 
   const activeCategoryMeta = visibleCategories.find((category) => category.id === activeCategory) || visibleCategories[0] || SETTINGS_CATEGORIES[0];
 
@@ -216,11 +221,11 @@ export function SettingsScreen(props: SettingsScreenProps) {
               </>
             )}
 
-            {(isMobile || activeCategory === 'access') && <AccessSection />}
+            {isWorkspaceManager && (isMobile || activeCategory === 'access') && <AccessSection />}
 
             {(isMobile || activeCategory === 'members') && <MembersSection />}
 
-            {(isMobile || activeCategory === 'requests') && <RequestsSection />}
+            {isWorkspaceManager && (isMobile || activeCategory === 'requests') && <RequestsSection />}
 
             {(isMobile || activeCategory === 'mcp_tools') && <McpToolsSection />}
 

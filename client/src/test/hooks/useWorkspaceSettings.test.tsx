@@ -47,6 +47,26 @@ describe('useWorkspaceSettings', () => {
     vi.unstubAllGlobals();
   });
 
+  it('does not fetch access data for a member', async () => {
+    const currentUser = { id: 'member-1', name: 'Member', email: 'member@example.com', avatar: '', role: 'member', tutorial_completed: 1 };
+    const fetchMock = vi.fn(async (input: string | URL | Request) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url.endsWith('/settings')) return jsonResponse({ workspaceId: 'workspace-1' });
+      if (url.endsWith('/members')) return jsonResponse([]);
+      throw new Error(`Unexpected access request: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const wrapper = ({ children }: { children: React.ReactNode }) => <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+    const { result } = renderHook(() => useWorkspaceSettings({
+      currentUser, activeWorkspaceId: 'workspace-1', canManageWorkspaceAccess: false,
+    }), { wrapper });
+    await waitFor(() => expect(result.current.settingsLoading).toBe(false));
+    expect(result.current.invites).toEqual([]);
+    expect(result.current.joinRequests).toEqual([]);
+    expect(fetchMock.mock.calls.some(([input]) => /\/(?:invites|join-requests)(?:\?|$)/.test(String(input)))).toBe(false);
+  });
+
   it.each(['disk write', 'manifest'] as const)('cancels the note response after a %s failure', async (failure) => {
     const currentUser = { id: 'owner-1', name: 'Owner', email: 'owner@example.com', avatar: '', role: 'owner', tutorial_completed: 1 };
     const cancelSource = vi.fn();
@@ -79,7 +99,7 @@ describe('useWorkspaceSettings', () => {
     vi.stubGlobal('fetch', fetchMock);
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const wrapper = ({ children }: { children: React.ReactNode }) => <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
-    const { result } = renderHook(() => useWorkspaceSettings({ currentUser, activeWorkspaceId: 'workspace-1' }), { wrapper });
+    const { result } = renderHook(() => useWorkspaceSettings({ currentUser, activeWorkspaceId: 'workspace-1', canManageWorkspaceAccess: true }), { wrapper });
     await waitFor(() => expect(result.current.settingsLoading).toBe(false));
     let succeeded = true;
     await act(async () => { succeeded = await result.current.exportNotes(); });
@@ -138,6 +158,7 @@ describe('useWorkspaceSettings', () => {
       useWorkspaceSettings({
         currentUser,
         activeWorkspaceId: 'workspace-1',
+        canManageWorkspaceAccess: true,
       }),
       { wrapper }
     );
@@ -214,6 +235,7 @@ describe('useWorkspaceSettings', () => {
       useWorkspaceSettings({
         currentUser,
         activeWorkspaceId: 'workspace-1',
+        canManageWorkspaceAccess: true,
       }),
       { wrapper }
     );
@@ -273,6 +295,7 @@ describe('useWorkspaceSettings', () => {
         useWorkspaceSettings({
           currentUser,
           activeWorkspaceId,
+          canManageWorkspaceAccess: true,
         }),
       { initialProps: { activeWorkspaceId: 'workspace-1' }, wrapper }
     );
@@ -343,6 +366,7 @@ describe('useWorkspaceSettings', () => {
         useWorkspaceSettings({
           currentUser,
           activeWorkspaceId,
+          canManageWorkspaceAccess: true,
         }),
       { initialProps: { activeWorkspaceId: 'workspace-1' }, wrapper }
     );

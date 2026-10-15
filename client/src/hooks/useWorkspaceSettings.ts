@@ -60,6 +60,7 @@ export interface WorkspaceJoinRequest {
 interface UseWorkspaceSettingsOptions {
   currentUser: User | null;
   activeWorkspaceId: string;
+  canManageWorkspaceAccess: boolean;
 }
 
 const defaultSettings = (workspaceId: string): WorkspaceAdminSettings => ({
@@ -106,7 +107,7 @@ function normalizeWorkspaceInvite(invite: Record<string, unknown>): WorkspaceInv
   };
 }
 
-export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWorkspaceSettingsOptions) {
+export function useWorkspaceSettings({ currentUser, activeWorkspaceId, canManageWorkspaceAccess }: UseWorkspaceSettingsOptions) {
   const queryClient = useQueryClient();
   const savingRef = useRef(false);
   const draftRevision = useRef(0);
@@ -122,6 +123,7 @@ export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWork
   const noteExportAbortRef = useRef<AbortController | null>(null);
 
   const enabled = !!currentUser && !!activeWorkspaceId;
+  const accessQueriesEnabled = enabled && canManageWorkspaceAccess;
   const userId = currentUser?.id;
 
   const buildHeaders = useCallback(() => {
@@ -203,7 +205,7 @@ export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWork
     },
     staleTime: CACHE_CONFIGS.workspaceInvites.staleTime,
     gcTime: CACHE_CONFIGS.workspaceInvites.gcTime,
-    enabled,
+    enabled: accessQueriesEnabled,
   });
 
   // Workspace Join Requests Query
@@ -224,7 +226,7 @@ export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWork
     },
     staleTime: CACHE_CONFIGS.workspaceJoinRequests.staleTime,
     gcTime: CACHE_CONFIGS.workspaceJoinRequests.gcTime,
-    enabled,
+    enabled: accessQueriesEnabled,
   });
 
   // Combine query loading states
@@ -238,10 +240,9 @@ export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWork
     await Promise.all([
       settingsQuery.refetch(),
       membersQuery.refetch(),
-      invitesQuery.refetch(),
-      joinRequestsQuery.refetch(),
+      ...(canManageWorkspaceAccess ? [invitesQuery.refetch(), joinRequestsQuery.refetch()] : []),
     ]);
-  }, [settingsQuery, membersQuery, invitesQuery, joinRequestsQuery]);
+  }, [settingsQuery, membersQuery, invitesQuery, joinRequestsQuery, canManageWorkspaceAccess]);
 
   // --- Success timer helper ---
   useEffect(() => {
@@ -588,9 +589,9 @@ export function useWorkspaceSettings({ currentUser, activeWorkspaceId }: UseWork
     saveSuccess,
     saveError,
     members: membersQuery.data || [],
-    invites: invitesQuery.data || [],
+    invites: canManageWorkspaceAccess ? invitesQuery.data || [] : [],
     invitesLoading: invitesQuery.isLoading,
-    joinRequests: joinRequestsQuery.data || [],
+    joinRequests: canManageWorkspaceAccess ? joinRequestsQuery.data || [] : [],
     inviteLoading: createInviteMutation.isPending,
     inviteError,
     approveLoadingId: approveJoinRequestMutation.isPending ? approveJoinRequestMutation.variables : null,

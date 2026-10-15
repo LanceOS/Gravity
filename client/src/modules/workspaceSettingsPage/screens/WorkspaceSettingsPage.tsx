@@ -68,6 +68,7 @@ export function WorkspaceSettingsPageRoute() {
   } = useWorkspaceSettings({
     currentUser,
     activeWorkspaceId: workspaceId,
+    canManageWorkspaceAccess: activeWorkspace?.memberRole === 'owner' || activeWorkspace?.memberRole === 'admin',
   });
 
   const {

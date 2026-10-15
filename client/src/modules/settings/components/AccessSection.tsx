@@ -8,12 +8,16 @@ import { COPY_FEEDBACK_STORAGE_KEY } from '../../../constants/storage';
 const COPY_FEEDBACK_DURATION_MS = 2200;
 
 function getInviteStateLabel(invite: WorkspaceInvite) {
+  if (invite.useCount > 0) return 'Used';
   if (invite.revokedAt) return 'Revoked';
+  if (!/^WSP-[A-F0-9]{48}$/.test(invite.code)) return 'Expired';
+  if (!invite.expiresAt || new Date(invite.expiresAt).getTime() <= Date.now()) return 'Expired';
+  if (new Date(invite.createdAt).getTime() + 15 * 60 * 1000 <= Date.now()) return 'Expired';
   return 'Active';
 }
 
 function getInviteStateVariant(invite: WorkspaceInvite): 'accent' | 'success' | 'error' | 'warning' | 'default' {
-  if (invite.revokedAt) return 'error';
+  if (getInviteStateLabel(invite) !== 'Active') return 'error';
   return 'success';
 }
 
@@ -23,11 +27,12 @@ export function AccessSection(): React.ReactNode {
 
   const latestInvite = invites[0] ?? null;
   const [label, setLabel] = useState('');
+  const [pendingCopy, setPendingCopy] = useState<{ key: string; value: string } | null>(null);
   const { copy, copiedKey: copiedField, error: copyError } = useCopyToClipboard({
     resetAfterMs: COPY_FEEDBACK_DURATION_MS,
     storageKey: COPY_FEEDBACK_STORAGE_KEY,
   });
-  const handleCopy = (key: string, value: string) => copy(value, key);
+  const handleCopy = (key: string, value: string) => setPendingCopy({ key, value });
 
   const handleCreateInvite = async () => {
     const success = await onCreateInvite({
@@ -43,7 +48,7 @@ export function AccessSection(): React.ReactNode {
   };
 
   const getInviteLink = (code: string) => {
-    return `${window.location.origin}/?invite=${code}`;
+    return `${window.location.origin}/#invite=${encodeURIComponent(code)}`;
   };
 
   return (
@@ -81,6 +86,13 @@ export function AccessSection(): React.ReactNode {
         </div>
 
         {copyError && <p role="alert">Unable to copy. Please select and copy the invite manually.</p>}
+        {pendingCopy && (
+          <div role="alert">
+            <p>This one-use invite expires after 15 minutes. Your clipboard may be visible to other apps. Share it only with the intended recipient.</p>
+            <Button variant="default" size="xs" onClick={() => { void copy(pendingCopy.value, pendingCopy.key); setPendingCopy(null); }}>Copy invite</Button>
+            <Button variant="default" size="xs" onClick={() => setPendingCopy(null)}>Cancel</Button>
+          </div>
+        )}
 
         {latestInvite && (
           <Stack gap="var(--space-md)" style={{ padding: 'var(--space-md)', borderRadius: 'var(--radius-md)', background: 'rgba(170, 59, 255, 0.02)', border: '1px solid rgba(170, 59, 255, 0.15)' }}>
@@ -96,12 +108,12 @@ export function AccessSection(): React.ReactNode {
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-sm)', padding: 'var(--space-md)', borderRadius: 'var(--radius-md)', background: 'var(--color-base100)', border: '1px solid var(--color-border-default)' }}>
               <span style={{ fontSize: '10px', fontWeight: 600, color: 'var(--color-text-disabled)', textTransform: 'uppercase' }}>Invite URL</span>
-              <span style={{ fontSize: '12px', color: 'var(--color-text-primary)', fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{getInviteLink(latestInvite.code)}</span>
+              <span style={{ fontSize: '12px', color: 'var(--color-text-primary)', fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{getInviteStateLabel(latestInvite) === 'Active' ? getInviteLink(latestInvite.code) : 'This invite can no longer be used.'}</span>
               <div style={{ display: 'flex', gap: 'var(--space-sm)', marginTop: 'var(--space-xs)' }}>
-                <Button variant="default" size="xs" onClick={() => void handleCopy('invite-url', getInviteLink(latestInvite.code))}>
+                <Button variant="default" size="xs" disabled={getInviteStateLabel(latestInvite) !== 'Active'} onClick={() => handleCopy('invite-url', getInviteLink(latestInvite.code))}>
                   {copiedField === 'invite-url' ? 'Copied URL' : 'Copy Invite URL'}
                 </Button>
-                <Button variant="default" size="xs" onClick={() => void handleCopy('invite-code', latestInvite.code)}>
+                <Button variant="default" size="xs" disabled={getInviteStateLabel(latestInvite) !== 'Active'} onClick={() => handleCopy('invite-code', latestInvite.code)}>
                   {copiedField === 'invite-code' ? 'Copied Code' : 'Copy Code Only'}
                 </Button>
               </div>
@@ -152,7 +164,6 @@ export function AccessSection(): React.ReactNode {
                 <div>
                   <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-primary)' }}>{invite.label || 'No Label'}</div>
                   <div style={{ fontSize: '11px', color: 'var(--color-text-disabled)', marginTop: '4px', display: 'flex', flexWrap: 'wrap', gap: 'var(--space-md)' }}>
-                    <span>Code: {invite.code}</span>
                     <span>Used: {invite.useCount}</span>
                     <span>Created by: {invite.createdByName}</span>
                   </div>
@@ -162,7 +173,7 @@ export function AccessSection(): React.ReactNode {
                   <Badge variant={getInviteStateVariant(invite)}>
                     {getInviteStateLabel(invite)}
                   </Badge>
-                  <Button variant="default" size="xs" onClick={() => void handleCopy(`invite-row-${invite.id}`, getInviteLink(invite.code))}>
+                  <Button variant="default" size="xs" disabled={getInviteStateLabel(invite) !== 'Active'} onClick={() => handleCopy(`invite-row-${invite.id}`, getInviteLink(invite.code))}>
                     {copiedField === `invite-row-${invite.id}` ? 'Copied' : 'Copy Link'}
                   </Button>
                   {!invite.revokedAt && (

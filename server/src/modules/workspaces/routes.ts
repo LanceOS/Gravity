@@ -67,7 +67,7 @@ function getParamString(param?: string | string[] | undefined): string {
   return '';
 }
 
-const DEFAULT_WORKSPACE_INVITE_TTL_MS = 24 * 60 * 60 * 1000;
+const DEFAULT_WORKSPACE_INVITE_TTL_MS = 15 * 60 * 1000;
 const DEFAULT_WORKSPACE_INVITE_MAX_USES = 1;
 const activeWorkspaceNoteExports = new Set<string>();
 const MAX_ACTIVE_NOTE_EXPORTS = 2;
@@ -730,6 +730,13 @@ async function buildMcpConnectionResponse(
 
 export function createWorkspacesRouter() {
   const router = Router();
+  router.use((req, res, next) => {
+    if (/^\/workspaces\/(?:invites\/join-requests|[^/]+\/invites(?:\/[^/]+\/revoke)?)$/.test(req.path)) {
+      res.set('Referrer-Policy', 'no-referrer');
+      res.set('Cache-Control', 'no-store');
+    }
+    next();
+  });
   // Basic rate limiters: per-user (or per-ip fallback) and per-ip
   const createLimiter = env.redisEnabled ? createRedisRateLimiter : createRateLimiter;
   const connectionUserKey = async (req: Request) => {
@@ -1366,6 +1373,11 @@ export function createWorkspacesRouter() {
 
   router.get('/workspaces/:workspaceId/invites', async (req, res) => {
     try {
+      const auth = await authorizeWorkspaceOwnerOrAdminAccess(req, getParamString(req.params.workspaceId));
+      if (!auth.allowed) {
+        res.status(auth.status).json({ error: auth.error });
+        return;
+      }
       const invites = await db
         .select({
           id: workspaceInvites.id,
@@ -1792,13 +1804,20 @@ export function createWorkspacesRouter() {
     }
   });
 
-  router.post('/workspaces/invites/:inviteCode/join-requests', async (req, res) => {
-    const inviteCode = Array.isArray(req.params.inviteCode) ? req.params.inviteCode[0] : (req.params.inviteCode as string);
-    const { message } = req.body ?? {};
+  router.post('/workspaces/invites/join-requests', async (req, res) => {
+    const { inviteCode, message } = req.body ?? {};
+    if (typeof inviteCode !== 'string' || !inviteCode.trim()) {
+      res.status(400).json({ error: 'Invite code is required.' });
+      return;
+    }
     const userId = await resolveRequestActorUserId(req);
     
     if (!userId) {
       res.status(401).json({ error: 'Authentication required.' });
+      return;
+    }
+    if (!/^WSP-[A-F0-9]{48}$/.test(inviteCode)) {
+      res.status(400).json({ error: 'This invite has expired.' });
       return;
     }
 
@@ -1807,6 +1826,7 @@ export function createWorkspacesRouter() {
         .select({
           id: workspaceInvites.id,
           workspaceId: workspaceInvites.workspaceId,
+          createdAt: workspaceInvites.createdAt,
           revokedAt: workspaceInvites.revokedAt,
           expiresAt: workspaceInvites.expiresAt,
           maxUses: workspaceInvites.maxUses,
@@ -1828,11 +1848,10 @@ export function createWorkspacesRouter() {
         return;
       }
       const normalizedMaxUses = normalizeWorkspaceInviteMaxUses(invite.maxUses);
-      const inviteExpiresAt = invite.expiresAt
-        ? new Date(String(invite.expiresAt))
-        : getDefaultWorkspaceInviteExpiresAt();
+      const inviteExpiresAt = invite.expiresAt ? new Date(String(invite.expiresAt)) : null;
 
-      if (inviteExpiresAt.getTime() < Date.now()) {
+      if (!inviteExpiresAt || inviteExpiresAt.getTime() <= Date.now() ||
+          new Date(invite.createdAt).getTime() + DEFAULT_WORKSPACE_INVITE_TTL_MS <= Date.now()) {
         res.status(400).json({ error: 'This invite has expired.' });
         return;
       }
@@ -1879,22 +1898,24 @@ export function createWorkspacesRouter() {
           const consumeRows = await tx
             .update(workspaceInvites)
             .set({
-              expiresAt: inviteExpiresAt,
-              maxUses: normalizedMaxUses,
+              revokedAt: requestCreatedAt,
               useCount: sql`${workspaceInvites.useCount} + 1`,
             })
             .where(
               and(
                 eq(workspaceInvites.id, String(invite.id)),
                 isNull(workspaceInvites.revokedAt),
-                invite.expiresAt ? sql`${workspaceInvites.expiresAt} > NOW()` : sql`true`,
+                // NOW() is fixed at transaction start in PostgreSQL. Check the
+                // actual clock after any wait for a concurrent row update.
+                sql`${workspaceInvites.expiresAt} > clock_timestamp()`,
+                gt(workspaceInvites.createdAt, new Date(Date.now() - DEFAULT_WORKSPACE_INVITE_TTL_MS)),
                 sql`${workspaceInvites.useCount} < ${normalizedMaxUses}`,
               ),
             )
             .returning({ id: workspaceInvites.id });
 
           if (consumeRows.length === 0) {
-            throw new Error('INVITE_USAGE_LIMIT');
+            throw new Error('INVITE_NO_LONGER_AVAILABLE');
           }
 
           await tx.insert(workspaceJoinRequests).values({
@@ -1918,8 +1939,26 @@ export function createWorkspacesRouter() {
           }
         });
       } catch (consumeError) {
-        if (consumeError instanceof Error && consumeError.message === 'INVITE_USAGE_LIMIT') {
-          res.status(400).json({ error: 'This invite has reached its usage limit.' });
+        if (consumeError instanceof Error && consumeError.message === 'INVITE_NO_LONGER_AVAILABLE') {
+          const [current] = await db.select({
+            createdAt: workspaceInvites.createdAt,
+            expiresAt: workspaceInvites.expiresAt,
+            revokedAt: workspaceInvites.revokedAt,
+            maxUses: workspaceInvites.maxUses,
+            useCount: workspaceInvites.useCount,
+          }).from(workspaceInvites).where(eq(workspaceInvites.id, String(invite.id))).limit(1);
+          if (!current) {
+            res.status(404).json({ error: 'Invite not found.' });
+          } else if (!current.expiresAt || current.expiresAt.getTime() <= Date.now() ||
+              current.createdAt.getTime() + DEFAULT_WORKSPACE_INVITE_TTL_MS <= Date.now()) {
+            res.status(400).json({ error: 'This invite has expired.' });
+          } else if (current.useCount >= normalizeWorkspaceInviteMaxUses(current.maxUses)) {
+            res.status(400).json({ error: 'This invite has reached its usage limit.' });
+          } else if (current.revokedAt) {
+            res.status(400).json({ error: 'This invite has been revoked.' });
+          } else {
+            res.status(409).json({ error: 'This invite is no longer available.' });
+          }
           return;
         }
         throw consumeError;
@@ -1951,8 +1990,8 @@ export function createWorkspacesRouter() {
         reviewedAt: autoJoin ? requestCreatedAt.toISOString() : null,
         createdAt: requestCreatedAt.toISOString(),
       });
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to create join request.' });
+    } catch {
+      res.status(500).json({ error: 'Failed to create join request.' });
     }
   });
 

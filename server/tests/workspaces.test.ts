@@ -1,7 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { api, createAuthenticatedApi, seedWorkspaceFixture } from './helpers/test-helpers.js';
 import { db } from '../src/db/index.js';
-import { projectMembers, projects, tickets, workspaceMembers } from '../src/db/schema.js';
+import { projectMembers, projects, tickets, workspaceInvites, workspaceMembers } from '../src/db/schema.js';
+import { eq } from 'drizzle-orm';
 import { getDefaultTeamId } from '../src/modules/workspaces/utils/default-team.js';
 
 describe('workspaces routes', () => {
@@ -197,8 +198,8 @@ describe('workspaces routes', () => {
     const applicant = applicantApi.user;
 
     const joinRequestResponse = await applicantApi
-      .post(`/api/v1/workspaces/invites/${inviteResponse.body.code}/join-requests`)
-      .send({ message: 'Requesting access to the workspace.' });
+      .post('/api/v1/workspaces/invites/join-requests')
+      .send({ inviteCode: inviteResponse.body.code, message: 'Requesting access to the workspace.' });
 
     expect(joinRequestResponse.status).toBe(201);
     expect(joinRequestResponse.body).toMatchObject({
@@ -207,7 +208,7 @@ describe('workspaces routes', () => {
       status: 'pending',
     });
 
-    const listInvitesResponse = await api().get(`/api/v1/workspaces/${workspace.id}/invites`);
+    const listInvitesResponse = await ownerApi.get(`/api/v1/workspaces/${workspace.id}/invites`);
     expect(listInvitesResponse.status).toBe(200);
     expect(listInvitesResponse.body).toEqual([
       expect.objectContaining({
@@ -238,6 +239,115 @@ describe('workspaces routes', () => {
       reviewedBy: owner.id,
     });
 
+  });
+
+  it('keeps invite codes out of API paths and permits one atomic redemption', async () => {
+    const ownerApi = await createAuthenticatedApi({ email: 'invite-owner@example.com', role: 'owner' });
+    const firstApi = await createAuthenticatedApi({ email: 'invite-first@example.com' });
+    const secondApi = await createAuthenticatedApi({ email: 'invite-second@example.com' });
+    const { workspace } = await seedWorkspaceFixture({ owner: ownerApi.user });
+    const url = `/api/v1/workspaces/${workspace.id}/invites`;
+
+    const created = await ownerApi.post(url).send({ label: 'One person' });
+    expect(created.status).toBe(201);
+    expect(created.headers['referrer-policy']).toBe('no-referrer');
+    expect(created.headers['cache-control']).toBe('no-store');
+    expect(created.body.code).toMatch(/^WSP-[A-F0-9]{48}$/);
+    expect(new Date(created.body.expiresAt).getTime() - Date.now()).toBeLessThanOrEqual(15 * 60 * 1000);
+    expect(new Date(created.body.expiresAt).getTime() - Date.now()).toBeGreaterThan(14 * 60 * 1000);
+
+    const unauthenticatedList = await api().get(url);
+    expect(unauthenticatedList.status).toBe(401);
+    expect(unauthenticatedList.text).not.toContain(created.body.code);
+    const outsiderList = await firstApi.get(url);
+    expect(outsiderList.status).toBe(403);
+    const adminApi = await createAuthenticatedApi({ email: 'invite-admin@example.com' });
+    const memberApi = await createAuthenticatedApi({ email: 'invite-member@example.com' });
+    await db.insert(workspaceMembers).values([
+      { workspaceId: workspace.id, userId: adminApi.user.id, role: 'admin' },
+      { workspaceId: workspace.id, userId: memberApi.user.id, role: 'member' },
+    ]);
+    const adminList = await adminApi.get(url);
+    expect(adminList.status).toBe(200);
+    expect(adminList.body[0].code).toBe(created.body.code);
+    expect((await memberApi.get(url)).status).toBe(403);
+
+    const joinUrl = '/api/v1/workspaces/invites/join-requests';
+    const [first, second] = await Promise.all([
+      firstApi.post(joinUrl).send({ inviteCode: created.body.code }),
+      secondApi.post(joinUrl).send({ inviteCode: created.body.code }),
+    ]);
+    expect([first.status, second.status].sort()).toEqual([201, 400]);
+    expect(first.headers['referrer-policy']).toBe('no-referrer');
+    expect(second.headers['referrer-policy']).toBe('no-referrer');
+    const [stored] = await db.select().from(workspaceInvites).where(eq(workspaceInvites.id, created.body.id));
+    expect(stored.useCount).toBe(1);
+    expect(stored.revokedAt).not.toBeNull();
+  });
+
+  it('allows only one concurrent auto-join and commits its membership with redemption', async () => {
+    const ownerApi = await createAuthenticatedApi({ email: 'auto-owner@example.com', role: 'owner' });
+    const firstApi = await createAuthenticatedApi({ email: 'auto-first@example.com' });
+    const secondApi = await createAuthenticatedApi({ email: 'auto-second@example.com' });
+    const { workspace, project } = await seedWorkspaceFixture({ owner: ownerApi.user, workspace: { joinMode: 'auto_join' } });
+    const created = await ownerApi.post(`/api/v1/workspaces/${workspace.id}/invites`).send({ label: 'Auto join' });
+    const joinUrl = '/api/v1/workspaces/invites/join-requests';
+    const [first, second] = await Promise.all([
+      firstApi.post(joinUrl).send({ inviteCode: created.body.code }),
+      secondApi.post(joinUrl).send({ inviteCode: created.body.code }),
+    ]);
+    expect([first.status, second.status].sort()).toEqual([201, 400]);
+    const winner = first.status === 201 ? firstApi.user.id : secondApi.user.id;
+    const loser = first.status === 400 ? firstApi.user.id : secondApi.user.id;
+    const members = await db.select().from(workspaceMembers).where(eq(workspaceMembers.workspaceId, workspace.id));
+    const projectRows = await db.select().from(projectMembers).where(eq(projectMembers.projectId, project.id));
+    expect(members.filter((row) => row.userId === winner)).toHaveLength(1);
+    expect(members.filter((row) => row.userId === loser)).toHaveLength(0);
+    expect(projectRows.filter((row) => row.userId === winner)).toHaveLength(1);
+    expect(projectRows.filter((row) => row.userId === loser)).toHaveLength(0);
+  });
+
+  it('reports expiry if a token expires after lookup but before the conditional update', async () => {
+    const ownerApi = await createAuthenticatedApi({ email: 'race-expiry-owner@example.com', role: 'owner' });
+    const applicantApi = await createAuthenticatedApi({ email: 'race-expiry-applicant@example.com' });
+    const { workspace } = await seedWorkspaceFixture({ owner: ownerApi.user });
+    const created = await ownerApi.post(`/api/v1/workspaces/${workspace.id}/invites`).send({ label: 'Boundary' });
+    const originalTransaction = db.transaction.bind(db);
+    vi.spyOn(db, 'transaction').mockImplementationOnce(async (callback) => {
+      await db.update(workspaceInvites).set({ expiresAt: new Date(Date.now() - 1_000) })
+        .where(eq(workspaceInvites.id, created.body.id));
+      return originalTransaction(callback);
+    });
+    const response = await applicantApi.post('/api/v1/workspaces/invites/join-requests')
+      .send({ inviteCode: created.body.code });
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({ error: 'This invite has expired.' });
+    const [stored] = await db.select().from(workspaceInvites).where(eq(workspaceInvites.id, created.body.id));
+    expect(stored.useCount).toBe(0);
+  });
+
+  it('rejects expired, legacy, and missing-expiration invites', async () => {
+    const ownerApi = await createAuthenticatedApi({ email: 'invite-expiry-owner@example.com', role: 'owner' });
+    const applicantApi = await createAuthenticatedApi({ email: 'invite-expiry-applicant@example.com' });
+    const { workspace } = await seedWorkspaceFixture({ owner: ownerApi.user });
+    const created = await ownerApi.post(`/api/v1/workspaces/${workspace.id}/invites`).send({ label: 'Soon expired' });
+    const join = () => applicantApi.post('/api/v1/workspaces/invites/join-requests').send({ inviteCode: created.body.code });
+    await db.update(workspaceInvites).set({ expiresAt: new Date(Date.now() - 1_000) }).where(eq(workspaceInvites.id, created.body.id));
+    expect((await join()).status).toBe(400);
+    await db.update(workspaceInvites).set({ expiresAt: null }).where(eq(workspaceInvites.id, created.body.id));
+    expect((await join()).status).toBe(400);
+    await db.update(workspaceInvites).set({
+      expiresAt: new Date(Date.now() + 60_000),
+      createdAt: new Date(Date.now() - 16 * 60_000),
+    }).where(eq(workspaceInvites.id, created.body.id));
+    expect((await join()).status).toBe(400);
+    await db.update(workspaceInvites).set({
+      code: 'WSP-GRV-1234',
+      createdAt: new Date(),
+    }).where(eq(workspaceInvites.id, created.body.id));
+    expect((await applicantApi.post('/api/v1/workspaces/invites/join-requests').send({ inviteCode: 'WSP-GRV-1234' })).status).toBe(400);
+    const [stored] = await db.select().from(workspaceInvites).where(eq(workspaceInvites.id, created.body.id));
+    expect(stored.useCount).toBe(0);
   });
 
   it('exports all workspace tasks with metadata for owners only', async () => {
