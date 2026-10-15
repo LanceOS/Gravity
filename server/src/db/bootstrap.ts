@@ -936,6 +936,15 @@ async function bootstrapDatabase() {
     );
     CREATE INDEX IF NOT EXISTS note_body_revisions_recovery_idx ON note_body_revisions (state, created_at);
   `);
+  if (!env.databaseUrl.startsWith('pgmem://')) {
+    await pool.query(`
+      DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'note_metadata_visibility_check') THEN
+          ALTER TABLE note_metadata ADD CONSTRAINT note_metadata_visibility_check CHECK (visibility IN ('private', 'shared'));
+        END IF;
+      END $$;
+    `);
+  }
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS note_bucket_cleanups (

@@ -6,12 +6,13 @@ import { db } from '../../../db/index.js';
 import { authUsers } from '../../../db/schema.js';
 import { RustFS } from '../../../lib/rustfs.js';
 import { noteMetadata } from '../../notes/schema.js';
-import { getWorkspaceMemberRole } from './membership.js';
+import { currentWorkspaceOwner } from '../../notes/services/access.js';
 import { parseMediaReferences } from '../../notes/services/media-cleanup.js';
 import { projects, workspaceNoteExportEvents, workspaces } from '../schema.js';
 
 const BATCH_SIZE = 100;
 const CHUNK_BYTES = 48 * 1024;
+class NoteExportAccessRevokedError extends Error {}
 
 type Diagnostic = {
   noteId: string;
@@ -120,7 +121,10 @@ export async function streamWorkspaceNoteExport(
   actorUserId: string,
   signal: AbortSignal,
 ) {
-  if (await getWorkspaceMemberRole(workspaceId, actorUserId) !== 'owner') return null;
+  if (!await currentWorkspaceOwner(workspaceId, actorUserId)) return null;
+  const assertOwner = async () => {
+    if (!await currentWorkspaceOwner(workspaceId, actorUserId)) throw new NoteExportAccessRevokedError('Workspace note export access revoked');
+  };
   const startedAt = new Date();
   const eventId = randomUUID();
   const [workspace] = await db.select({ id: workspaces.id, key: workspaces.key, name: workspaces.name })
@@ -155,10 +159,12 @@ export async function streamWorkspaceNoteExport(
 
     let cursor = '';
     while (!signal.aborted) {
+      await assertOwner();
       const batch = await noteBatch(workspaceId, startedAt, cursor);
       if (!batch.length) break;
       for (const note of batch) {
         if (signal.aborted) throw new Error('Export cancelled');
+        await assertOwner();
         cursor = note.id;
         let body: string | null = null;
         try {
@@ -177,6 +183,7 @@ export async function streamWorkspaceNoteExport(
           await diagnostic({ noteId: note.id, object: 'body', reason: isMissing(error) ? 'missing' : 'unavailable' });
         }
 
+        await assertOwner();
         await writeRecord(res, {
           type: 'note', id: note.id, projectId: note.projectId, projectName: note.projectName,
           author: { id: note.userId, name: note.authorName, email: note.authorEmail },
@@ -216,6 +223,7 @@ export async function streamWorkspaceNoteExport(
                 for await (const raw of readable) {
                   const buffer = Buffer.isBuffer(raw) ? raw : Buffer.from(raw);
                   for (let offset = 0; offset < buffer.length; offset += CHUNK_BYTES) {
+                    await assertOwner();
                     const chunk = buffer.subarray(offset, offset + CHUNK_BYTES);
                     hash.update(chunk);
                     bytes += chunk.length;
@@ -234,6 +242,7 @@ export async function streamWorkspaceNoteExport(
               }, signal);
               attachmentCount++;
             } catch (error) {
+              if (error instanceof NoteExportAccessRevokedError) throw error;
               if (signal.aborted) throw error;
               await diagnostic({ noteId: targetNoteId, filename, object: 'attachment', reason: isMissing(error) ? 'missing' : isChanged(error) ? 'changed' : 'unavailable' });
             } finally {
@@ -245,6 +254,7 @@ export async function streamWorkspaceNoteExport(
       if (batch.length < BATCH_SIZE) break;
     }
     if (signal.aborted) throw new Error('Export cancelled');
+    await assertOwner();
     if (noteCount !== expectedNoteCount) {
       await diagnostic({ noteId: '', object: 'reference', reason: 'changed' });
     }

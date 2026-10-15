@@ -11,4 +11,5 @@ export interface NoteMetadata {
 
 export interface Note extends NoteMetadata {
   body: string;
+  canManage?: boolean;
 }

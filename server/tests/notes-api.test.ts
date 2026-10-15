@@ -6,9 +6,98 @@ import { createMediaDeletionClaim } from '../src/modules/notes/services/media-cl
 import { noteMediaDeletions } from '../src/modules/notes/schema.js';
 import { db } from '../src/db/index.js';
 import { workspaceMembers } from '../src/db/schema.js';
+import { and, eq } from 'drizzle-orm';
+import { cleanupNoteMediaForActor, deleteNoteForActor, getNoteForActor, listNotesForActor, updateNoteForActor } from '../src/modules/notes/services/notes.js';
 import { api, createAuthenticatedApi, seedWorkspaceFixture } from './helpers/test-helpers.js';
 
 describe('notes routes', () => {
+  it('rechecks membership and role for direct service callers and cached API sessions', async () => {
+    const owner = await createAuthenticatedApi({ email: 'fresh-owner@example.com', role: 'owner' });
+    const member = await createAuthenticatedApi({ email: 'fresh-member@example.com' });
+    const admin = await createAuthenticatedApi({ email: 'fresh-admin@example.com' });
+    const { workspace, project } = await seedWorkspaceFixture({ owner: { ...owner.user, avatarUrl: owner.user.avatar } });
+    await db.insert(workspaceMembers).values([
+      { workspaceId: workspace.id, userId: member.user.id, role: 'member' },
+      { workspaceId: workspace.id, userId: admin.user.id, role: 'admin' },
+    ]);
+    const scope = { 'x-project-id': project.id };
+    const shared = await owner.post('/api/v1/notes').set(scope).send({ title: 'Shared', body: 'body', visibility: 'shared' });
+    const privateNote = await owner.post('/api/v1/notes').set(scope).send({ title: 'Private', body: 'secret' });
+    const forgedMember = { userId: member.user.id, workspaceRole: 'owner' };
+    expect(await deleteNoteForActor(shared.body.id, project.id, forgedMember)).toBe(false);
+    await expect(updateNoteForActor(shared.body.id, project.id, forgedMember, 1, { visibility: 'private' })).rejects.toThrow('NOT_FOUND');
+    expect(await getNoteForActor(privateNote.body.id, project.id, { userId: admin.user.id, workspaceRole: 'owner' })).toBeNull();
+
+    await db.update(workspaceMembers).set({ role: 'member' }).where(and(eq(workspaceMembers.workspaceId, workspace.id), eq(workspaceMembers.userId, admin.user.id)));
+    expect(await deleteNoteForActor(shared.body.id, project.id, { userId: admin.user.id, workspaceRole: 'admin' })).toBe(false);
+    expect((await member.get(`/api/v1/notes/${shared.body.id}`).set(scope)).status).toBe(200); // Warm the cached route membership.
+    await db.delete(workspaceMembers).where(and(eq(workspaceMembers.workspaceId, workspace.id), eq(workspaceMembers.userId, member.user.id)));
+    expect((await member.get('/api/v1/notes').set(scope)).status).toBe(403);
+    expect((await member.get(`/api/v1/notes/${shared.body.id}`).set(scope)).status).toBe(403);
+    await expect(listNotesForActor(project.id, forgedMember)).rejects.toThrow('NOTE_ACCESS_DENIED');
+    expect(await getNoteForActor(shared.body.id, project.id, forgedMember)).toBeNull();
+    await expect(updateNoteForActor(shared.body.id, project.id, forgedMember, 1, { body: 'stolen' })).rejects.toThrow('NOT_FOUND');
+  });
+
+  it.each(['revocation', 'unshare'])('blocks a queued shared-note write after %s', async change => {
+    const owner = await createAuthenticatedApi({ email: `race-owner-${change}@example.com`, role: 'owner' });
+    const member = await createAuthenticatedApi({ email: `race-member-${change}@example.com` });
+    const { workspace, project } = await seedWorkspaceFixture({ owner: { ...owner.user, avatarUrl: owner.user.avatar } });
+    await db.insert(workspaceMembers).values({ workspaceId: workspace.id, userId: member.user.id, role: 'member' });
+    const scope = { 'x-project-id': project.id };
+    const created = await owner.post('/api/v1/notes').set(scope).send({ title: 'Shared', body: 'original', visibility: 'shared' });
+    let entered!: () => void;
+    let release!: () => void;
+    const enteredPromise = new Promise<void>(resolve => { entered = resolve; });
+    const releasePromise = new Promise<void>(resolve => { release = resolve; });
+    const save = RustFS.saveFile;
+    vi.spyOn(RustFS, 'saveFile').mockImplementationOnce(async (...args) => {
+      entered();
+      await releasePromise;
+      return save(...args);
+    });
+    const pending = updateNoteForActor(created.body.id, project.id, { userId: member.user.id, workspaceRole: 'owner' }, 1, { body: 'late write' });
+    const rejected = expect(pending).rejects.toThrow('NOT_FOUND');
+    await enteredPromise;
+    if (change === 'revocation') {
+      await db.delete(workspaceMembers).where(and(eq(workspaceMembers.workspaceId, workspace.id), eq(workspaceMembers.userId, member.user.id)));
+    } else {
+      expect((await owner.patch(`/api/v1/notes/${created.body.id}`).set(scope).send({ version: 1, visibility: 'private' })).status).toBe(200);
+    }
+    release();
+    await rejected;
+    const current = await owner.get(`/api/v1/notes/${created.body.id}`).set(scope);
+    expect(current.body.body).toBe('original');
+    expect(current.body.version).toBe(change === 'unshare' ? 2 : 1);
+  });
+
+  it('rechecks cleanup permission before claiming an orphan after unshare', async () => {
+    const owner = await createAuthenticatedApi({ email: 'cleanup-race-owner@example.com', role: 'owner' });
+    const author = await createAuthenticatedApi({ email: 'cleanup-race-author@example.com' });
+    const { workspace, project } = await seedWorkspaceFixture({ owner: { ...owner.user, avatarUrl: owner.user.avatar } });
+    await db.insert(workspaceMembers).values({ workspaceId: workspace.id, userId: author.user.id, role: 'member' });
+    const scope = { 'x-project-id': project.id };
+    const created = await author.post('/api/v1/notes').set(scope).send({ title: 'Shared', body: 'body', visibility: 'shared' });
+    await RustFS.saveFile(created.body.bucketPath, 'orphan.png', 'old attachment');
+    let entered!: () => void;
+    let release!: () => void;
+    const enteredPromise = new Promise<void>(resolve => { entered = resolve; });
+    const releasePromise = new Promise<void>(resolve => { release = resolve; });
+    vi.spyOn(RustFS, 'statFile').mockImplementationOnce(async () => {
+      entered();
+      await releasePromise;
+      return { etag: 'old-version', lastModified: new Date(0) };
+    });
+    const remove = vi.spyOn(RustFS, 'deleteFile');
+    const pending = cleanupNoteMediaForActor(created.body.id, project.id, { userId: owner.user.id, workspaceRole: 'owner' });
+    const rejected = expect(pending).rejects.toThrow('NOT_FOUND');
+    await enteredPromise;
+    expect((await author.patch(`/api/v1/notes/${created.body.id}`).set(scope).send({ version: 1, visibility: 'private' })).status).toBe(200);
+    release();
+    await rejected;
+    expect(remove).not.toHaveBeenCalled();
+    expect(await RustFS.readFileUtf8(created.body.bucketPath, 'orphan.png')).toBe('old attachment');
+  });
   it('keeps private notes author-only and shares opted-in notes with workspace members', async () => {
     const owner = await createAuthenticatedApi({ email: 'privacy-owner@example.com', role: 'owner' });
     const member = await createAuthenticatedApi({ email: 'privacy-member@example.com' });

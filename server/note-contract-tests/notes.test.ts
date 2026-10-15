@@ -5,9 +5,18 @@ import { Readable } from 'node:stream';
 import { beforeAll, afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../src/lib/platform.js', () => ({ getProjectIdFromRequest: (req: any) => req.headers['x-project-id'] || req.query.projectId || req.body?.projectId || '' }));
-vi.mock('../src/modules/workspaces/services/membership.js', () => ({ authorizeProjectAccess: vi.fn(async () => ({ allowed: true, userId: 'test-user', workspaceRole: 'owner' })) }));
 vi.mock('../src/modules/auth/utils/request-auth.js', () => ({ resolveRequestActorUserId: vi.fn(async () => 'test-user') }));
 vi.mock('../src/modules/notes/services/notes.js', () => ({ createNoteForActor: vi.fn(), updateNoteForActor: vi.fn(), getNoteForActor: vi.fn(), listNotesForActor: vi.fn(), searchNotesForActor: vi.fn(), deleteNoteForActor: vi.fn(), cleanupNoteMediaForActor: vi.fn() }));
+vi.mock('../src/modules/notes/services/access.js', () => ({
+  currentNoteActor: vi.fn(async (_projectId: string, userId: string) => ({ userId, workspaceRole: 'owner' })),
+  noteProjectExists: vi.fn(async () => true),
+  authorizedNote: vi.fn(async (noteId: string, projectId: string) => {
+    const { MetadataRepository } = await import('../src/modules/notes/repositories.js');
+    const metadata = await MetadataRepository.getNoteMetadata(noteId);
+    return metadata?.projectId === projectId ? metadata : null;
+  }),
+  NoteAccessDeniedError: class extends Error {},
+}));
 vi.mock('../src/modules/notes/repositories.js', () => ({ isNoteBodyFile: (name: string) => name === 'body.md' || name.startsWith('.revisions/'), MetadataRepository: { getNoteMetadata: vi.fn() }, NotesRepository: { getAttachmentStream: vi.fn(), saveAttachmentStream: vi.fn() } }));
 vi.mock('../src/modules/notes/services/media-deletion.js', () => ({
   deleteNoteMediaForActor: vi.fn(),
@@ -19,7 +28,7 @@ vi.mock('../src/modules/notes/services/media-deletion.js', () => ({
 import { deleteNoteMediaForActor, uploadNoteMediaForActor, MediaReferenceUnavailableError, NoteMediaInUseError } from '../src/modules/notes/services/media-deletion.js';
 import * as notes from '../src/modules/notes/services/notes.js';
 import { MetadataRepository, NotesRepository } from '../src/modules/notes/repositories.js';
-import { authorizeProjectAccess } from '../src/modules/workspaces/services/membership.js';
+import { authorizedNote, currentNoteActor, noteProjectExists } from '../src/modules/notes/services/access.js';
 import { createNotesRouter } from '../src/modules/notes/routes.js';
 import { parseApiJson } from '../src/modules/notes/request-body.js';
 import { noteErrorContext, noteErrorHandler } from '../src/modules/notes/errors.js';
@@ -48,7 +57,12 @@ const assertError = (response: any, status = 400) => {
 beforeEach(() => {
   vi.resetAllMocks();
   vi.mocked(MetadataRepository.getNoteMetadata).mockResolvedValue({ projectId: 'project-test', userId: 'test-user', visibility: 'private', bucketPath: 'synthetic' } as any);
-  vi.mocked(authorizeProjectAccess).mockResolvedValue({ allowed: true, userId: 'test-user', workspaceRole: 'owner' });
+  vi.mocked(currentNoteActor).mockImplementation(async (_projectId, userId) => ({ userId, workspaceRole: 'owner' }));
+  vi.mocked(noteProjectExists).mockResolvedValue(true);
+  vi.mocked(authorizedNote).mockImplementation(async (noteId, projectId) => {
+    const metadata = await MetadataRepository.getNoteMetadata(noteId);
+    return metadata?.projectId === projectId ? metadata : null;
+  });
   vi.mocked(uploadNoteMediaForActor).mockImplementation(async (_id, _project, filename, stream, length) => {
     await NotesRepository.saveAttachmentStream('synthetic', filename, stream, length);
     return true;
@@ -186,7 +200,7 @@ describe('note runtime contracts (isolated, no database or storage)', () => {
     const log = vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.mocked(notes.listNotesForActor).mockRejectedValueOnce(error);
     assertError(await api().get('/notes').set('x-project-id', 'project-test'), 500);
-    vi.mocked(authorizeProjectAccess).mockRejectedValueOnce(error);
+    vi.mocked(currentNoteActor).mockRejectedValueOnce(error);
     assertError(await api().get('/notes').set('x-project-id', 'project-test'), 500);
     vi.mocked(MetadataRepository.getNoteMetadata).mockResolvedValue({ projectId: 'project-test', userId: 'test-user', visibility: 'private', bucketPath: 'synthetic' } as any);
     vi.mocked(NotesRepository.getAttachmentStream).mockRejectedValueOnce(error);

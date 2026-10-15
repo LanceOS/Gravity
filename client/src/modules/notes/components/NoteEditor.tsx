@@ -239,7 +239,7 @@ function NoteEditorSession({ projectId, noteId, onTitleChange }: NoteEditorProps
   };
 
   const handleVisibilityChange = async (event: React.ChangeEvent<HTMLSelectElement>) => {
-    if (!note || !currentUser || note.userId !== currentUser.id || dirty || saving) return;
+    if (!note || !currentUser || !(note.canManage ?? note.userId === currentUser.id) || dirty || saving) return;
     const visibility = event.target.value as 'private' | 'shared';
     setChangingVisibility(true);
     try {
@@ -282,7 +282,7 @@ function NoteEditorSession({ projectId, noteId, onTitleChange }: NoteEditorProps
       onDrop={onDrop}
     >
       <div className="note-editor__header">
-        {note && (note.userId === currentUser?.id ? (
+        {note && ((note.canManage ?? note.userId === currentUser?.id) ? (
           <label className="note-editor__visibility">
             Visibility{' '}
             <select aria-label="Note visibility" value={note.visibility}

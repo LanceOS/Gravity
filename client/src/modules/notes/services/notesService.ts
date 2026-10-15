@@ -33,40 +33,47 @@ function isNumber(value: unknown): value is number {
   return typeof value === 'number';
 }
 
-function isNoteMetadata(value: unknown): value is NoteMetadata {
+function normalizeNoteMetadata(value: unknown, projectId?: string): NoteMetadata | null {
   if (!value || typeof value !== 'object') {
-    return false;
+    return null;
   }
 
   const candidate = value as Partial<NoteMetadata>;
-  return isString(candidate.id)
-    && isString(candidate.projectId)
-    && isString(candidate.userId)
-    && (candidate.visibility === 'private' || candidate.visibility === 'shared')
-    && isString(candidate.title)
-    && isNumber(candidate.version)
-    && isString(candidate.createdAt)
-    && isString(candidate.updatedAt);
-}
-
-function isNote(value: unknown): value is Note {
-  return isNoteMetadata(value) && isString((value as Partial<Note>).body);
+  if (!isString(candidate.id) || !isString(candidate.projectId ?? projectId)
+    || !isString(candidate.title) || !isNumber(candidate.version)
+    || !isString(candidate.createdAt) || !isString(candidate.updatedAt)
+    || (candidate.visibility !== undefined && candidate.visibility !== 'private' && candidate.visibility !== 'shared')) return null;
+  // Legacy servers returned author-only lists without these fields. A missing
+  // visibility is private; the detail response supplies the actual author.
+  return {
+    ...candidate,
+    id: candidate.id,
+    projectId: candidate.projectId ?? projectId!,
+    userId: isString(candidate.userId) ? candidate.userId : '',
+    visibility: candidate.visibility ?? 'private',
+    title: candidate.title,
+    version: candidate.version,
+    createdAt: candidate.createdAt,
+    updatedAt: candidate.updatedAt,
+  };
 }
 
 function ensureNote(value: unknown): Note {
-  if (isNote(value)) {
-    return value;
+  const metadata = normalizeNoteMetadata(value);
+  if (metadata && metadata.userId && isString((value as Partial<Note>).body)) {
+    const canManage = (value as Partial<Note>).canManage;
+    return { ...metadata, body: (value as Note).body, ...(typeof canManage === 'boolean' ? { canManage } : {}) };
   }
 
   throw new ApiError(500, 'Invalid note payload.');
 }
 
-function normalizeNoteMetadataList(data: unknown): NoteMetadata[] {
+function normalizeNoteMetadataList(data: unknown, projectId: string): NoteMetadata[] {
   if (!Array.isArray(data)) {
     return [];
   }
 
-  return data.filter(isNoteMetadata);
+  return data.map(value => normalizeNoteMetadata(value, projectId)).filter((value): value is NoteMetadata => value !== null);
 }
 
 function validateAttachment(data: unknown): NoteAttachment {
@@ -104,7 +111,7 @@ export class DefaultNotesService implements NotesService {
       },
     });
 
-    return normalizeNoteMetadataList(data);
+    return normalizeNoteMetadataList(data, projectId);
   }
 
   async updateNote(projectId: string, noteId: string, updates: NoteUpdatePayload): Promise<Note> {

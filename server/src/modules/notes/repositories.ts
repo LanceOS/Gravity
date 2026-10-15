@@ -79,9 +79,10 @@ export class MetadataRepository {
     userId: string,
     limit: number = 20,
     offset: number = 0,
-    sortDirection: 'desc' | 'asc' = 'desc'
+    sortDirection: 'desc' | 'asc' = 'desc',
+    executor: typeof db | NoteTransaction = db,
   ): Promise<NoteListItem[]> {
-    return await db
+    return await executor
       .select({
         id: noteMetadata.id,
         projectId: noteMetadata.projectId,
@@ -109,7 +110,8 @@ export class MetadataRepository {
     query: string,
     limit: number = 20,
     offset: number = 0,
-    sortDirection: 'desc' | 'asc' = 'desc'
+    sortDirection: 'desc' | 'asc' = 'desc',
+    executor: typeof db | NoteTransaction = db,
   ): Promise<(NoteListItem & { snippet: string })[]> {
     const useSearchVector = typeof env.databaseUrl === 'string' && !env.databaseUrl.startsWith('pgmem://');
     const pageSize = Math.max(1, Math.min(limit, 100));
@@ -119,7 +121,7 @@ export class MetadataRepository {
       // We use websearch_to_tsquery for user-friendly query parsing when tsvector is available
       const tsQuery = sql`websearch_to_tsquery('english', ${query})`;
 
-      const rows = await db
+      const rows = await executor
         .select({
           id: noteMetadata.id,
           projectId: noteMetadata.projectId,
@@ -149,7 +151,7 @@ export class MetadataRepository {
 
     // Fallback for pg-mem: match the same complete content with simple ILIKE.
     const likeQuery = `%${query}%`;
-    const rows = await db
+    const rows = await executor
       .select({
         id: noteMetadata.id,
         projectId: noteMetadata.projectId,

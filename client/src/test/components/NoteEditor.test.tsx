@@ -120,6 +120,16 @@ describe('NoteEditor', () => {
     expect(screen.getByText('Shared with workspace')).toBeInTheDocument();
   });
 
+  it('shows visibility controls to a workspace admin allowed to manage the shared note', () => {
+    vi.mocked(useNote, { partial: true, deep: true }).mockReturnValue({
+      note: makeNote({ userId: 'another-user', visibility: 'shared', canManage: true }),
+      loading: false, saving: false, saveError: null, savedAt: null,
+      saveNote: mockSaveNote, uploadMedia: mockUploadMedia,
+    });
+    render(<NoteEditor projectId="proj-1" noteId="note-1" />);
+    expect(screen.getByLabelText('Note visibility')).toBeInTheDocument();
+  });
+
   it('renders the title input and rich text editor when loaded', () => {
     render(<NoteEditor projectId="proj-1" noteId="note-1" />);
     const titleInput = screen.getByPlaceholderText('Title...') as HTMLInputElement;

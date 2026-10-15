@@ -5,9 +5,9 @@ import { withNoteReferenceLock, type NoteTransaction } from '../reference-lock.j
 import { and, eq } from 'drizzle-orm';
 import { noteMediaDeletions } from '../schema.js';
 import { createMediaDeletionClaim, deleteClaimedMedia, getMediaDeletionClaim } from './media-claims.js';
-import { canAccessNote, type NoteActor } from './access.js';
+import { canAccessNote, currentNoteActor, type NoteActor } from './access.js';
 
-// Routes use the ForActor variants; unguarded variants are internal primitives.
+// Routes use the ForActor variants; unchecked variants are internal primitives.
 
 export class NoteMediaInUseError extends Error {
   constructor() {
@@ -37,7 +37,7 @@ export async function assertNoteAttachmentsUnshared(target: CleanupNote, tx: Not
   }
 }
 
-export async function deleteNoteMedia(noteId: string, projectId: string, filename: string) {
+export async function deleteNoteMediaUnchecked(noteId: string, projectId: string, filename: string) {
   return deleteNoteMediaInternal(noteId, projectId, filename);
 }
 
@@ -49,7 +49,8 @@ async function deleteNoteMediaInternal(noteId: string, projectId: string, filena
   if (isNoteBodyFile(filename)) throw new Error('Filename is reserved for note bodies');
   const decision = await withNoteReferenceLock(async tx => {
     const target = await MetadataRepository.getNoteMetadata(noteId, tx);
-    if (!target || target.projectId !== projectId || (actor && !canAccessNote(target, actor, 'manage'))) return null;
+    const currentActor = actor ? await currentNoteActor(projectId, actor.userId, tx, true) : null;
+    if (!target || target.projectId !== projectId || (actor && (!currentActor || !canAccessNote(target, currentActor, 'manage')))) return null;
 
     const inventory = await deletionInventory(target, tx);
     const sourceIds = [...inventory.bySource]
@@ -61,7 +62,7 @@ async function deleteNoteMediaInternal(noteId: string, projectId: string, filena
       const remainingReferences: Array<{ noteId: string }> = [];
       for (const sourceId of sourceIds) {
         const source = await MetadataRepository.getNoteMetadata(sourceId, tx);
-        if (source?.projectId === projectId && (!actor || canAccessNote(source, actor, 'read'))) remainingReferences.push({ noteId: sourceId });
+        if (source?.projectId === projectId && (!actor || (currentActor && canAccessNote(source, currentActor, 'read')))) remainingReferences.push({ noteId: sourceId });
       }
       return { deleted: false, blocked: true, remainingReferences };
     }
@@ -121,7 +122,7 @@ export class MediaUploadBlockedError extends Error {
 /** Hold the publication boundary through PUT, then clear only a confirmed claim.
  * An ambiguous DELETE can still arrive later, so its filename stays fenced.
  */
-export async function uploadNoteMedia(
+export async function uploadNoteMediaUnchecked(
   noteId: string, projectId: string, filename: string, stream: NodeJS.ReadableStream, contentLength?: number,
 ) {
   return uploadNoteMediaInternal(noteId, projectId, filename, stream, contentLength);
@@ -138,7 +139,8 @@ async function uploadNoteMediaInternal(
 ) {
   return withNoteReferenceLock(async tx => {
     const note = await MetadataRepository.getNoteMetadata(noteId, tx);
-    if (!note || note.projectId !== projectId || (actor && !canAccessNote(note, actor, 'write'))) return false;
+    const currentActor = actor ? await currentNoteActor(projectId, actor.userId, tx, true) : null;
+    if (!note || note.projectId !== projectId || (actor && (!currentActor || !canAccessNote(note, currentActor, 'write')))) return false;
     const claim = await getMediaDeletionClaim(note.bucketPath, filename, tx);
     if (claim && claim.status !== 'confirmed') throw new MediaUploadBlockedError();
     await NotesRepository.saveAttachmentStream(note.bucketPath, filename, stream, contentLength);

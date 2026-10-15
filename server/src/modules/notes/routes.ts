@@ -2,16 +2,26 @@ import { noteQuery, validateNoteRequest } from './contracts.js';
 import { noteErrorContext, noteErrorHandler, logNoteFailure } from './errors.js';
 import { Router } from 'express';
 import { getProjectIdFromRequest } from '../../lib/platform.js';
-import { authorizeProjectAccess } from '../workspaces/services/membership.js';
 import { createNoteForActor, deleteNoteForActor, getNoteForActor, listNotesForActor, updateNoteForActor, searchNotesForActor, cleanupNoteMediaForActor } from './services/notes.js';
 import { isNoteBodyFile, MetadataRepository, NotesRepository } from './repositories.js';
-import { authorizedNote } from './services/access.js';
+import { authorizedNote, currentNoteActor, noteProjectExists, NoteAccessDeniedError } from './services/access.js';
 import { deleteNoteMediaForActor, MediaReferenceUnavailableError, MediaUploadBlockedError, NoteMediaInUseError, uploadNoteMediaForActor } from './services/media-deletion.js';
 import { resolveRequestActorUserId } from '../auth/utils/request-auth.js';
 
 export function createNotesRouter() {
   const router = Router();
   router.use('/notes', noteErrorContext);
+
+  async function authorizeNoteProjectAccess(req: Parameters<typeof resolveRequestActorUserId>[0], projectId: string) {
+    const userId = await resolveRequestActorUserId(req);
+    if (!userId) return { allowed: false as const, status: 401, error: 'Authentication required.' };
+    const current = await currentNoteActor(projectId, userId);
+    if (!current) {
+      if (!await noteProjectExists(projectId)) return { allowed: false as const, status: 404, error: 'Project not found.' };
+      return { allowed: false as const, status: 403, error: 'Access denied: not a member of the workspace.' };
+    }
+    return { allowed: true as const, userId, workspaceRole: current.workspaceRole };
+  }
 
   function normalizeRouteParam(value: string | string[]) {
     return Array.isArray(value) ? value[0] ?? '' : value;
@@ -24,7 +34,7 @@ export function createNotesRouter() {
       return;
     }
 
-    const auth = await authorizeProjectAccess(req, projectId);
+    const auth = await authorizeNoteProjectAccess(req, projectId);
     if (!auth.allowed) {
       res.status(auth.status).json({ error: auth.error });
       return;
@@ -34,6 +44,7 @@ export function createNotesRouter() {
       const created = await createNoteForActor(projectId, auth, req.body.title, req.body.body, req.body.visibility);
       res.status(201).json(created);
     } catch (error) {
+      if (error instanceof NoteAccessDeniedError) { res.status(403).json({ error: 'Access denied: not a member of the workspace.' }); return; }
       if (error instanceof MediaReferenceUnavailableError) {
         res.status(409).json({ error: error.message });
         return;
@@ -50,7 +61,7 @@ export function createNotesRouter() {
       return;
     }
 
-    const auth = await authorizeProjectAccess(req, projectId);
+    const auth = await authorizeNoteProjectAccess(req, projectId);
     if (!auth.allowed) {
       res.status(auth.status).json({ error: auth.error });
       return;
@@ -67,6 +78,7 @@ export function createNotesRouter() {
       const notesList = await searchNotesForActor(projectId, auth, query, limit, offset, sort);
       res.json(notesList);
     } catch (error) {
+      if (error instanceof NoteAccessDeniedError) { res.status(403).json({ error: 'Access denied: not a member of the workspace.' }); return; }
       logNoteFailure(res, error, req.route.path);
       res.status(500).json({ error: 'Failed to search notes.' });
     }
@@ -79,7 +91,7 @@ export function createNotesRouter() {
       return;
     }
 
-    const auth = await authorizeProjectAccess(req, projectId);
+    const auth = await authorizeNoteProjectAccess(req, projectId);
     if (!auth.allowed) {
       res.status(auth.status).json({ error: auth.error });
       return;
@@ -90,6 +102,7 @@ export function createNotesRouter() {
       const notesList = await listNotesForActor(projectId, auth, limit, offset, sort);
       res.json(notesList);
     } catch (error) {
+      if (error instanceof NoteAccessDeniedError) { res.status(403).json({ error: 'Access denied: not a member of the workspace.' }); return; }
       logNoteFailure(res, error, req.route.path);
       res.status(500).json({ error: 'Failed to load notes.' });
     }
@@ -102,7 +115,7 @@ export function createNotesRouter() {
       return;
     }
 
-    const auth = await authorizeProjectAccess(req, projectId);
+    const auth = await authorizeNoteProjectAccess(req, projectId);
     if (!auth.allowed) {
       res.status(auth.status).json({ error: auth.error });
       return;
@@ -131,7 +144,7 @@ export function createNotesRouter() {
       return;
     }
 
-    const auth = await authorizeProjectAccess(req, projectId);
+    const auth = await authorizeNoteProjectAccess(req, projectId);
     if (!auth.allowed) {
       res.status(auth.status).json({ error: auth.error });
       return;
@@ -169,7 +182,7 @@ export function createNotesRouter() {
       return;
     }
 
-    const auth = await authorizeProjectAccess(req, projectId);
+    const auth = await authorizeNoteProjectAccess(req, projectId);
     if (!auth.allowed) {
       res.status(auth.status).json({ error: auth.error });
       return;
@@ -205,7 +218,7 @@ export function createNotesRouter() {
       return;
     }
 
-    const auth = await authorizeProjectAccess(req, projectId);
+    const auth = await authorizeNoteProjectAccess(req, projectId);
     if (!auth.allowed) {
       res.status(auth.status).json({ error: auth.error });
       return;
@@ -276,7 +289,7 @@ export function createNotesRouter() {
         projectId = noteMeta.projectId;
       }
 
-      const auth = await authorizeProjectAccess(req, projectId);
+      const auth = await authorizeNoteProjectAccess(req, projectId);
       if (!auth.allowed) {
         // Legacy bare media URLs resolve project scope by ID. Hide whether a
         // note exists in a workspace the caller cannot access.
@@ -362,7 +375,7 @@ export function createNotesRouter() {
       return;
     }
 
-    const auth = await authorizeProjectAccess(req, projectId);
+    const auth = await authorizeNoteProjectAccess(req, projectId);
     if (!auth.allowed) {
       res.status(auth.status).json({ error: auth.error });
       return;
@@ -400,7 +413,7 @@ export function createNotesRouter() {
       return;
     }
 
-    const auth = await authorizeProjectAccess(req, projectId);
+    const auth = await authorizeNoteProjectAccess(req, projectId);
     if (!auth.allowed) {
       res.status(auth.status).json({ error: auth.error });
       return;

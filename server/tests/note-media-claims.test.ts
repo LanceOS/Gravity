@@ -8,8 +8,8 @@ import { withNoteReferenceLock } from '../src/modules/notes/reference-lock.js';
 import { noteMediaDeletions } from '../src/modules/notes/schema.js';
 import { createMediaDeletionClaim, deleteClaimedMedia, recoverMediaDeletionClaims } from '../src/modules/notes/services/media-claims.js';
 import { cleanupMedia } from '../src/modules/notes/services/media-cleanup.js';
-import { deleteNoteMedia, uploadNoteMedia } from '../src/modules/notes/services/media-deletion.js';
-import { createNote, getNote, updateNote } from '../src/modules/notes/services/notes.js';
+import { deleteNoteMediaUnchecked as deleteNoteMedia, uploadNoteMediaUnchecked as uploadNoteMedia } from '../src/modules/notes/services/media-deletion.js';
+import { createNoteUnchecked as createNote, getNoteUnchecked as getNote, updateNoteUnchecked as updateNote } from '../src/modules/notes/services/notes.js';
 
 function gate() {
   let resolve!: () => void;

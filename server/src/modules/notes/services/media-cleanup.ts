@@ -4,6 +4,7 @@ import { MAX_LISTED_FILES, MAX_LISTED_KEY_BYTES } from '../../../lib/object-list
 import { env } from '../../../env.js';
 import { withNoteReferenceLock } from '../reference-lock.js';
 import { createMediaDeletionClaim, deleteClaimedMedia } from './media-claims.js';
+import type { NoteTransaction } from '../reference-lock.js';
 
 export type CleanupNote = { id: string; bucketPath: string; bodyKey?: string | null };
 export type MediaVersion = { lastModified: Date; etag: string };
@@ -15,6 +16,7 @@ export type MediaCleanupDependencies = {
   deleteFile: (bucket: string, file: string, etag: string) => Promise<void>;
   /** Inventory-only test seam; production always uses the transactional claim. */
   claimOrphan?: (entry: { bucket: string; file: string; noteId: string }, etag: string) => Promise<string | null>;
+  authorizeTarget?: (tx: NoteTransaction) => Promise<void>;
 };
 export type CleanupOptions = { dryRun?: boolean; gracePeriodMs?: number };
 export const DEFAULT_MEDIA_GRACE_MS = 24 * 60 * 60 * 1000;
@@ -144,6 +146,7 @@ export async function cleanupMedia(deps: MediaCleanupDependencies, options: Clea
       const claimId = deps.claimOrphan
         ? await deps.claimOrphan(entry, version.etag)
         : await withNoteReferenceLock(async tx => {
+          await deps.authorizeTarget?.(tx);
           const locked = await buildMediaReferenceIndex({
             listNotes: () => MetadataRepository.listNotesForMediaCleanup(tx),
             getBody: deps.getBody,

@@ -2,8 +2,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { db } from '../src/db/index.js';
 import { RustFS } from '../src/lib/rustfs.js';
 import { MetadataRepository, NotesRepository } from '../src/modules/notes/repositories.js';
-import { createNote, deleteNote, getNote, updateNote } from '../src/modules/notes/services/notes.js';
-import { deleteNoteMedia } from '../src/modules/notes/services/media-deletion.js';
+import { createNoteUnchecked as createNote, deleteNoteUnchecked as deleteNote, getNoteUnchecked as getNote, updateNoteUnchecked as updateNote } from '../src/modules/notes/services/notes.js';
+import { deleteNoteMediaUnchecked as deleteNoteMedia } from '../src/modules/notes/services/media-deletion.js';
 
 function gate() {
   let resolve!: () => void;

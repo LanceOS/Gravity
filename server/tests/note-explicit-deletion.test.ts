@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import { RustFS } from '../src/lib/rustfs.js';
 import { MetadataRepository, NotesRepository } from '../src/modules/notes/repositories.js';
-import { createNote, deleteNote } from '../src/modules/notes/services/notes.js';
-import { deleteNoteMedia } from '../src/modules/notes/services/media-deletion.js';
+import { createNoteUnchecked as createNote, deleteNoteUnchecked as deleteNote } from '../src/modules/notes/services/notes.js';
+import { deleteNoteMediaUnchecked as deleteNoteMedia } from '../src/modules/notes/services/media-deletion.js';
 import { createAuthenticatedApi, seedWorkspaceFixture } from './helpers/test-helpers.js';
 
 async function fixture() {
