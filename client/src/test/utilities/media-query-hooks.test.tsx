@@ -25,6 +25,7 @@ function mockMatchMedia(api: 'modern' | 'legacy', initialMatches = false) {
     removeListener,
     addEventListener,
     removeEventListener,
+    listenerCount: () => listeners.size,
     setMatches(matches: boolean) {
       mediaQuery.matches = matches;
       act(() => {
@@ -44,8 +45,11 @@ describe('media query hooks', () => {
     const { result, unmount } = renderHook(useReducedMotion);
 
     expect(result.current).toBe(false);
+    expect(mediaQuery.listenerCount()).toBe(1);
     mediaQuery.setMatches(true);
     expect(result.current).toBe(true);
+    mediaQuery.setMatches(false);
+    expect(result.current).toBe(false);
 
     if (api === 'modern') {
       expect(mediaQuery.addEventListener).toHaveBeenCalledWith('change', expect.any(Function));
@@ -59,6 +63,7 @@ describe('media query hooks', () => {
       unmount();
       expect(mediaQuery.removeListener).toHaveBeenCalledWith(mediaQuery.addListener.mock.calls[0][0]);
     }
+    expect(mediaQuery.listenerCount()).toBe(0);
   });
 
   it.each(['modern', 'legacy'] as const)('updates mobile layout and cleans up %s listeners', (api) => {
@@ -66,8 +71,11 @@ describe('media query hooks', () => {
     const { result, unmount } = renderHook(useIsMobileTicketLayout);
 
     expect(result.current).toBe(false);
+    expect(mediaQuery.listenerCount()).toBe(1);
     mediaQuery.setMatches(true);
     expect(result.current).toBe(true);
+    mediaQuery.setMatches(false);
+    expect(result.current).toBe(false);
 
     if (api === 'modern') {
       expect(mediaQuery.addEventListener).toHaveBeenCalledWith('change', expect.any(Function));
@@ -81,5 +89,6 @@ describe('media query hooks', () => {
       unmount();
       expect(mediaQuery.removeListener).toHaveBeenCalledWith(mediaQuery.addListener.mock.calls[0][0]);
     }
+    expect(mediaQuery.listenerCount()).toBe(0);
   });
 });
