@@ -42,6 +42,7 @@ export class MetadataRepository {
       title: data.title,
       excerpt,
       searchText: data.searchText ?? null,
+      searchIndexedVersion: data.searchText === undefined ? null : 1,
       bucketPath: data.bucketPath,
       bodyKey: data.bodyKey,
     };
@@ -127,6 +128,8 @@ export class MetadataRepository {
           and(
             eq(noteMetadata.projectId, projectId),
             eq(noteMetadata.userId, userId),
+            eq(noteMetadata.searchIndexedVersion, noteMetadata.version),
+            sql`${noteMetadata.searchText} IS NOT NULL`,
             sql`${noteMetadata.searchVector} @@ ${tsQuery}`
           )
         )
@@ -153,6 +156,8 @@ export class MetadataRepository {
         and(
           eq(noteMetadata.projectId, projectId),
           eq(noteMetadata.userId, userId),
+          eq(noteMetadata.searchIndexedVersion, noteMetadata.version),
+          sql`${noteMetadata.searchText} IS NOT NULL`,
           sql`(${noteMetadata.title} ILIKE ${likeQuery} OR ${noteMetadata.searchText} ILIKE ${likeQuery})`
         )
       )
@@ -186,6 +191,7 @@ export class MetadataRepository {
             const base: Record<string, unknown> = {
               ...updates,
               version: currentVersion + 1,
+              searchIndexedVersion: currentVersion + 1,
               updatedAt: new Date(),
             };
             if (!(typeof env.databaseUrl === 'string' && env.databaseUrl.startsWith('pgmem://'))) {

@@ -938,6 +938,11 @@ async function bootstrapDatabase() {
   await pool.query(`
     ALTER TABLE note_metadata ADD COLUMN IF NOT EXISTS excerpt TEXT NOT NULL DEFAULT '';
     ALTER TABLE note_metadata ADD COLUMN IF NOT EXISTS search_text TEXT;
+    ALTER TABLE note_metadata ADD COLUMN IF NOT EXISTS search_indexed_version INTEGER;
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS note_metadata_search_backfill_idx ON note_metadata (id)
+      WHERE search_text IS NULL OR COALESCE(search_indexed_version, 0) <> version;
   `);
   // Add search_vector column and indexes only when running against real Postgres.
   if (!env.databaseUrl.startsWith('pgmem://')) {

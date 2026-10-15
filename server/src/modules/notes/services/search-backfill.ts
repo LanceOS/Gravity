@@ -1,9 +1,11 @@
-import { and, asc, eq, gt, isNull, sql } from 'drizzle-orm';
+import { and, asc, eq, gt, sql } from 'drizzle-orm';
 import { db } from '../../../db/index.js';
 import { env } from '../../../env.js';
 import { noteMetadata } from '../schema.js';
 import { NotesRepository } from '../repositories.js';
 import { noteSearchText } from '../search-text.js';
+
+const needsBackfill = sql`(${noteMetadata.searchText} IS NULL OR COALESCE(${noteMetadata.searchIndexedVersion}, 0) <> ${noteMetadata.version})`;
 
 /** Resume on every startup; compare the captured immutable revision before writing. */
 export async function backfillNoteSearchIndex(batchSize = 100): Promise<number> {
@@ -14,7 +16,7 @@ export async function backfillNoteSearchIndex(batchSize = 100): Promise<number> 
     const rows = await db.select({
       id: noteMetadata.id, version: noteMetadata.version,
       bucketPath: noteMetadata.bucketPath, bodyKey: noteMetadata.bodyKey,
-    }).from(noteMetadata).where(and(isNull(noteMetadata.searchText), gt(noteMetadata.id, cursor)))
+    }).from(noteMetadata).where(and(needsBackfill, gt(noteMetadata.id, cursor)))
       .orderBy(asc(noteMetadata.id)).limit(batchSize);
     if (!rows.length) {
       if (!raced) return indexed;
@@ -32,13 +34,13 @@ export async function backfillNoteSearchIndex(batchSize = 100): Promise<number> 
         body = '';
       }
       const searchText = noteSearchText(body);
-      const values: Record<string, unknown> = { searchText };
+      const values: Record<string, unknown> = { searchText, searchIndexedVersion: row.version };
       if (!env.databaseUrl.startsWith('pgmem://')) {
         values.searchVector = sql`setweight(to_tsvector('english', ${noteMetadata.title}), 'A') || setweight(to_tsvector('english', ${searchText}), 'B')`;
       }
       const changed = await db.update(noteMetadata).set(values)
         .where(and(eq(noteMetadata.id, row.id), eq(noteMetadata.version, row.version),
-          eq(noteMetadata.bodyKey, row.bodyKey), isNull(noteMetadata.searchText)))
+          eq(noteMetadata.bodyKey, row.bodyKey), needsBackfill))
         .returning({ id: noteMetadata.id });
       indexed += changed.length;
       if (!changed.length) raced = true;
@@ -46,8 +48,8 @@ export async function backfillNoteSearchIndex(batchSize = 100): Promise<number> 
   }
 }
 
-/** Keep transient storage failures from taking down the API; retry from null rows. */
-export function startNoteSearchBackfill(retryDelayMs = 60_000): () => void {
+/** Reconcile after transient failures and during rolling deployments with older writers. */
+export function startNoteSearchBackfill(intervalMs = 60_000): () => void {
   let stopped = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
   const run = async () => {
@@ -55,11 +57,12 @@ export function startNoteSearchBackfill(retryDelayMs = 60_000): () => void {
     try {
       await backfillNoteSearchIndex();
     } catch (error) {
-      if (stopped) return;
-      console.error('Note search backfill deferred; retrying after storage or database recovery', {
+      if (!stopped) console.error('Note search backfill deferred; retrying after storage or database recovery', {
         code: error && typeof error === 'object' && 'code' in error ? String(error.code) : 'unknown',
       });
-      timer = setTimeout(() => { void run(); }, retryDelayMs);
+    } finally {
+      if (stopped) return;
+      timer = setTimeout(() => { void run(); }, intervalMs);
       timer.unref();
     }
   };

@@ -139,4 +139,22 @@ describe('complete note search', () => {
     expect((await request().query({ q: 'staletoken' })).body).toEqual([]);
     expect((await request().query({ q: 'currenttoken' })).body[0].id).toBe(id);
   });
+
+  it('reindexes a revision written by an older server during a rolling deployment', async () => {
+    const { request, create } = await fixture();
+    const note = await create('Rolling deployment', 'originaltoken');
+    const newBodyKey = '.revisions/older-server.md';
+    await NotesRepository.saveBody(note.bucketPath, 'newerlegacytoken', newBodyKey);
+    await db.update(noteMetadata).set({ bodyKey: newBodyKey, version: 2, excerpt: 'newerlegacytoken' })
+      .where(eq(noteMetadata.id, note.id));
+    // The old writer has advanced the body pointer but cannot update the new
+    // search columns. Search must not expose the stale indexed revision.
+    expect((await request().query({ q: 'originaltoken' })).body).toEqual([]);
+    expect((await request().query({ q: 'newerlegacytoken' })).body).toEqual([]);
+    expect(await backfillNoteSearchIndex(1)).toBe(1);
+    expect((await request().query({ q: 'newerlegacytoken' })).body[0].id).toBe(note.id);
+    expect((await request().query({ q: 'originaltoken' })).body).toEqual([]);
+    const [row] = await db.select().from(noteMetadata).where(eq(noteMetadata.id, note.id));
+    expect(row.searchIndexedVersion).toBe(2);
+  });
 });
