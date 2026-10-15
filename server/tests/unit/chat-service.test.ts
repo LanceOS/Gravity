@@ -837,12 +837,17 @@ describe('ChatService MCP integration regressions', () => {
       .where(eq(workspaceSettings.workspaceId, workspace.id));
     const ai = { chat: vi.fn()
       .mockResolvedValueOnce({ content: '', toolCalls: [{ id: 'disabled', name: 'set_ticket_status', arguments: { ticketKey: 'GRV-1', status: 'done' } }] })
-      .mockResolvedValueOnce({ content: 'This operation is disabled.' }) };
+      .mockResolvedValue({ content: 'This operation is disabled.' }) };
     const executeTool = vi.fn();
     await new ChatService({ ai, executeTool }).generateResponse({ userId, chatId, projectId, message: 'Change its status' });
     expect(executeTool).not.toHaveBeenCalled();
     const result = ai.chat.mock.calls[1][2].messages.find((message: any) => message.role === 'tool');
     expect(JSON.parse(result.content)).toMatchObject({ isError: true, error: { message: expect.stringContaining('disabled') } });
+
+    await new ChatService({ ai, executeTool }).generateResponse({ userId, chatId, projectId, message: 'What happened?' });
+    const replayed = ai.chat.mock.calls[2][2].messages.find((message: any) => message.role === 'tool');
+    expect(replayed).toMatchObject({ name: 'set_ticket_status', tool_call_id: 'disabled' });
+    expect(JSON.parse(replayed.content)).toMatchObject({ isError: true });
   });
 
   it('replays new and legacy tool output as matched tool messages, never system instructions', async () => {
@@ -932,6 +937,12 @@ describe('generation cancellation and budgets', () => {
     const stored = await rows(fixture.chatId);
     expect(stored.find(row => asJsonMetadata(row.metadata).source === 'tool')?.content).toContain('committed-ticket');
     expect(stored.filter(row => asJsonMetadata(row.metadata).status === 'canceled')).toHaveLength(1);
+
+    const retryAi = { chat: vi.fn().mockResolvedValue({ content: 'The ticket was created.' }) };
+    await new ChatService({ ai: retryAi }).generateResponse({ ...fixture, message: 'What happened?' });
+    expect(retryAi.chat.mock.calls[0][2].messages).toContainEqual(expect.objectContaining({
+      role: 'tool', name: 'create_ticket', tool_call_id: 'first', content: '{"id":"committed-ticket"}',
+    }));
   });
 
   it('retains the concurrency slot until an in-flight tool settles after disconnect', async () => {
