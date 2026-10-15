@@ -15,7 +15,9 @@ import {
   Stepper,
   Tabs,
 } from '@library';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+afterEach(() => vi.restoreAllMocks());
 
 function NavigationHarness() {
   const [page, setPage] = useState(1);
@@ -83,6 +85,34 @@ function NavigationHarness() {
 }
 
 describe('library navigation components', () => {
+  it('tracks the last section past its threshold with a passive capture listener', () => {
+    const addListener = vi.spyOn(window, 'addEventListener');
+    const removeListener = vi.spyOn(window, 'removeEventListener');
+    const { unmount } = render(
+      <div data-testid="scroller"><Scrollspy targets={['section-a', 'section-b']}>
+        <section id="section-a">Alpha section</section>
+        <section id="section-b">Beta section</section>
+      </Scrollspy></div>,
+    );
+    const scrollCall = addListener.mock.calls.find(([type]) => type === 'scroll');
+    expect(scrollCall).toEqual(['scroll', expect.any(Function), { capture: true, passive: true }]);
+
+    let firstTop = 80;
+    let secondTop = 200;
+    vi.spyOn(document.getElementById('section-a')!, 'getBoundingClientRect').mockImplementation(() => new DOMRect(0, firstTop, 100, 40));
+    vi.spyOn(document.getElementById('section-b')!, 'getBoundingClientRect').mockImplementation(() => new DOMRect(0, secondTop, 100, 40));
+
+    fireEvent.scroll(screen.getByTestId('scroller'));
+    expect(screen.getByRole('link', { name: 'section-a' })).toHaveStyle({ fontWeight: '500' });
+    firstTop = 40;
+    secondTop = 120;
+    fireEvent.scroll(screen.getByTestId('scroller'));
+    expect(screen.getByRole('link', { name: 'section-b' })).toHaveStyle({ fontWeight: '500' });
+
+    unmount();
+    expect(removeListener).toHaveBeenCalledWith('scroll', scrollCall?.[1], true);
+  });
+
   it('renders the structural navigation primitives', () => {
     render(<NavigationHarness />);
 
