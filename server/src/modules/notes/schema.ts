@@ -1,4 +1,4 @@
-import { customType, index, integer, pgTable, text, timestamp } from 'drizzle-orm/pg-core';
+import { customType, index, integer, pgTable, primaryKey, text, timestamp } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 
 const tsvector = customType<{ data: string }>({
@@ -51,3 +51,22 @@ export const noteBucketCleanups = pgTable('note_bucket_cleanups', {
   nextAttemptAt: timestamp('next_attempt_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, table => ({ recoveryIdx: index('note_bucket_cleanups_recovery_idx').on(table.nextAttemptAt, table.bucketPath) }));
+
+// A committed claim fences note publication before an object DELETE begins.
+// Ambiguous requests retain the fence because a delayed DELETE may still land.
+export const noteMediaDeletions = pgTable('note_media_deletions', {
+  bucketPath: text('bucket_path').notNull(),
+  filename: text('filename').notNull(),
+  noteId: text('note_id').notNull(),
+  etag: text('etag').notNull(),
+  claimId: text('claim_id').notNull(),
+  status: text('status').notNull().default('pending'),
+  attempts: integer('attempts').notNull().default(0),
+  lastError: text('last_error'),
+  nextAttemptAt: timestamp('next_attempt_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, table => ({
+  pk: primaryKey({ columns: [table.bucketPath, table.filename] }),
+  recoveryIdx: index('note_media_deletions_recovery_idx').on(table.nextAttemptAt, table.bucketPath, table.filename)
+    .where(sql`status <> 'confirmed'`),
+}));

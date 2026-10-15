@@ -21,9 +21,9 @@ export async function withNoteReferenceLock<T>(work: (tx: NoteTransaction) => Pr
     }
   }
   return db.transaction(async tx => {
-    // Bound contention, not total transaction duration: storage inventories run
-    // while this lock is held. Durable claims for RPCs that outlive a lost
-    // transaction, and orphan-cleanup coordination, remain GRAV-250 work.
+    // Bound contention, not total transaction duration: reference inventories
+    // and explicit deletion run while this lock is held. Durable media claims
+    // keep publication fenced if a storage RPC outlives its transaction.
     await tx.execute(sql`set local lock_timeout = '5s'`);
     // Cross-project references require a global mutation lock. Reads continue;
     // inserts/updates/deletes and other holders wait until this tx commits.

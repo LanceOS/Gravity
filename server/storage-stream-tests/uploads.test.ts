@@ -110,6 +110,20 @@ describe('request upload lifecycle', () => {
     expect(body.destroyed).toBe(true);
     expect(baseline(source)).toEqual(listeners);
   });
+  it('bounds a stalled upload even when storage ignores cancellation', async () => {
+    send.mockImplementation((command: any, options: any) => {
+      body = command.input.Body;
+      signal = options.abortSignal;
+      return new Promise(() => {});
+    });
+    const source = new PassThrough();
+    const listeners = baseline(source);
+    const upload = RustFS.saveFileStream('notes/synthetic', 'file.txt', source, undefined, 10);
+    await expect(upload).rejects.toThrow('UPLOAD_TIMEOUT');
+    expect(signal.aborted).toBe(true);
+    expect(body.destroyed).toBe(true);
+    expect(baseline(source)).toEqual(listeners);
+  });
   it('forwards destination errors while the source remains open', async () => {
     const source = new PassThrough();
     await checkFailure(source, () => body.destroy(new Error('destination failed')), 'destination failed');

@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import { MetadataRepository } from '../src/modules/notes/repositories.js';
 import { RustFS } from '../src/lib/rustfs.js';
+import { withNoteReferenceLock } from '../src/modules/notes/reference-lock.js';
+import { createMediaDeletionClaim } from '../src/modules/notes/services/media-claims.js';
+import { noteMediaDeletions } from '../src/modules/notes/schema.js';
 import { api, createAuthenticatedApi, seedWorkspaceFixture } from './helpers/test-helpers.js';
 
 describe('notes routes', () => {
@@ -129,6 +132,25 @@ describe('notes routes', () => {
     expect(missing.body.error).toBe('Media cleanup blocked; see server diagnostics.');
     expect(diagnostic).toHaveBeenCalledWith('Note API failure', expect.objectContaining({ requestId: missing.body.requestId, operation: '/notes/:noteId/cleanup' }));
     expect(remove).not.toHaveBeenCalled();
+  });
+
+  it('returns a safe conflict for a filename with an ambiguous deletion claim', async () => {
+    const owner = await createAuthenticatedApi({ email: 'media-claim-owner@example.com' });
+    const { project } = await seedWorkspaceFixture({ owner: { ...owner.user, avatarUrl: owner.user.avatar } });
+    const created = await owner.post('/api/v1/notes').set('x-project-id', project.id)
+      .send({ title: 'Media claim', body: 'Body' });
+    expect(created.status).toBe(201);
+    await withNoteReferenceLock(async tx => {
+      await createMediaDeletionClaim(created.body.id, created.body.bucketPath, 'photo.png', 'old-etag', tx);
+      await tx.update(noteMediaDeletions).set({ status: 'ambiguous' });
+    });
+    const blocked = await owner.post(`/api/v1/notes/${created.body.id}/media?filename=photo.png`)
+      .set('x-project-id', project.id).set('Content-Type', 'application/octet-stream').send(Buffer.from('new photo'));
+    expect(blocked.status).toBe(409);
+    expect(blocked.body.error).toContain('Upload with another filename');
+    const renamed = await owner.post(`/api/v1/notes/${created.body.id}/media?filename=renamed.png`)
+      .set('x-project-id', project.id).set('Content-Type', 'application/octet-stream').send(Buffer.from('new photo'));
+    expect(renamed.status).toBe(201);
   });
 
   it('preserves content and revision after rejected updates', async () => {

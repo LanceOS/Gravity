@@ -11,6 +11,7 @@ function fixture() {
     listFiles: vi.fn(async () => ['body.md', '.revisions/old.json', 'photo.png']),
     statFile: vi.fn(async () => ({ lastModified: new Date(0), etag: 'version-1' })),
     deleteFile: vi.fn(async () => {}),
+    claimOrphan: vi.fn(async () => 'test-claim'),
   } satisfies MediaCleanupDependencies;
 }
 

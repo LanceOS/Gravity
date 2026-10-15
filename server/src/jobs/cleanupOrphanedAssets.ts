@@ -4,8 +4,12 @@ import { recoverAbandonedNoteRevisions } from '../modules/notes/services/notes.j
 import { RustFS } from '../lib/rustfs.js';
 import { MetadataRepository, NotesRepository } from '../modules/notes/repositories.js';
 import { cleanupMedia, type CleanupOptions } from '../modules/notes/services/media-cleanup.js';
+import { recoverMediaDeletionClaims } from '../modules/notes/services/media-claims.js';
 
 async function runCleanup(dryRun = false, options: Omit<CleanupOptions, 'dryRun'> = {}) {
+  // Retry durable claims before another cleanup path or malformed inventory
+  // can abort the job.
+  const mediaDeletionClaims = await recoverMediaDeletionClaims({ dryRun });
   const deletedNoteBuckets = await recoverDeletedNoteBuckets({ dryRun });
   const media = await cleanupMedia({
     listNotes: MetadataRepository.listNotesForMediaCleanup,
@@ -15,7 +19,7 @@ async function runCleanup(dryRun = false, options: Omit<CleanupOptions, 'dryRun'
     deleteFile: (bucket, file, etag) => RustFS.deleteFile(bucket, file, etag),
   }, { ...options, dryRun });
   const abandonedRevisions = await recoverAbandonedNoteRevisions(dryRun);
-  return { ...media, abandonedRevisions, deletedNoteBuckets };
+  return { ...media, mediaDeletionClaims, abandonedRevisions, deletedNoteBuckets };
 }
 
 if (import.meta.url) {

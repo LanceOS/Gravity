@@ -59,6 +59,7 @@ describe('cleanup inventory before deletion', () => {
       getBody: async () => '![asset](/api/v1/notes/note/media/later-page.png)',
       listFiles: async () => { throw new Error('listing interrupted'); },
       deleteFile: remove,
+      claimOrphan: async () => 'test-claim',
     });
     await expect(service.cleanupNoteMedia('note', 'project')).rejects.toThrow('listing interrupted');
     expect(remove).not.toHaveBeenCalled();
@@ -78,6 +79,7 @@ describe('cleanup inventory before deletion', () => {
       getBody: async () => '![keep](/api/v1/notes/note/media/keep.png)',
       listFiles: async () => ['body.md', ...Array.from({ length: 1001 }, (_, i) => `orphan-${i}.png`), 'keep.png'],
       deleteFile: remove,
+      claimOrphan: async () => 'test-claim',
     });
     const result = await service.cleanupNoteMedia('note', 'project');
     expect(maximum).toBe(1);
