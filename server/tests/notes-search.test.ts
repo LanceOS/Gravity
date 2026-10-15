@@ -1,8 +1,9 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { createAuthenticatedApi, seedWorkspaceFixture } from './helpers/test-helpers.js';
 import { MetadataRepository, NotesRepository } from '../src/modules/notes/repositories.js';
 import { backfillNoteSearchIndex } from '../src/modules/notes/services/search-backfill.js';
 import { noteMetadata } from '../src/modules/notes/schema.js';
+import { highlightedSnippet } from '../src/modules/notes/search-text.js';
 import { db } from '../src/db/index.js';
 import { eq } from 'drizzle-orm';
 
@@ -23,6 +24,14 @@ async function fixture() {
 }
 
 describe('complete note search', () => {
+  it('keeps a late highlighted match inside a bounded plain-text snippet', () => {
+    const headline = `${'prefix '.repeat(30)}⟦latezephyr⟧ after`;
+    const snippet = highlightedSnippet(headline, 'Title', 'prefix latezephyr');
+    expect(snippet).toContain('latezephyr');
+    expect(snippet).not.toContain('⟦');
+    expect(snippet.length).toBeLessThanOrEqual(202);
+    expect(highlightedSnippet('unrelated body', 'Latezephyr title', 'latezephyr')).toContain('Latezephyr');
+  });
   it('finds late Markdown and rich-text terms while keeping previews and snippets bounded', async () => {
     const { request, create } = await fixture();
     const markdown = await create('Markdown', `${'prefix '.repeat(90)}**latezephyr** [linked words](https://example.com)`);
@@ -49,6 +58,7 @@ describe('complete note search', () => {
     const note = await first.create('Private', 'uniquesecretterm');
     expect((await first.request().query({ q: 'uniquesecretterm' })).body.map((item: any) => item.id)).toContain(note.id);
     expect((await second.request().query({ q: 'uniquesecretterm' })).body).toEqual([]);
+    expect(await MetadataRepository.searchNotesMetadata(first.project.id, second.owner.user.id, 'uniquesecretterm')).toEqual([]);
     expect((await second.owner.get('/api/v1/notes/search').set('x-project-id', first.project.id).query({ q: 'uniquesecretterm' })).status).toBe(403);
     expect((await first.owner.delete(`/api/v1/notes/${note.id}`).set('x-project-id', first.project.id)).status).toBe(200);
     expect((await first.request().query({ q: 'uniquesecretterm' })).body).toEqual([]);
@@ -100,5 +110,33 @@ describe('complete note search', () => {
     const second = await request().query({ q: 'rankneedle', limit: 1, offset: 1 });
     expect(first.body.map((item: any) => item.id)).toEqual([titleMatch.id]);
     expect(second.body.map((item: any) => item.id)).toEqual([bodyMatch.id]);
+  });
+
+  it('resumes after a storage outage and does not publish a stale backfill read', async () => {
+    const { owner, project, request } = await fixture();
+    const id = `note-${crypto.randomUUID()}`;
+    const bucketPath = `notes/${project.id}/${owner.user.id}/${crypto.randomUUID()}`;
+    await NotesRepository.saveBody(bucketPath, 'staletoken');
+    await MetadataRepository.createNoteMetadata({ id, projectId: project.id, userId: owner.user.id,
+      title: 'Legacy race', bucketPath });
+
+    vi.spyOn(NotesRepository, 'getBody').mockRejectedValueOnce(Object.assign(new Error('offline'), { code: 'ECONNRESET' }));
+    await expect(backfillNoteSearchIndex(1)).rejects.toMatchObject({ code: 'ECONNRESET' });
+    expect((await db.select().from(noteMetadata).where(eq(noteMetadata.id, id)))[0].searchText).toBeNull();
+
+    let release!: (body: string) => void;
+    let markStarted!: () => void;
+    const started = new Promise<void>(resolve => { markStarted = resolve; });
+    const delayedRead = new Promise<string>(resolve => { release = resolve; });
+    vi.spyOn(NotesRepository, 'getBody').mockImplementationOnce(() => { markStarted(); return delayedRead; });
+    const backfill = backfillNoteSearchIndex(1);
+    await started;
+    const update = await owner.patch(`/api/v1/notes/${id}`).set('x-project-id', project.id)
+      .send({ version: 1, body: 'currenttoken' });
+    expect(update.status).toBe(200);
+    release('staletoken');
+    expect(await backfill).toBe(0);
+    expect((await request().query({ q: 'staletoken' })).body).toEqual([]);
+    expect((await request().query({ q: 'currenttoken' })).body[0].id).toBe(id);
   });
 });

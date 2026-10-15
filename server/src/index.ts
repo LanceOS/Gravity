@@ -9,6 +9,7 @@ import { closeHttpServer } from './lib/http-shutdown.js';
 
 async function main() {
   let stopMcpEventBridge: () => Promise<void> = async () => {};
+  let stopNoteSearchBackfill: () => void = () => {};
   if (env.encryptedCredentialsMode === 'disabled') console.warn('Encrypted credentials and cloud AI are disabled (ENCRYPTED_CREDENTIALS_MODE=disabled).');
   const app = createApp();
   const server = createServer(app);
@@ -41,6 +42,7 @@ async function main() {
     }
 
     stopAutoRefresh();
+    stopNoteSearchBackfill();
     await stopMcpEventBridge();
 
     try {
@@ -90,12 +92,12 @@ async function main() {
     // Bucket creation follows the existing first-write provisioning policy.
     const { initializeObjectStorage } = await import('./lib/dependency-readiness.js');
     await initializeObjectStorage();
-    const { backfillNoteSearchIndex } = await import('./modules/notes/services/search-backfill.js');
-    await backfillNoteSearchIndex();
     await startServiceTokens();
     if (!isShuttingDown) {
       stopMcpEventBridge = startMcpEventBridge();
       completeServerInitialization();
+      const { startNoteSearchBackfill } = await import('./modules/notes/services/search-backfill.js');
+      stopNoteSearchBackfill = startNoteSearchBackfill();
     }
   } catch (error) {
     beginServerInitialization();

@@ -12,7 +12,7 @@ export async function backfillNoteSearchIndex(batchSize = 100): Promise<number> 
   let raced = false;
   for (;;) {
     const rows = await db.select({
-      id: noteMetadata.id, title: noteMetadata.title, version: noteMetadata.version,
+      id: noteMetadata.id, version: noteMetadata.version,
       bucketPath: noteMetadata.bucketPath, bodyKey: noteMetadata.bodyKey,
     }).from(noteMetadata).where(and(isNull(noteMetadata.searchText), gt(noteMetadata.id, cursor)))
       .orderBy(asc(noteMetadata.id)).limit(batchSize);
@@ -44,4 +44,25 @@ export async function backfillNoteSearchIndex(batchSize = 100): Promise<number> 
       if (!changed.length) raced = true;
     }
   }
+}
+
+/** Keep transient storage failures from taking down the API; retry from null rows. */
+export function startNoteSearchBackfill(retryDelayMs = 60_000): () => void {
+  let stopped = false;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const run = async () => {
+    if (stopped) return;
+    try {
+      await backfillNoteSearchIndex();
+    } catch (error) {
+      if (stopped) return;
+      console.error('Note search backfill deferred; retrying after storage or database recovery', {
+        code: error && typeof error === 'object' && 'code' in error ? String(error.code) : 'unknown',
+      });
+      timer = setTimeout(() => { void run(); }, retryDelayMs);
+      timer.unref();
+    }
+  };
+  void run();
+  return () => { stopped = true; if (timer) clearTimeout(timer); };
 }

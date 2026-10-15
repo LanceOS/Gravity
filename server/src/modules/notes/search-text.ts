@@ -9,7 +9,7 @@ function richText(body: string): string | null {
       (document as { type?: unknown }).type !== 'doc' ||
       !Array.isArray((document as { content?: unknown }).content)) return null;
 
-  const block = new Set(['doc', 'paragraph', 'heading', 'blockquote', 'bullet_list', 'ordered_list', 'list_item', 'code_block']);
+  const block = new Set(['doc', 'blockquote', 'bullet_list', 'ordered_list', 'list_item']);
   const visit = (node: unknown): string => {
     if (!node || typeof node !== 'object' || Array.isArray(node)) return '';
     const value = node as { text?: unknown; type?: unknown; content?: unknown };
@@ -17,7 +17,7 @@ function richText(body: string): string | null {
     if (value.type === 'hard_break') return ' ';
     if (!Array.isArray(value.content)) return '';
     const parts = value.content.map(visit);
-    return parts.join(block.has(String(value.type)) && value.type !== 'paragraph' && value.type !== 'heading' ? ' ' : '');
+    return parts.join(block.has(String(value.type)) ? ' ' : '');
   };
   return visit(document).replace(/\s+/g, ' ').trim();
 }
@@ -52,4 +52,13 @@ export function searchSnippet(searchText: string, query: string): string {
   const start = Math.max(0, (matches.length ? Math.min(...matches) : 0) - 70);
   const snippet = searchText.slice(start, start + 200).trim();
   return `${start ? '…' : ''}${snippet}${start + 200 < searchText.length ? '…' : ''}`;
+}
+
+export function highlightedSnippet(headline: string, title: string, query: string): string {
+  const match = headline.indexOf('⟦');
+  if (match < 0) return searchSnippet(title, query);
+  const text = headline.replace(/[⟦⟧]/g, '');
+  const start = Math.max(0, match - 70);
+  const snippet = text.slice(start, start + 200).trim();
+  return `${start ? '…' : ''}${snippet}${start + 200 < text.length ? '…' : ''}`;
 }

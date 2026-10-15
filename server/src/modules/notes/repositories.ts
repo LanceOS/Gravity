@@ -4,7 +4,7 @@ import { noteBodyRevisions, noteBucketCleanups, noteMetadata } from './schema.js
 import { RustFS } from '../../lib/rustfs.js';
 import { env } from '../../env.js';
 import { withNoteReferenceLock, type NoteTransaction } from './reference-lock.js';
-import { searchSnippet } from './search-text.js';
+import { highlightedSnippet, searchSnippet } from './search-text.js';
 
 export type NoteMetadata = typeof noteMetadata.$inferSelect;
 
@@ -120,7 +120,7 @@ export class MetadataRepository {
           version: noteMetadata.version,
           createdAt: noteMetadata.createdAt,
           updatedAt: noteMetadata.updatedAt,
-          headline: sql<string>`ts_headline('english', COALESCE(${noteMetadata.searchText}, ''), ${tsQuery}, 'MaxWords=30, MinWords=8, MaxFragments=1')`,
+          headline: sql<string>`ts_headline('english', COALESCE(${noteMetadata.searchText}, ''), ${tsQuery}, 'MaxWords=30, MinWords=8, MaxFragments=1, StartSel=⟦, StopSel=⟧')`,
         })
         .from(noteMetadata)
         .where(
@@ -133,7 +133,7 @@ export class MetadataRepository {
         .orderBy(desc(sql`ts_rank(${noteMetadata.searchVector}, ${tsQuery})`), sortDirection === 'desc' ? desc(noteMetadata.updatedAt) : asc(noteMetadata.updatedAt), asc(noteMetadata.id))
         .limit(pageSize)
         .offset(pageOffset);
-      return rows.map(({ headline, ...row }) => ({ ...row, snippet: searchSnippet(headline.replace(/<\/?b>/g, ''), query) }));
+      return rows.map(({ headline, ...row }) => ({ ...row, snippet: highlightedSnippet(headline, row.title, query) }));
     }
 
     // Fallback for pg-mem: match the same complete content with simple ILIKE.
