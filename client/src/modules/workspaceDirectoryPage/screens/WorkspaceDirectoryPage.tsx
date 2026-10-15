@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import { ArrowRight, FolderPlus, Globe, KeyRound, LogOut, Server, Settings2, Users } from 'lucide-react';
+import React, { useId, useMemo, useState } from 'react';
+import { ArrowRight, Eye, EyeOff, FolderPlus, Globe, KeyRound, LogOut, Server, Settings2, Users } from 'lucide-react';
 import {
   Button,
   TextInput,
@@ -41,6 +41,32 @@ const visuallyHiddenStyle: React.CSSProperties = {
   whiteSpace: 'nowrap',
   border: 0,
 };
+
+function CurrentUserEmail({ email, isMobile }: { email: string; isMobile: boolean }) {
+  const [isVisible, setIsVisible] = useState(false);
+  const emailId = useId();
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-sm)', minWidth: 0 }}>
+      <Server size={15} style={{ color: 'var(--color-text-disabled)' }} />
+      <span style={{ color: 'var(--color-text-disabled)', flexShrink: 0 }}>Current User:</span>
+      <span id={emailId} style={{ fontWeight: 600, color: 'var(--color-text-primary)', minWidth: 0, overflowWrap: 'anywhere' }}>
+        {isVisible ? email : <><span aria-hidden="true">••••••••</span><span style={visuallyHiddenStyle}>Email hidden</span></>}
+      </span>
+      <Button
+        variant="ghost"
+        size="sm"
+        aria-label={isVisible ? 'Hide email' : 'View email'}
+        aria-controls={emailId}
+        aria-expanded={isVisible}
+        onClick={() => setIsVisible(visible => !visible)}
+        style={{ width: isMobile ? '48px' : '36px', height: isMobile ? '48px' : '36px', padding: 0, flexShrink: 0, border: '1px solid var(--color-border-default)' }}
+      >
+        {isVisible ? <EyeOff size={16} aria-hidden="true" /> : <Eye size={16} aria-hidden="true" />}
+      </Button>
+    </div>
+  );
+}
 
 export function WorkspaceDirectoryPage({
   currentUser,
@@ -306,11 +332,7 @@ export function WorkspaceDirectoryPage({
               <span style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>{workspaces.reduce((sum, w) => sum + w.memberCount, 0)}</span>
               <span style={{ color: 'var(--color-text-disabled)' }}>Members</span>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-sm)' }}>
-              <Server size={15} style={{ color: 'var(--color-text-disabled)' }} />
-              <span style={{ color: 'var(--color-text-disabled)' }}>Current User:</span>
-              <span style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>{currentUser.email}</span>
-            </div>
+            <CurrentUserEmail key={JSON.stringify([currentUser.id, currentUser.email])} email={currentUser.email} isMobile={isMobile} />
           </div>
 
           {isMobile && (
