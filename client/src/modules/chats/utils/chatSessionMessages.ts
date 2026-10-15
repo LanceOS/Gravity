@@ -1,6 +1,11 @@
 import type { Message } from '../../ai';
 import type { ChatSessionDetail } from '../types/ChatSession';
 
+function isToolSourced(metadata: unknown): boolean {
+  return metadata !== null && typeof metadata === 'object' && !Array.isArray(metadata)
+    && (metadata as Record<string, unknown>).source === 'tool';
+}
+
 export function normalizeChatHistoryRole(role: string): Message['role'] {
   switch (role.trim().toLowerCase()) {
     case 'user':
@@ -20,6 +25,7 @@ export function normalizeChatHistoryRole(role: string): Message['role'] {
 
 export function toChatMessages(detail: ChatSessionDetail): Message[] {
   const transcript = detail.messages
+    .filter((message) => !isToolSourced(message.metadata))
     .map((message) => ({
       role: normalizeChatHistoryRole(message.role),
       content: message.content,
@@ -28,6 +34,10 @@ export function toChatMessages(detail: ChatSessionDetail): Message[] {
 
   if (transcript.length > 0) {
     return transcript;
+  }
+
+  if (detail.messages.some((message) => isToolSourced(message.metadata))) {
+    return [];
   }
 
   const preview = detail.lastMessagePreview?.trim();

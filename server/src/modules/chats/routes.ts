@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, ilike, inArray } from 'drizzle-orm';
+import { and, asc, desc, eq, ilike, inArray, sql } from 'drizzle-orm';
 import { Router, type Request, type Response } from 'express';
 import { db } from '../../db/index.js';
 import { createRateLimiter } from '../../lib/rateLimit.js';
@@ -57,6 +57,11 @@ function buildMessagePreview(content: string) {
   return `${trimmed.slice(0, CHAT_MESSAGE_PREVIEW_LENGTH - 1).trimEnd()}…`;
 }
 
+function isToolMessage(metadata: unknown) {
+  return metadata !== null && typeof metadata === 'object' && !Array.isArray(metadata)
+    && (metadata as Record<string, unknown>).source === 'tool';
+}
+
 async function loadLastMessagePreviews(sessionIds: string[]): Promise<Map<string, string>> {
   if (sessionIds.length === 0) {
     return new Map();
@@ -68,7 +73,10 @@ async function loadLastMessagePreviews(sessionIds: string[]): Promise<Map<string
       content: chatMessages.content,
     })
     .from(chatMessages)
-    .where(inArray(chatMessages.sessionId, sessionIds))
+    .where(and(
+      inArray(chatMessages.sessionId, sessionIds),
+      sql`coalesce(${chatMessages.metadata}->>'source', '') <> 'tool'`,
+    ))
     .orderBy(chatMessages.sessionId, desc(chatMessages.createdAt), desc(chatMessages.id));
 
   const previewBySessionId = new Map<string, string>();
@@ -372,7 +380,13 @@ export function createChatsRouter() {
         .where(eq(chatMessages.sessionId, chatId))
         .orderBy(asc(chatMessages.createdAt), asc(chatMessages.id));
 
-      const lastMessage = messageRows[messageRows.length - 1];
+      let lastMessage: (typeof messageRows)[number] | undefined;
+      for (let index = messageRows.length - 1; index >= 0; index--) {
+        if (!isToolMessage(messageRows[index].metadata)) {
+          lastMessage = messageRows[index];
+          break;
+        }
+      }
       const lastMessagePreview = lastMessage ? buildMessagePreview(lastMessage.content) : null;
 
       res.json({

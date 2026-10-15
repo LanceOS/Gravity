@@ -8,6 +8,44 @@ import { createId } from '../src/lib/platform.js';
 import { userSettings } from '../src/modules/users/schema.js';
 
 describe('chat sessions routes', () => {
+  it('uses only user-visible rows for list and detail previews while retaining tool rows', async () => {
+    const ownerApi = await createAuthenticatedApi({
+      name: 'Preview Owner', email: 'preview-owner@example.com', role: 'owner',
+    });
+    const { project } = await seedWorkspaceFixture({ owner: {
+      id: ownerApi.user.id, name: ownerApi.user.name, email: ownerApi.user.email,
+      role: 'owner', avatarUrl: ownerApi.user.avatar,
+    } });
+    const chat = await ownerApi.post(`/api/v1/projects/${project.id}/chats`).send({ title: 'Preview Chat' });
+    const chatId = chat.body.id;
+    await db.insert(chatMessages).values([
+      { id: 'visible-message', sessionId: chatId, role: 'user', content: 'Show my tickets', metadata: {}, createdAt: new Date('2026-01-01T00:00:00.000Z') },
+      { id: 'tool-message', sessionId: chatId, role: 'system', content: 'Tool output (list_tickets): {"id":"internal-123"}', metadata: { source: 'tool' }, createdAt: new Date('2026-01-01T00:00:01.000Z') },
+    ]);
+
+    const list = await ownerApi.get(`/api/v1/projects/${project.id}/chats`);
+    expect(list.status).toBe(200);
+    expect(list.body.find((session: { id: string }) => session.id === chatId).lastMessagePreview).toBe('Show my tickets');
+
+    const detail = await ownerApi.get(`/api/v1/projects/${project.id}/chats/${chatId}`);
+    expect(detail.status).toBe(200);
+    expect(detail.body.lastMessagePreview).toBe('Show my tickets');
+    expect(detail.body.messages).toHaveLength(2);
+    expect(detail.body.messages[1]).toMatchObject({ id: 'tool-message', metadata: { source: 'tool' } });
+
+    const toolOnlyChat = await ownerApi.post(`/api/v1/projects/${project.id}/chats`).send({ title: 'Tool Only' });
+    await db.insert(chatMessages).values({
+      id: 'tool-only-message', sessionId: toolOnlyChat.body.id, role: 'system',
+      content: 'Tool output (list_tickets): {"id":"internal-456"}', metadata: { source: 'tool' },
+      createdAt: new Date('2026-01-01T00:00:00.000Z'),
+    });
+    const listWithToolOnly = await ownerApi.get(`/api/v1/projects/${project.id}/chats`);
+    expect(listWithToolOnly.body.find((session: { id: string }) => session.id === toolOnlyChat.body.id).lastMessagePreview).toBeNull();
+    const toolOnlyDetail = await ownerApi.get(`/api/v1/projects/${project.id}/chats/${toolOnlyChat.body.id}`);
+    expect(toolOnlyDetail.body.lastMessagePreview).toBeNull();
+    expect(toolOnlyDetail.body.messages).toHaveLength(1);
+  });
+
   it('creates, lists, updates, retrieves with messages, paginates, and deletes chat sessions', async () => {
     const ownerApi = await createAuthenticatedApi({
       name: 'Chat Owner',
