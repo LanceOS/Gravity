@@ -6,7 +6,8 @@ import { workspaceSettings, tickets, workspaceMembers } from '../src/db/schema.j
 import { bootstrapMcpRegistries } from '../src/modules/mcp/bootstrap.js';
 import { executeTool } from '../src/modules/mcp/tool-executor.js';
 import { handleMcpRequest } from '../src/modules/mcp/request-handler.js';
-import { getToolDefinition, listCanonicalTools, mcpToolsList, registerMcpTools } from '../src/modules/mcp/tools.js';
+import { canonicalToolName, getToolDefinition, listCanonicalTools, mcpToolsList, registerMcpTools, TOOL_ALIAS_GROUPS } from '../src/modules/mcp/tools.js';
+import { ticketToolDefinitions } from '../src/modules/tickets/mcp.js';
 import { seedWorkspaceFixture, seedTicket, seedUser } from './helpers/test-helpers.js';
 
 beforeEach(() => bootstrapMcpRegistries());
@@ -76,6 +77,35 @@ describe('MCP execution boundary', () => {
     const canonical = listCanonicalTools();
     expect(new Set(canonical.map((tool) => tool.name)).size).toBe(canonical.length);
     expect(canonical.find((tool) => tool.name === 'get_ticket')?.aliases).toContain('read_ticket_details');
+  });
+
+  it('advertises ticket action risk consistently in the registered and wire catalogs, including aliases', async () => {
+    const { workspace, owner } = await fixture();
+    const response: any = await handleMcpRequest({ jsonrpc: '2.0', id: 1, method: 'tools/list' }, workspace.id, owner.id);
+    const advertised = new Map<string, any>(response.result.tools.map((tool: any) => [tool.name, tool]));
+    const additive = new Set([
+      'create_ticket', 'create_comment', 'add_comment',
+      'mark_ticket_blocked', 'add_ticket_dependency', 'add_dependency', 'add_ticket_labels',
+    ]);
+    for (const definition of ticketToolDefinitions) {
+      const registered = getToolDefinition(definition.name);
+      const readOnly = /^(list_|get_|read_|preview_|search_)/.test(definition.name);
+      const expected = { readOnlyHint: readOnly, destructiveHint: !readOnly && !additive.has(definition.name), idempotentHint: readOnly };
+      expect(registered?.annotations, definition.name).toMatchObject(expected);
+      if (canonicalToolName(definition.name) === definition.name) {
+        expect(advertised.get(definition.name)?.annotations, definition.name).toMatchObject(expected);
+      } else {
+        expect(advertised.has(definition.name), definition.name).toBe(false);
+      }
+    }
+    for (const group of TOOL_ALIAS_GROUPS) {
+      const canonical = getToolDefinition(group[0]);
+      for (const alias of group.slice(1)) {
+        expect(getToolDefinition(alias)?.annotations, alias).toEqual(canonical?.annotations);
+      }
+    }
+    expect(advertised.get('move_ticket')?.description).toMatch(/flat hierarchy.*any project move clears all labels/i);
+    expect(advertised.get('set_ticket_status')?.description).toMatch(/done or canceled.*blocker\/dependency relationships/i);
   });
 
   it('advertises SDK-valid, exclusive success and error output shapes for every tool', () => {
