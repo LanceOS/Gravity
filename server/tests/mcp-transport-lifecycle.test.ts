@@ -122,6 +122,12 @@ describe('MCP transport and credentials', () => {
     expect(catalog.body.tools.find((tool: any) => tool.name === 'create_ticket').allowedForConnection).toBe(false);
     expect(catalog.body.tools.find((tool: any) => tool.name === 'set_ticket_status').policyParents).toEqual(['update_ticket']);
     expect(catalog.body.tools.find((tool: any) => tool.name === 'search_tickets').policyParents).toEqual(['list_tickets']);
+    for (const name of ['move_ticket', 'update_ticket', 'set_ticket_status', 'edit_ticket_content', 'set_ticket_pr']) {
+      expect(catalog.body.tools.find((tool: any) => tool.name === name)?.annotations, name)
+        .toMatchObject({ readOnlyHint: false, destructiveHint: true, idempotentHint: false });
+    }
+    expect(catalog.body.tools.find((tool: any) => tool.name === 'add_ticket_labels')?.annotations)
+      .toMatchObject({ readOnlyHint: false, destructiveHint: false });
     expect((await memberApi.get(`/api/v1/workspaces/${workspace.id}/mcp/connections`)).body.map((row: any) => row.id)).toEqual([issued.body.id]);
     const read = await api().post('/api/v1/mcp').set('Authorization', `Bearer ${issued.body.auth.token}`).set('X-Workspace-Id', workspace.id)
       .send({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'list_tickets', arguments: {} } });
