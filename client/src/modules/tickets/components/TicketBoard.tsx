@@ -27,6 +27,9 @@ export const TicketBoard = React.memo(({
   userAvatarById,
   onMoveTicket,
   onSelectTicket,
+  selectedTicketIds,
+  onToggleTicketSelection,
+  onVisibleTicketsChange,
   onOpenCreateTicket,
   onLoadMore,
   hasMoreRows,
@@ -179,27 +182,40 @@ export const TicketBoard = React.memo(({
       const fullTickets = ticketsByColumn[col.id as keyof typeof ticketsByColumn] || [];
       const visibleCount = visibleByColumn[col.id] ?? INITIAL_CARDS_PER_COLUMN;
       const colTickets = fullTickets.slice(0, visibleCount);
-        return colTickets.map((ticket) => {
-          return {
-            id: ticket.id,
-            title: ticket.title,
-            status: ticket.status,
-            content: (
+      return colTickets.map((ticket) => ({
+        id: ticket.id,
+        title: ticket.title,
+        status: ticket.status,
+        content: (
+          <div className="ticket-board__selectable-card" style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
+            {onToggleTicketSelection && <input
+              type="checkbox"
+              aria-label={`Select ${ticket.key}: ${ticket.title}`}
+              checked={selectedTicketIds?.has(ticket.id) ?? false}
+              onChange={() => onToggleTicketSelection(ticket)}
+              style={{ flex: 'none', marginTop: 16, width: 16, height: 16, cursor: 'pointer' }}
+            />}
             <TicketContextMenu ticket={ticket} availableTickets={availableTickets}>
-                <TicketCard
-                  ticket={ticket}
-                  onClick={getSelectTicketHandler(ticket)}
-                  onDragStart={getDragStartHandler(ticket)}
-                  priority={ticket.priority}
-                  priorityColor={getPriorityColor(ticket.priority)}
-                  assigneeAvatar={getAssigneeAvatar(userAvatarById, ticket.assigneeId)}
-                />
+              <TicketCard
+                ticket={ticket}
+                onClick={getSelectTicketHandler(ticket)}
+                onDragStart={getDragStartHandler(ticket)}
+                priority={ticket.priority}
+                priorityColor={getPriorityColor(ticket.priority)}
+                assigneeAvatar={getAssigneeAvatar(userAvatarById, ticket.assigneeId)}
+              />
             </TicketContextMenu>
-          ),
-          };
-      });
+          </div>
+        ),
+      }));
     });
-  }), [availableTickets, getDragStartHandler, getSelectTicketHandler, ticketsByColumn, userAvatarById, visibleByColumn]);
+  }), [availableTickets, getDragStartHandler, getSelectTicketHandler, onToggleTicketSelection, selectedTicketIds, ticketsByColumn, userAvatarById, visibleByColumn]);
+
+  const visibleTicketIds = useMemo(() => BOARD_COLUMNS.flatMap((column) =>
+    (ticketsByColumn[column.id as keyof typeof ticketsByColumn] || [])
+      .slice(0, visibleByColumn[column.id] ?? INITIAL_CARDS_PER_COLUMN).map((ticket) => ticket.id)
+  ), [ticketsByColumn, visibleByColumn]);
+  useEffect(() => onVisibleTicketsChange?.(visibleTicketIds), [onVisibleTicketsChange, visibleTicketIds]);
 
   const visibleCardCount = formattedCards.length;
 
@@ -246,7 +262,7 @@ export const TicketBoard = React.memo(({
           columns={BOARD_COLUMNS}
           cards={formattedCards}
           cardRowHeight={TICKET_CARD_ROW_HEIGHT}
-          cardFocusSelector=".ticket-card"
+          cardFocusSelector="input[type='checkbox'], .ticket-card"
           onCardMove={handleCardMove}
           renderColumnHeader={renderColumnHeader}
         />

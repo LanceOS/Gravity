@@ -1177,6 +1177,8 @@ export async function updateTicketRecordWithEffects(
     projectId: string;
   }>,
   projectId?: string,
+  expectedUpdatedAt?: Date,
+  authorizedWorkspaceId?: string,
 ): Promise<TicketUpdateEffects | null> {
   const existingRows = await db
     .select()
@@ -1191,6 +1193,9 @@ export async function updateTicketRecordWithEffects(
   const sourceProject = await getProjectScope(existingTicket.projectId);
   if (!sourceProject) {
     throw new Error(`Project ${existingTicket.projectId} is missing.`);
+  }
+  if (authorizedWorkspaceId && sourceProject.workspaceId !== authorizedWorkspaceId) {
+    throw new Error('TICKET_MOVE_CROSS_WORKSPACE');
   }
 
   const requestedProjectId = typeof updates.projectId === 'string' ? updates.projectId.trim() : '';
@@ -1260,12 +1265,31 @@ export async function updateTicketRecordWithEffects(
       .where(and(eq(tickets.id, ticketId), eq(tickets.projectId, sourceProject.id))).limit(1);
     // Another move may have completed between the initial lookup and acquiring the project lock.
     if (!currentTicket) return null;
+    if (expectedUpdatedAt && currentTicket.updatedAt.getTime() !== expectedUpdatedAt.getTime()) return null;
+    if (expectedUpdatedAt) {
+      payload.updatedAt = new Date(Math.max(payload.updatedAt.getTime(), currentTicket.updatedAt.getTime() + 1));
+    }
     if (nextAssigneeId !== undefined || isProjectMove) {
       await assertAssigneeInProjectScope(tx, targetProject, nextAssigneeId !== undefined ? nextAssigneeId : currentTicket.assigneeId);
     }
     await assertTicketRelationships(tx, targetProject, ticketId,
       nextCycleId !== undefined ? nextCycleId : currentTicket.cycleId,
       nextParentId !== undefined ? nextParentId : currentTicket.parentId);
+
+    const shouldUpdateLabels = updates.labelIds !== undefined || projectLabelScopeChanged || teamChanged;
+    const labelIdsForTicket = nextLabelIds ?? [];
+    const resolvedLabels = shouldUpdateLabels && labelIdsForTicket.length > 0
+      ? await tx.select({ ...labelSelectFields }).from(labels).where(
+          targetProject.hierarchyMode === 'flat'
+            ? and(eq(labels.projectId, targetProject.id), inArray(labels.id, labelIdsForTicket))
+            : and(eq(labels.teamId, targetProject.teamId), isNull(labels.projectId), inArray(labels.id, labelIdsForTicket)),
+        )
+      : [];
+    if (shouldUpdateLabels && labelIdsForTicket.length > 0 && resolvedLabels.length !== labelIdsForTicket.length) {
+      throw new Error(targetProject.hierarchyMode === 'flat'
+        ? 'One or more labels were not found for this project.'
+        : 'One or more labels were not found for this team.');
+    }
 
     const rows = await tx
       .update(tickets)
@@ -1306,27 +1330,7 @@ export async function updateTicketRecordWithEffects(
       await tx.delete(ticketRelationships).where(eq(ticketRelationships.blockedTicketId, ticketId));
     }
 
-    if (updates.labelIds !== undefined || projectLabelScopeChanged || teamChanged) {
-      const labelIdsForTicket = nextLabelIds ?? [];
-      const resolvedLabels = labelIdsForTicket.length > 0
-        ? await tx
-            .select({
-              ...labelSelectFields,
-            })
-            .from(labels)
-            .where(
-              targetProject.hierarchyMode === 'flat'
-                ? and(eq(labels.projectId, targetProject.id), inArray(labels.id, labelIdsForTicket))
-                : and(eq(labels.teamId, targetProject.teamId), isNull(labels.projectId), inArray(labels.id, labelIdsForTicket)),
-            )
-        : [];
-
-      if (labelIdsForTicket.length > 0 && resolvedLabels.length !== labelIdsForTicket.length) {
-        throw new Error(targetProject.hierarchyMode === 'flat'
-          ? 'One or more labels were not found for this project.'
-          : 'One or more labels were not found for this team.');
-      }
-
+    if (shouldUpdateLabels) {
       await tx.delete(ticketLabels).where(eq(ticketLabels.ticketId, ticketId));
       if (resolvedLabels.length > 0) {
         await tx.insert(ticketLabels).values(

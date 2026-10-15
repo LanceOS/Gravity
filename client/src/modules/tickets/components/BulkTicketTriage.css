@@ -1,0 +1,8 @@
+.bulk-ticket-triage { padding: 8px 12px; border-bottom: 1px solid var(--border-subtle); background: var(--surface-glass-subtle); color: var(--color-text-primary); font-size: 12px; }
+.bulk-ticket-triage__controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.bulk-ticket-triage button, .bulk-ticket-triage select { min-height: 30px; border: 1px solid var(--border-subtle); border-radius: 4px; background: var(--color-surface-card); color: var(--color-text-primary); }
+.bulk-ticket-triage button { padding: 4px 8px; cursor: pointer; }
+.bulk-ticket-triage button:disabled { opacity: .55; cursor: default; }
+.bulk-ticket-triage label { display: inline-flex; align-items: center; gap: 4px; }
+.bulk-ticket-triage__preview, .bulk-ticket-triage__results { margin-top: 8px; }
+.bulk-ticket-triage ul { max-height: 140px; overflow: auto; margin: 4px 0 0; padding-left: 20px; }

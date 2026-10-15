@@ -8,6 +8,9 @@ export interface TicketBoardProps {
   userAvatarById: Record<string, string>;
   onMoveTicket: (ticketId: string, updates: Partial<Ticket>) => Promise<void>;
   onSelectTicket: (ticket: Ticket) => void;
+  selectedTicketIds?: ReadonlySet<string>;
+  onToggleTicketSelection?: (ticket: Ticket) => void;
+  onVisibleTicketsChange?: (ids: string[]) => void;
   onOpenCreateTicket: (initialStatus?: Ticket['status']) => void;
   onLoadMore?: () => void;
   hasMoreRows?: boolean;

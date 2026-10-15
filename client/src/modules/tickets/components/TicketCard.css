@@ -21,6 +21,11 @@
   contain-intrinsic-size: 160px;
 }
 
+.ticket-board__selectable-card .ticket-card.card {
+  flex: 1;
+  min-width: 0;
+}
+
 .ticket-card__key {
   font-family: var(--mono);
   font-size: 11px;

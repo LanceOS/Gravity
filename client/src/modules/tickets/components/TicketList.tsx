@@ -92,6 +92,9 @@ export const TicketList = React.memo(({
   userAvatarById,
   projectById,
   onSelectTicket,
+  selectedTicketIds,
+  onToggleTicketSelection,
+  onVisibleTicketsChange,
   onLoadMore,
   hasMoreRows,
   isLoadingMoreRows,
@@ -181,6 +184,9 @@ export const TicketList = React.memo(({
       visibleTicketCount,
     };
   }), [filteredCount, groupedTickets, projectById, showMoreButton, userAvatarById, visibleByStatus]);
+
+  const visibleTicketIds = useMemo(() => listItems.flatMap((item) => item.kind === 'ticket' ? [item.ticket.id] : []), [listItems]);
+  useEffect(() => onVisibleTicketsChange?.(visibleTicketIds), [onVisibleTicketsChange, visibleTicketIds]);
 
   useEffect(() => {
     const listElement = listRef.current;
@@ -338,17 +344,26 @@ export const TicketList = React.memo(({
             boxSizing: 'border-box',
           }}
         >
-          {isMobileTicketLayout ? (
-            <div className="ticket-list__row-mobile">
-              <TicketRowMobile {...rowProps} />
-            </div>
-          ) : (
-            <div className="ticket-list__row-desktop">
-              <TicketContextMenu ticket={item.ticket} availableTickets={availableTickets}>
-                <TicketRow {...rowProps} />
-              </TicketContextMenu>
-            </div>
-          )}
+          <div className={`ticket-list__selectable-row${isMobileTicketLayout ? ' ticket-list__selectable-row--mobile' : ''}`}>
+            {onToggleTicketSelection && <input
+              type="checkbox"
+              className="ticket-list__select-checkbox"
+              aria-label={`Select ${item.ticket.key}: ${item.ticket.title}`}
+              checked={selectedTicketIds?.has(item.ticket.id) ?? false}
+              onChange={() => onToggleTicketSelection(item.ticket)}
+            />}
+            {isMobileTicketLayout ? (
+              <div className="ticket-list__row-mobile">
+                <TicketRowMobile {...rowProps} />
+              </div>
+            ) : (
+              <div className="ticket-list__row-desktop">
+                <TicketContextMenu ticket={item.ticket} availableTickets={availableTickets}>
+                  <TicketRow {...rowProps} />
+                </TicketContextMenu>
+              </div>
+            )}
+          </div>
         </div>
       );
     }
@@ -424,7 +439,7 @@ export const TicketList = React.memo(({
         <div>No tickets match your active filters.</div>
       </div>
     );
-  }, [availableTickets, groupedTickets, handleLoadMoreStatus, isMobileTicketLayout, loadingMoreRows, onLoadMore, onSelectTicket, visibleByStatus]);
+  }, [availableTickets, groupedTickets, handleLoadMoreStatus, isMobileTicketLayout, loadingMoreRows, onLoadMore, onSelectTicket, onToggleTicketSelection, selectedTicketIds, visibleByStatus]);
 
   // Keep the same keyed row tree on both sides of the threshold. Only the
   // rendered range changes, preserving focus when data grows or shrinks.
@@ -446,7 +461,7 @@ export const TicketList = React.memo(({
         items={listItems}
         height={viewportHeight || LIST_DEFAULT_VIRTUAL_HEIGHT}
         getItemKey={listItemKey}
-        itemFocusSelector=".ticket-row, .ticket-row-mobile, button:not(:disabled)"
+        itemFocusSelector="input[type='checkbox'], .ticket-row, .ticket-row-mobile, button:not(:disabled)"
         isItemFocusable={isListItemFocusable}
         virtualize={shouldUseVirtualList}
         measureRows={isMobileTicketLayout}

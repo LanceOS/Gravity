@@ -10,6 +10,9 @@ export interface TicketListProps {
   /** When provided, each ticket row shows a project badge (teams all-tasks view). */
   projectById?: Record<string, Project>;
   onSelectTicket: (ticket: Ticket) => void;
+  selectedTicketIds?: ReadonlySet<string>;
+  onToggleTicketSelection?: (ticket: Ticket) => void;
+  onVisibleTicketsChange?: (ids: string[]) => void;
 }
 
 export interface TicketListPropsWithPerformance extends TicketListProps {

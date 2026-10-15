@@ -1,4 +1,10 @@
 /* Fill the virtual row's content box so only its bottom padding separates cards. */
+.ticket-list__selectable-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.ticket-list__selectable-row:not(.ticket-list__selectable-row--mobile),
+.ticket-list__selectable-row:not(.ticket-list__selectable-row--mobile) > .ticket-list__row-desktop { height: 100%; }
+.ticket-list__selectable-row > .ticket-list__row-desktop,
+.ticket-list__selectable-row > .ticket-list__row-mobile { flex: 1; min-width: 0; }
+.ticket-list__select-checkbox { flex: none; width: 16px; height: 16px; cursor: pointer; }
 .ticket-list__virtual-row > .ticket-list__row-desktop,
 .ticket-list__virtual-row .ticket-row {
   height: 100%;

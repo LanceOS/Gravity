@@ -171,8 +171,25 @@ describe('TicketList', () => {
     expect(props.onSelectTicket).toHaveBeenCalledWith(backlogTicket);
   });
 
+  it('exposes named keyboard checkboxes without opening tickets and reports only currently shown rows', async () => {
+    const user = userEvent.setup();
+    const onToggleTicketSelection = vi.fn();
+    const onVisibleTicketsChange = vi.fn();
+    const { props, rerender } = renderTicketList({ onToggleTicketSelection, onVisibleTicketsChange });
+    const checkbox = screen.getByRole('checkbox', { name: 'Select GRA-1: Fix sync retries' });
+    checkbox.focus();
+    await user.keyboard(' ');
+    expect(onToggleTicketSelection).toHaveBeenCalledWith(backlogTicket);
+    expect(props.onSelectTicket).not.toHaveBeenCalled();
+    expect(onVisibleTicketsChange).toHaveBeenLastCalledWith(['ticket-1', 'ticket-2']);
+
+    rerender(<TicketList {...props} filteredCount={1} groupedTickets={{ ...props.groupedTickets, backlog: [] }} />);
+    expect(onVisibleTicketsChange).toHaveBeenLastCalledWith(['ticket-2']);
+  });
+
   it('virtualizes a large single-status list from its first page and preserves row pitch after loading', async () => {
     const user = userEvent.setup();
+    const onVisibleTicketsChange = vi.fn();
     const tickets = Array.from({ length: 120 }, (_, index) => ({
       ...backlogTicket,
       id: `ticket-${index + 1}`,
@@ -181,6 +198,7 @@ describe('TicketList', () => {
 
     renderTicketList({
       filteredCount: tickets.length,
+      onVisibleTicketsChange,
       groupedTickets: {
         backlog: tickets,
         todo: [],
@@ -191,16 +209,19 @@ describe('TicketList', () => {
       },
     });
 
+    expect(onVisibleTicketsChange).toHaveBeenLastCalledWith(tickets.slice(0, 50).map((ticket) => ticket.id));
+
     const grid = screen.getByRole('grid');
     fireEvent.scroll(grid, { target: { scrollTop: 2200 } });
     await user.click(await screen.findByRole('button', { name: 'Load more 70 remaining' }));
     expect(screen.getByRole('button', { name: 'Load more 20 remaining' })).toHaveFocus();
     fireEvent.scroll(grid, { target: { scrollTop: 4700 } });
     await user.click(await screen.findByRole('button', { name: 'Load more 20 remaining' }));
+    expect(onVisibleTicketsChange).toHaveBeenLastCalledWith(tickets.map((ticket) => ticket.id));
     fireEvent.scroll(grid, { target: { scrollTop: 0 } });
 
     const firstTicketRow = (await screen.findByText('TicketRow GRA-1 avatar-1.png')).closest('.ticket-list__row-desktop');
-    expect(firstTicketRow?.parentElement).toHaveStyle({ height: '50.5px' });
+    expect(firstTicketRow?.parentElement?.parentElement).toHaveStyle({ height: '50.5px' });
   });
 
   it('keeps tickets rendered at the current scroll position when loading more within a virtualized status', async () => {
