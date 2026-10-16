@@ -2,6 +2,29 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.9.3] - 2026-10-15
+
+### Tickets and Workflows
+- Added bulk ticket selection and triage, paginated ticket and label results, and keyset-based ticket search, with tighter project and workspace scoping.
+- Improved large ticket views, ticket-save ordering, cache refresh behavior, and durable ticket numbering; added cycle progress history and burndown data.
+- Enforced workspace boundaries for ticket dependencies and strengthened cycle lifecycle validation.
+
+### Notes, Search, and Storage
+- Added full-content note search, immutable note revisions, shared-note permissions, and owner-only workspace note exports.
+- Improved media upload cancellation, deletion recovery, and orphan cleanup so note assets remain consistent through failures.
+
+### AI and MCP
+- Added workspace OAuth connections and longer-lived MCP credentials, and improved MCP authorization, throttling, audit previews, tool schemas, and error handling.
+- Improved chat context and transcript handling, and bounded MCP stdio request queues and shutdown behavior.
+
+### Security and Operations
+- Hardened rich-text sanitization, Trusted Types, CSP reporting, CSRF, CORS, webhook processing, token verification, and trusted-proxy handling.
+- Added stricter startup and deployment configuration checks, safer Compose secret handling, clearer readiness checks, and multi-architecture Docker image smoke validation.
+
+### Interface and Accessibility
+- Refined the workspace navigation and ticket views, improved keyboard access and focus behavior, and fixed settings navigation and tooltip lifecycle issues.
+- Reduced initial client loading by lazy-loading ticket details and the rich-text editor, and improved rendering performance for large ticket views.
+
 ## [0.8.1] - 2026-07-06
 
 ### UI Stability
