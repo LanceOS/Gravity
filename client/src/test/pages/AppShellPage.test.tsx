@@ -1011,6 +1011,7 @@ describe('AppShellPage', () => {
     await waitFor(() => expect(mocks.fetch).toHaveBeenCalledWith(
       expect.stringContaining('/api/v1/tickets/key/API-1'), expect.anything(),
     ));
+    expect(sharedQueryClient.getQueriesData({ queryKey: ['ticketByKey', 'API-1', 'user-1'] })).toHaveLength(1);
     expect(screen.queryByRole('button', { name: 'Delete active ticket' })).not.toBeInTheDocument();
   });
 

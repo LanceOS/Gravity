@@ -134,6 +134,7 @@ describe('ticket cache helpers', () => {
     const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
 
     queryClient.setQueryData(queryKeys.ticketDetail('ticket-1'), makeTicket({ key: 'ABC-4' }));
+    queryClient.setQueryData(['ticketByKey', 'ABC-4', 'user-1'], makeTicket({ key: 'ABC-4' }));
 
     invalidateTicketCaches(queryClient, 'ticket-1', 'project-1');
 
@@ -144,6 +145,7 @@ describe('ticket cache helpers', () => {
       queryKey: queryKeys.ticketDetail('ticket-1'),
       exact: true,
     });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['ticketByKey', 'ABC-4'] });
     expect(invalidateSpy).not.toHaveBeenCalledWith({
       queryKey: ['tickets', 'detail', 'ABC-4'],
       exact: true,

@@ -396,6 +396,7 @@ export function createTicketsRouter() {
         query: pagePagination && typeof req.query.search === 'string' ? req.query.search : undefined,
         listSort: pagePagination && typeof req.query.listSort === 'string' && ['created', 'label', 'newest', 'newest_urgent', 'oldest', 'priority_desc', 'priority_asc', 'updated_desc', 'updated_asc'].includes(req.query.listSort)
           ? req.query.listSort as 'created' | 'label' | 'newest' | 'newest_urgent' | 'oldest' | 'priority_desc' | 'priority_asc' | 'updated_desc' | 'updated_asc' : undefined,
+        projectPage: pagePagination,
         limit: cursorPagination || pagePagination ? pageSize + 1 : queryLimit,
         offset: cursorPagination ? undefined : queryOffset,
         after,

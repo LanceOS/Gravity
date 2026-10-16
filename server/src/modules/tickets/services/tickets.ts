@@ -56,6 +56,7 @@ export type TicketFilters = {
   offset?: number;
   order?: 'asc' | 'desc';
   listSort?: 'created' | 'label' | 'newest' | 'newest_urgent' | 'oldest' | 'priority_desc' | 'priority_asc' | 'updated_desc' | 'updated_asc';
+  projectPage?: boolean;
   after?: { createdAt: string; id: string };
 };
 
@@ -191,7 +192,7 @@ function buildTicketFilterConditions(projectIds: string[], filters: TicketFilter
     )!);
   }
   if (filters.teamId) conditions.push(eq(projects.teamId, filters.teamId));
-  if (filters.listSort && filters.query) {
+  if (filters.projectPage && filters.query) {
     const term = filters.query.trim().toLowerCase();
     const token = term.replace(/[^a-z0-9]+/g, '');
     const fields = [tickets.title, tickets.key, tickets.description, tickets.branchName];
@@ -210,10 +211,10 @@ function buildTicketFilterConditions(projectIds: string[], filters: TicketFilter
   if (filters.updatedAfter) conditions.push(gte(tickets.updatedAt, filters.updatedAfter));
   if (filters.updatedBefore) conditions.push(lte(tickets.updatedAt, filters.updatedBefore));
 
-  if (filters.status) conditions.push(filters.listSort
+  if (filters.status) conditions.push(filters.projectPage
     ? inArray(tickets.status, filters.status.split(',').map((value) => canonicalizeStatus(value.trim())))
     : eq(tickets.status, canonicalizeStatus(filters.status)));
-  if (filters.priority) conditions.push(filters.listSort
+  if (filters.priority) conditions.push(filters.projectPage
     ? inArray(tickets.priority, filters.priority.split(',').map((value) => canonicalizePriority(value.trim())))
     : eq(tickets.priority, canonicalizePriority(filters.priority)));
   if (filters.assigneeId) {
@@ -565,7 +566,7 @@ export async function listWorkspaceTickets(projectIds: string[], filters: Ticket
 
   const direction = filters.order === 'desc' ? desc : asc;
   const priorityRank = sql<number>`case ${tickets.priority} when 'urgent' then 4 when 'high' then 3 when 'medium' then 2 when 'low' then 1 else 0 end`;
-  const firstLabelName = sql<string>`(select ${labels.name} from ${ticketLabels} inner join ${labels} on ${labels.id} = ${ticketLabels.labelId} where ${ticketLabels.ticketId} = ${tickets.id} order by ${ticketLabels.labelId} limit 1)`;
+  const firstLabelName = sql<string>`(select ${labels.name} from ${ticketLabels} inner join ${labels} on ${labels.id} = ${ticketLabels.labelId} where ${ticketLabels.ticketId} = ${tickets.id} order by ${labels.sortOrder}, ${labels.name}, ${labels.id} limit 1)`;
   const listOrder = (() => {
     switch (filters.listSort) {
       case 'created': case 'oldest': return [asc(tickets.createdAt), asc(tickets.id)];
